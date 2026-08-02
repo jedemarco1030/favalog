@@ -5,26 +5,42 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const posters = [
+  // Movies
   ["afterglow", "Afterglow", "#3d1f4f", "#f0a97a"],
   ["paperlantern", "Paper Lantern", "#22334d", "#e8c07d"],
   ["lowcountry", "Low Country", "#0f1b1a", "#88b4a1"],
+  ["duneparttwo", "Dune: Part Two", "#3a2410", "#e0a760"],
+  ["quietsignal", "Quiet Signal", "#141a2e", "#8fb3ff"],
+  ["thecartographer", "The Cartographer", "#1a2a1a", "#c7d68f"],
+  // TV
   ["northlight", "Northlight", "#0e1f3a", "#a78bff"],
   ["gildedroom", "The Gilded Room", "#2b1a0e", "#d9a76b"],
+  ["harbourlines", "Harbour Lines", "#0f2530", "#7fd1c1"],
+  ["latecheckin", "Late Check-In", "#2e1420", "#f291b8"],
+  // Books
   ["smallhours", "The Small Hours", "#1a1420", "#c7bfd6"],
   ["orbitalnotes", "Orbital Notes", "#0f1a24", "#7fb2d1"],
   ["brightindex", "The Bright Index", "#241a2e", "#f2c26b"],
+  ["salttide", "Salt Tide", "#0f2028", "#a0d8e0"],
+  ["theweightofsand", "The Weight of Sand", "#2a1e10", "#e6c99a"],
 ];
 
 const backdrops = [
   ["afterglow", "#3d1f4f", "#0b0b0f", "#f0a97a"],
   ["northlight", "#0e1f3a", "#0b0b0f", "#a78bff"],
   ["brightindex", "#241a2e", "#0b0b0f", "#f2c26b"],
+  ["duneparttwo", "#3a2410", "#0b0b0f", "#e0a760"],
+  ["harbourlines", "#0f2530", "#0b0b0f", "#7fd1c1"],
 ];
 
 const avatars = [
   ["ari", "AO", "#3a2450"],
   ["mira", "MB", "#1e3a3a"],
   ["jules", "JM", "#3a2a1e"],
+  ["sana", "SI", "#1e2a3a"],
+  ["ravi", "RM", "#3a1e2a"],
+  ["camille", "CA", "#2a3a1e"],
+  ["devon", "DH", "#2a1e3a"],
 ];
 
 function posterSvg(title, bg, accent) {

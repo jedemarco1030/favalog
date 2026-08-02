@@ -38,7 +38,7 @@ by default.
 ```
 app/                     App Router routes, layouts, and global styles
   layout.tsx             Root layout — fonts, metadata, header, footer
-  page.tsx               Home page (hero + media rows + activity feed)
+  page.tsx               Home page (hero collage, Trending this week, From your circle, Popular reviews, Because you liked …, and a Build your Favalog CTA)
   globals.css            Tailwind entry + design tokens
   explore/page.tsx       Explore placeholder
   diary/page.tsx         Diary placeholder
@@ -123,7 +123,10 @@ and lightweight placeholders** for every primary destination:
   `Review`, `Rating`, `List`, `ActivityItem` (every `MediaItem` has a
   stable `slug`, distinct from its display title)
 - Mock data layer at `lib/data`
-- Home page with hero, movie / TV / book rows, and a feed preview
+- Home page composed of a hero (with a mixed movie / TV / book collage),
+  a unified **Trending this week** row, a **From your circle** social feed,
+  a **Popular reviews** section, a **Because you liked …** cross-media
+  recommendation preview, and a closing **Build your Favalog** CTA
 
 ### Primary navigation
 

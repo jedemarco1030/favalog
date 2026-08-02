@@ -28,6 +28,42 @@ export const users: User[] = [
     followerCount: 3421,
     followingCount: 187,
   },
+  {
+    id: "u_sana",
+    handle: "sana",
+    displayName: "Sana Iyer",
+    avatarUrl: "/media/avatars/sana.svg",
+    bio: "Reads on the train. Watches at 1x. No skipping intros.",
+    followerCount: 612,
+    followingCount: 240,
+  },
+  {
+    id: "u_ravi",
+    handle: "ravi",
+    displayName: "Ravi Menon",
+    avatarUrl: "/media/avatars/ravi.svg",
+    bio: "Series completionist. Currently rationing the finale.",
+    followerCount: 2015,
+    followingCount: 143,
+  },
+  {
+    id: "u_camille",
+    handle: "camille",
+    displayName: "Camille Roux",
+    avatarUrl: "/media/avatars/camille.svg",
+    bio: "Bookshops on holiday. Cinemas on Tuesdays.",
+    followerCount: 774,
+    followingCount: 302,
+  },
+  {
+    id: "u_devon",
+    handle: "devon",
+    displayName: "Devon Halle",
+    avatarUrl: "/media/avatars/devon.svg",
+    bio: "Essays, essays, essays. And the occasional slow film.",
+    followerCount: 1892,
+    followingCount: 220,
+  },
 ];
 
 export function getUserById(id: string): User | undefined {
