@@ -1,5 +1,5 @@
 /**
- * Core domain models for Lorely.
+ * Core domain models for Favalog.
  *
  * These types are intentionally framework-agnostic so they can be reused
  * by the current mock data layer and by a future backend/API layer without
@@ -9,11 +9,16 @@
 export type MediaKind = "movie" | "tv" | "book";
 
 /**
- * The shared shape every trackable title in Lorely conforms to.
+ * The shared shape every trackable title in Favalog conforms to.
  * Type-specific fields live on the discriminated variants below.
  */
 export interface MediaItemBase {
   id: string;
+  /**
+   * Stable, URL-safe identifier used for `/title/[slug]` routes.
+   * Distinct from `id` so that a display title change never breaks a URL.
+   */
+  slug: string;
   kind: MediaKind;
   title: string;
   /** Optional subtitle, e.g. a book's subtitle or a film's original title. */

@@ -7,7 +7,7 @@ interface LogoProps {
 }
 
 /**
- * Lorely wordmark. Uses the display serif token from `--font-display`.
+ * Favalog wordmark. Uses the display serif token from `--font-display`.
  * The trailing dot uses the accent color so the brand feels editorial,
  * not techy.
  */
@@ -19,7 +19,7 @@ export function Logo({ className, plain = false }: LogoProps) {
         className,
       )}
     >
-      lorely
+      favalog
       {!plain && <span className="text-accent">.</span>}
     </span>
   );

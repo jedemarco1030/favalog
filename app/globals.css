@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
- * Lorely design tokens.
+ * Favalog design tokens.
  * Dark-first, cinematic, editorial. Colors are near-black charcoal with
  * subtle elevated surfaces, warm off-white foregrounds, and an electric
  * violet accent. Tokens are exposed to Tailwind through the `@theme inline`

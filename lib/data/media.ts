@@ -12,6 +12,7 @@ import type { Book, MediaItem, Movie, TVShow } from "@/lib/types";
 export const movies: Movie[] = [
   {
     id: "m_afterglow",
+    slug: "afterglow",
     kind: "movie",
     title: "Afterglow",
     synopsis:
@@ -27,6 +28,7 @@ export const movies: Movie[] = [
   },
   {
     id: "m_paperlantern",
+    slug: "paper-lantern",
     kind: "movie",
     title: "Paper Lantern",
     synopsis:
@@ -41,6 +43,7 @@ export const movies: Movie[] = [
   },
   {
     id: "m_lowcountry",
+    slug: "low-country",
     kind: "movie",
     title: "Low Country",
     synopsis:
@@ -58,6 +61,7 @@ export const movies: Movie[] = [
 export const tvShows: TVShow[] = [
   {
     id: "t_northlight",
+    slug: "northlight",
     kind: "tv",
     title: "Northlight",
     synopsis:
@@ -74,6 +78,7 @@ export const tvShows: TVShow[] = [
   },
   {
     id: "t_gildedroom",
+    slug: "the-gilded-room",
     kind: "tv",
     title: "The Gilded Room",
     synopsis:
@@ -92,6 +97,7 @@ export const tvShows: TVShow[] = [
 export const books: Book[] = [
   {
     id: "b_smallhours",
+    slug: "the-small-hours",
     kind: "book",
     title: "The Small Hours",
     subtitle: "A Novel",
@@ -107,6 +113,7 @@ export const books: Book[] = [
   },
   {
     id: "b_orbital_notes",
+    slug: "orbital-notes",
     kind: "book",
     title: "Orbital Notes",
     synopsis:
@@ -120,6 +127,7 @@ export const books: Book[] = [
   },
   {
     id: "b_bright_index",
+    slug: "the-bright-index",
     kind: "book",
     title: "The Bright Index",
     synopsis:
@@ -139,6 +147,10 @@ export const mediaItems: MediaItem[] = [...movies, ...tvShows, ...books];
 
 export function getMediaById(id: string): MediaItem | undefined {
   return mediaItems.find((item) => item.id === id);
+}
+
+export function getMediaBySlug(slug: string): MediaItem | undefined {
+  return mediaItems.find((item) => item.slug === slug);
 }
 
 export function getMediaByKind(kind: MediaItem["kind"]): MediaItem[] {

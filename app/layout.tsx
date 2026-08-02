@@ -3,6 +3,8 @@ import { Fraunces, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
+import { MobileNav } from "@/components/layout/mobile-nav";
+import { siteConfig } from "@/lib/site-config";
 
 const inter = Inter({
   variable: "--font-sans-family",
@@ -23,17 +25,14 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
-const siteUrl = "https://lorely.app";
-
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
+  metadataBase: new URL(siteConfig.url),
   title: {
-    default: "Lorely — Everything you watch and read",
-    template: "%s · Lorely",
+    default: `${siteConfig.name} — Everything you watch and read`,
+    template: `%s · ${siteConfig.name}`,
   },
-  description:
-    "Lorely is a social home for everything you watch and read. Track films, series, and books, rate them, review them, and remember them.",
-  applicationName: "Lorely",
+  description: siteConfig.shortDescription,
+  applicationName: siteConfig.name,
   keywords: [
     "movies",
     "tv shows",
@@ -41,23 +40,21 @@ export const metadata: Metadata = {
     "reviews",
     "tracking",
     "social",
-    "letterboxd",
-    "goodreads",
   ],
-  authors: [{ name: "Lorely" }],
+  authors: [{ name: siteConfig.name }],
   openGraph: {
     type: "website",
-    url: siteUrl,
-    title: "Lorely — Everything you watch and read",
+    url: siteConfig.url,
+    title: `${siteConfig.name} — Everything you watch and read`,
     description:
-      "One social home for everything you watch and read. Films, series, and books.",
-    siteName: "Lorely",
+      "One social home for everything you watch and read. Movies, TV, and books.",
+    siteName: siteConfig.name,
   },
   twitter: {
     card: "summary_large_image",
-    title: "Lorely — Everything you watch and read",
+    title: `${siteConfig.name} — Everything you watch and read`,
     description:
-      "One social home for everything you watch and read. Films, series, and books.",
+      "One social home for everything you watch and read. Movies, TV, and books.",
   },
 };
 
@@ -78,6 +75,7 @@ export default function RootLayout({
         <SiteHeader />
         <main className="flex-1">{children}</main>
         <SiteFooter />
+        <MobileNav />
       </body>
     </html>
   );

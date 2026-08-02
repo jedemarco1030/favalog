@@ -9,7 +9,7 @@ interface ContainerProps {
 
 /**
  * Centered page-width wrapper. Uses generous horizontal padding
- * on larger screens to match Lorely's editorial feel.
+ * on larger screens to match Favalog's editorial feel.
  */
 export function Container({ as: Tag = "div", className, children }: ContainerProps) {
   return (

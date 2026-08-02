@@ -1,60 +1,63 @@
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { Bell } from "lucide-react";
 import { Container } from "@/components/ui/container";
 import { Logo } from "@/components/brand/logo";
-
-const NAV = [
-  { href: "/", label: "Home" },
-  { href: "/films", label: "Films" },
-  { href: "/series", label: "Series" },
-  { href: "/books", label: "Books" },
-  { href: "/activity", label: "Activity" },
-] as const;
+import { SearchInput } from "@/components/ui/search-input";
+import { UserAvatar } from "@/components/user/user-avatar";
+import { PrimaryNavLinks } from "@/components/layout/primary-nav-links";
+import { users } from "@/lib/data";
 
 /**
- * Top navigation bar. Links point at routes that will be filled in during
- * subsequent MVP work — for now they are anchor placeholders so the shell
- * is fully keyboard-navigable and screen-reader friendly.
+ * Application shell top bar. A Server Component: wordmark, primary nav
+ * (desktop only — primary destinations move to `MobileNav`'s bottom tab
+ * bar on small screens), search field (desktop only — mobile search lives
+ * in the tab bar's search sheet), notifications button, and an avatar menu
+ * placeholder. Both breakpoints get notifications and the avatar here.
+ *
+ * `SearchInput`, `Bell`, and the avatar are intentionally presentation-only
+ * — no backend, no auth, no notifications yet.
  */
 export function SiteHeader() {
+  // Purely visual: pick a stable mock viewer so the avatar has a real image.
+  const viewer = users[0];
+
   return (
     <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-md">
-      <Container className="flex h-16 items-center justify-between gap-6">
+      <Container className="flex h-16 items-center gap-4">
         <Link
           href="/"
           className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          aria-label="Lorely home"
+          aria-label="Favalog — home"
         >
           <Logo />
         </Link>
-        <nav aria-label="Primary" className="hidden md:block">
-          <ul className="flex items-center gap-7 text-sm text-foreground/70">
-            {NAV.map((item) => (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  className="rounded transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                >
-                  {item.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
+
+        {/* Desktop primary nav */}
+        <nav aria-label="Primary" className="ml-4 hidden md:block">
+          <PrimaryNavLinks />
         </nav>
-        <div className="flex items-center gap-3">
+
+        {/* Desktop search — expands to take the remaining space */}
+        <div className="ml-auto hidden max-w-sm flex-1 md:block">
+          <SearchInput hint="⌘K" />
+        </div>
+
+        {/* Right-hand utility cluster (notifications + avatar) */}
+        <div className="ml-auto flex items-center gap-2 md:ml-0">
           <button
             type="button"
-            className="inline-flex size-9 items-center justify-center rounded-full border border-border/70 bg-surface-1 text-foreground/70 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            aria-label="Search"
+            aria-label="Notifications"
+            className="relative inline-flex size-9 items-center justify-center rounded-full border border-border/70 bg-surface-1 text-foreground/70 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            <Search className="size-4" aria-hidden="true" />
+            <Bell className="size-4" aria-hidden="true" />
           </button>
-          <Link
-            href="/join"
-            className="hidden rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:inline-flex"
+          <button
+            type="button"
+            aria-label="Account menu"
+            className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
-            Join Lorely
-          </Link>
+            <UserAvatar user={viewer} size="md" decorative />
+          </button>
         </div>
       </Container>
     </header>

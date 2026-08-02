@@ -1,16 +1,17 @@
-# Lorely
+# Favalog
 
 > **Everything you watch and read. One place to remember it.**
 
-Lorely is a social entertainment platform that combines the ideas behind
-Letterboxd and Goodreads into a single home for films, television, and books.
-Track what you watch and read, rate it, review it, build lists, follow other
-people, and remember it later.
+Favalog is a social entertainment platform where people track, rate, review,
+organize, and discover the movies, TV, and books they love. Long-term, a
+person's Favalog becomes a living record of their taste — the things they
+watch, read, and love, and eventually the games, music, and other interests
+that make up their taste.
 
-This repository is the **frontend MVP**. It is deliberately built against a
-typed mock-data layer — there is no backend, no authentication, no external
-media API, and no AI yet. The architecture is designed so those pieces can
-drop in later without touching the UI code.
+The current MVP scope is **movies, TV, and books**. This repository is built
+against a typed mock-data layer — there is no backend, no authentication, no
+external media API, and no AI yet. The architecture is designed so those
+pieces can drop in later without rewriting the UI.
 
 ---
 
@@ -39,16 +40,27 @@ app/                     App Router routes, layouts, and global styles
   layout.tsx             Root layout — fonts, metadata, header, footer
   page.tsx               Home page (hero + media rows + activity feed)
   globals.css            Tailwind entry + design tokens
+  explore/page.tsx       Explore placeholder
+  diary/page.tsx         Diary placeholder
+  lists/page.tsx         Lists placeholder
+  title/[slug]/page.tsx  Title detail placeholder, keyed by `MediaItem.slug`
 
 components/
   brand/                 Wordmark and brand-only assets
-  layout/                Site header and footer
-  ui/                    Design-system primitives (Container, Badge, StarRating)
-  media/                 MediaCard and related presentational components
+  layout/                Site header, footer, primary nav, mobile nav
+  ui/                    Design-system primitives (Container, Badge,
+                         StarRating, RatingDisplay, SearchInput,
+                         SectionHeader, EmptyState, Skeleton)
+  media/                 MediaCard, MediaPoster, MediaTypeBadge,
+                         HorizontalMediaRow
   activity/              ActivityCard used by the feed
+  reviews/               ReviewCard
+  user/                  UserAvatar, ProfileStats
+  skeletons/             Media, activity/feed, and profile skeletons
 
 lib/
   types.ts               Strongly typed domain models
+  site-config.ts         Centralized brand name, tagline, and site URL
   cn.ts                  Class name joiner utility
   data/                  Mock data layer (users, media, activity, index)
 
@@ -91,20 +103,40 @@ node scripts/generate-placeholders.mjs
 
 ## MVP scope (current)
 
-The current implementation covers the **foundation** only:
+The current implementation covers the **application shell, shared UI layer,
+and lightweight placeholders** for every primary destination:
 
 - Design system: dark-first tokens, editorial typography, accent color
-- Root layout with SEO metadata, viewport, and Open Graph tags
-- Reusable primitives: `Container`, `Badge`, `StarRating`, `MediaCard`,
-  `ActivityCard`, `SiteHeader`, `SiteFooter`, `Logo`
+- Root layout with deployment-aware SEO metadata and Open Graph tags,
+  centralized in `lib/site-config.ts`
+- Responsive top navigation: wordmark, primary nav, search field,
+  notifications, avatar menu, and a dedicated mobile sheet
+- Reusable primitives: `Container`, `Badge`, `StarRating`, `RatingDisplay`,
+  `SearchInput`, `SectionHeader`, `EmptyState`, `Skeleton`
+- Media components: `MediaCard`, `MediaPoster`, `MediaTypeBadge`,
+  `HorizontalMediaRow`
+- Social components: `ActivityCard`, `ReviewCard`, `UserAvatar`,
+  `ProfileStats`
+- Loading states: `MediaCardSkeleton`, `MediaRowSkeleton`,
+  `ActivityCardSkeleton`, `FeedSkeleton`, `ProfileSkeleton`
 - Typed domain models: `User`, `MediaItem`, `Movie`, `TVShow`, `Book`,
-  `Review`, `Rating`, `List`, `ActivityItem`
+  `Review`, `Rating`, `List`, `ActivityItem` (every `MediaItem` has a
+  stable `slug`, distinct from its display title)
 - Mock data layer at `lib/data`
-- Home page with hero, film / series / book rows, and a feed preview
+- Home page with hero, movie / TV / book rows, and a feed preview
 
-Detail routes (`/films`, `/series`, `/books`, `/activity`, `/join`) are linked
-in the navigation but not yet implemented — they will be built on top of this
-foundation.
+### Primary navigation
+
+| Route              | Status                                                        |
+| ------------------ | -------------------------------------------------------------- |
+| `/`                | Implemented (home)                                              |
+| `/explore`         | Placeholder — media-type filter (All, Movies, TV, Books) is next |
+| `/diary`           | Placeholder — personal activity log is next                     |
+| `/lists`           | Placeholder — building and sharing lists is next                |
+| `/title/[slug]`    | Placeholder — shows title, artwork, and synopsis; full detail page (cast, reviews, ratings breakdown) is next |
+
+Movies, TV, and books are **not** top-level destinations. They are media
+types that will be filtered inside `/explore`.
 
 ---
 
@@ -123,7 +155,15 @@ foundation.
   the few Client Components that need it.
 - **Recommendations & stats**: derived views built on top of activity —
   intentionally out of scope until the write path exists.
-- **Search**: full-text search over `MediaItem` served from the backend.
+- **Search**: full-text search over `MediaItem` served from the backend. The
+  header's `SearchInput` is presentation-only for now.
+- **Canonical domain**: the site URL is resolved in `lib/site-config.ts` from
+  `NEXT_PUBLIC_SITE_URL`, then Vercel's `VERCEL_URL`, then
+  `http://localhost:3000` in development, falling back to the current
+  deployment at `https://favalog.vercel.app`. When a production domain
+  (e.g. `favalog.com`) is chosen and owned, either set
+  `NEXT_PUBLIC_SITE_URL` at deploy time or update the fallback in
+  `lib/site-config.ts`.
 
 ---
 

@@ -1,5 +1,7 @@
-import Image from "next/image";
+import Link from "next/link";
 import type { ActivityItem, MediaItem, User } from "@/lib/types";
+import { MediaPoster } from "@/components/media/media-poster";
+import { UserAvatar } from "@/components/user/user-avatar";
 import { StarRating } from "@/components/ui/star-rating";
 import { cn } from "@/lib/cn";
 
@@ -13,7 +15,7 @@ interface ActivityCardProps {
 const KIND_VERB: Record<ActivityItem["kind"], string> = {
   rated: "rated",
   reviewed: "reviewed",
-  listed: "added",
+  listed: "added to a list",
   finished: "finished",
   started: "started",
 };
@@ -24,8 +26,8 @@ const dateFormatter = new Intl.DateTimeFormat("en", {
 });
 
 /**
- * A single feed row. Renders who did what to which title, plus optional
- * rating and review excerpt.
+ * A single feed row: who did what to which title, with optional rating
+ * and review excerpt. The media title links to `/title/[slug]`.
  */
 export function ActivityCard({ activity, user, media, className }: ActivityCardProps) {
   return (
@@ -35,20 +37,31 @@ export function ActivityCard({ activity, user, media, className }: ActivityCardP
         className,
       )}
     >
-      <div className="relative size-16 shrink-0 overflow-hidden rounded-md bg-surface-2 sm:size-20">
-        <Image
-          src={media.posterUrl}
-          alt=""
-          fill
+      <Link
+        href={`/title/${media.slug}`}
+        aria-label={`View ${media.title}`}
+        className="shrink-0 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      >
+        <MediaPoster
+          item={media}
           sizes="80px"
-          className="object-cover"
+          decorative
+          className="size-16 rounded-md ring-0 sm:size-20"
         />
-      </div>
+      </Link>
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <p className="text-sm text-foreground/70">
-          <span className="font-medium text-foreground">{user.displayName}</span>{" "}
-          <span>{KIND_VERB[activity.kind]}</span>{" "}
-          <span className="font-medium text-foreground">{media.title}</span>
+        <p className="flex flex-wrap items-center gap-1.5 text-sm text-foreground/70">
+          <UserAvatar user={user} size="sm" decorative />
+          <span className="font-medium text-foreground">
+            {user.displayName}
+          </span>
+          <span>{KIND_VERB[activity.kind]}</span>
+          <Link
+            href={`/title/${media.slug}`}
+            className="font-medium text-foreground transition-colors hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            {media.title}
+          </Link>
         </p>
         {activity.rating != null && <StarRating value={activity.rating} />}
         {activity.excerpt && (
