@@ -1,26 +1,62 @@
 @import "tailwindcss";
 
+/*
+ * Lorely design tokens.
+ * Dark-first, cinematic, editorial. Colors are near-black charcoal with
+ * subtle elevated surfaces, warm off-white foregrounds, and an electric
+ * violet accent. Tokens are exposed to Tailwind through the `@theme inline`
+ * block below so utilities like `bg-surface-1` and `text-accent` work.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: dark;
+
+  /* Base surfaces */
+  --background: #0b0b0f;      /* near-black charcoal */
+  --surface-1: #14141a;       /* first elevation */
+  --surface-2: #1c1c24;       /* second elevation, chips / poster bg */
+
+  /* Text */
+  --foreground: #f4efe6;      /* warm off-white */
+  --foreground-muted: #a6a19a;
+
+  /* Borders */
+  --border: #26262f;
+
+  /* Brand accent — electric violet with a coral shift on hover states */
+  --accent: #a78bff;
+  --accent-strong: #8b6bff;
+  --accent-foreground: #0b0b0f;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-foreground-muted: var(--foreground-muted);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --font-sans: var(--font-sans-family);
+  --font-mono: var(--font-mono-family);
+  --font-display: var(--font-display-family);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+html,
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+body {
+  font-family: var(--font-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: color-mix(in oklch, var(--accent) 40%, transparent);
+  color: var(--foreground);
 }
