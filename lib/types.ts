@@ -138,3 +138,32 @@ export interface ActivityItem {
   /** Optional short excerpt, e.g. for a review activity card. */
   excerpt?: string;
 }
+
+/**
+ * The verb describing what a user did when they logged a title in their diary.
+ * The vocabulary is deliberately media-aware: films/series are watched, books
+ * are read, and either can be revisited.
+ */
+export type DiaryAction = "watched" | "rewatched" | "read" | "reread";
+
+/**
+ * A single chronological entry in a user's unified entertainment diary — the
+ * record of a title they watched or read on a given day.
+ *
+ * Media is referenced by `mediaId` (resolved against the catalog) rather than
+ * embedded, and any attached review is referenced by `reviewId` rather than
+ * duplicated, so a diary entry stays a thin log row.
+ */
+export interface DiaryEntry {
+  id: string;
+  userId: string;
+  mediaId: string;
+  /** ISO timestamp of when the title was logged (the diary date). */
+  loggedAt: string;
+  /** The verb for this entry; defaults are derived from the media kind. */
+  action?: DiaryAction;
+  /** The rating the user gave at log time, if they rated it. */
+  rating?: RatingValue;
+  /** Id of an associated `Review`, if the user wrote one. */
+  reviewId?: string;
+}

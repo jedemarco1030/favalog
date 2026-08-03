@@ -83,6 +83,38 @@ export const reviews: Review[] = [
     likeCount: 33,
     containsSpoilers: false,
   },
+  {
+    id: "r_8",
+    userId: "u_ari",
+    mediaId: "t_harbourlines",
+    rating: 4,
+    title: "A logbook of a show",
+    body: "Watched two a night for a week. It rewards patience — by the finale the dispatcher's ledger felt like my own.",
+    createdAt: "2026-06-22T21:10:00.000Z",
+    likeCount: 47,
+    containsSpoilers: false,
+  },
+  {
+    id: "r_9",
+    userId: "u_ari",
+    mediaId: "b_bright_index",
+    rating: 4.5,
+    title: "Catalogues that read like spells",
+    body: "Aldana turns a defunded archive into the most hopeful place on the page. I finished it and immediately reshelved my own books.",
+    createdAt: "2026-05-09T08:40:00.000Z",
+    likeCount: 39,
+    containsSpoilers: false,
+  },
+  {
+    id: "r_10",
+    userId: "u_ari",
+    mediaId: "m_afterglow",
+    rating: 4,
+    body: "A second watch. Quieter than I remembered, and better for it.",
+    createdAt: "2026-03-30T19:55:00.000Z",
+    likeCount: 21,
+    containsSpoilers: false,
+  },
 ];
 
 export const lists: List[] = [
@@ -269,6 +301,12 @@ export function getReviewsForMedia(mediaId: string): Review[] {
   return reviews
     .filter((review) => review.mediaId === mediaId)
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+}
+
+/** Look up a single review by id. Kept in the data layer so consumers that
+ * only hold a `reviewId` (such as diary entries) never touch the raw array. */
+export function getReviewById(id: string): Review | undefined {
+  return reviews.find((review) => review.id === id);
 }
 
 /**

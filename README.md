@@ -41,7 +41,7 @@ app/                     App Router routes, layouts, and global styles
   page.tsx               Home page (hero collage, Trending this week, From your circle, Popular reviews, Because you liked …, and a Build your Favalog CTA)
   globals.css            Tailwind entry + design tokens
   explore/page.tsx       Explore — search, media-type filter, and editorial shelves
-  diary/page.tsx         Diary placeholder
+  diary/page.tsx         Diary — unified newest-first log of watched / read titles with a media-type filter
   lists/page.tsx         Lists placeholder
   title/[slug]/page.tsx  Unified movie / TV / book detail page, keyed by `MediaItem.slug`
   not-found.tsx          Site-wide 404 for unmatched routes and `notFound()`
@@ -56,6 +56,8 @@ components/
                          HorizontalMediaRow, MediaHero, MediaActions,
                          MediaDetails, RatingBreakdown
   activity/              ActivityCard used by the feed
+  diary/                 DiaryTimeline, DiaryEntry, DiarySummary, and the
+                         shared diary view-model/helpers
   reviews/               ReviewCard
   user/                  UserAvatar, ProfileStats
   skeletons/             Media, activity/feed, and profile skeletons
@@ -64,7 +66,7 @@ lib/
   types.ts               Strongly typed domain models
   site-config.ts         Centralized brand name, tagline, and site URL
   cn.ts                  Class name joiner utility
-  data/                  Mock data layer (users, media, activity, index)
+  data/                  Mock data layer (users, media, activity, diary, index)
 
 public/media/            Local SVG placeholder posters, backdrops, avatars
 
@@ -122,8 +124,8 @@ and lightweight placeholders** for every primary destination:
 - Loading states: `MediaCardSkeleton`, `MediaRowSkeleton`,
   `ActivityCardSkeleton`, `FeedSkeleton`, `ProfileSkeleton`
 - Typed domain models: `User`, `MediaItem`, `Movie`, `TVShow`, `Book`,
-  `Review`, `Rating`, `List`, `ActivityItem` (every `MediaItem` has a
-  stable `slug`, distinct from its display title)
+  `Review`, `Rating`, `List`, `ActivityItem`, `DiaryEntry` (every
+  `MediaItem` has a stable `slug`, distinct from its display title)
 - Mock data layer at `lib/data`
 - Home page composed of a hero (with a mixed movie / TV / book collage),
   a unified **Trending this week** row, a **From your circle** social feed,
@@ -136,7 +138,7 @@ and lightweight placeholders** for every primary destination:
 | ------------------ | -------------------------------------------------------------- |
 | `/`                | Implemented (home)                                              |
 | `/explore`         | Implemented — local search, All / Movies / TV / Books filter, editorial shelves |
-| `/diary`           | Placeholder — personal activity log is next                     |
+| `/diary`           | Implemented — unified newest-first diary of movies, TV, and books, grouped by month, with All / Movies / TV / Books local filtering and a derived activity summary |
 | `/lists`           | Placeholder — building and sharing lists is next                |
 | `/title/[slug]`    | Implemented — unified detail page for movies, TV, and books with adaptive credits, community rating breakdown, popular reviews, and cross-media "More like this" |
 
@@ -177,6 +179,44 @@ types that will be filtered inside `/explore`.
   is a deterministic interleave, "popular" sorts by `averageRating`, and
   "hidden gems" is a curated id list in the data layer. All of these are
   drop-in replaceable once a real backend exists.
+
+### Diary (`/diary`)
+
+`/diary` is the personal, chronological record of everything a user has
+watched and read. Movies, TV, and books share **one** newest-first timeline —
+there are no per-kind diary routes.
+
+- **Unified log-entry model.** A typed `DiaryEntry` (`lib/types.ts`) has
+  stable identity and references media by `mediaId` and any review by
+  `reviewId` — never embedding a full `MediaItem` or duplicating review
+  bodies. Deterministic mock entries spanning several months of 2026 live in
+  `lib/data/diary.ts` alongside selectors: `getDiaryEntriesForUser`,
+  `getDiaryEntryMedia`, `getDiaryEntriesByType`, and `getDiarySummary`.
+- **Derived activity summary.** The restrained summary strip (total logged
+  this year plus a films / series / books breakdown) is computed from the
+  diary itself via `getDiarySummary`, so the counts can never drift from the
+  log. It is intentionally a single line, not a stats dashboard.
+- **Month-grouped timeline.** Entries are grouped by month and ordered newest
+  first. Each row shows the date, cover artwork, title, year, media type, the
+  action taken (watched / rewatched / read / reread), the user's rating if
+  present, and a small review indicator with a one-line excerpt when a review
+  exists. Both artwork and title link to `/title/[slug]`. Dates are formatted
+  with native `Intl.DateTimeFormat` — no date library was added.
+- **Local media-type filtering.** All / Movies / TV / Books, implemented as
+  `aria-pressed` toggle buttons (`All` is the default). Filtering runs
+  entirely on the client against the already-resolved entries and mirrors to
+  the URL as `?type=…` via `router.replace`; `type=all` is omitted so the
+  default URL stays clean. Each empty filter shows concise copy
+  (e.g. "No books logged yet.").
+- **Server-first.** The page resolves every `DiaryEntry` into a flat,
+  serializable view model on the server (looking up media and review by id),
+  so the only Client Component (`DiaryTimeline`) filters the array it is given
+  and never touches the data layer. The header, summary, and entry rows
+  otherwise render as Server Components.
+- **Responsive & accessible.** A single `h1`, month headings as `h2`, a
+  responsive list/timeline (no wide desktop table) with compact artwork and a
+  readable date rail on mobile, meaningful link names, `aria-pressed` filter
+  state, visible focus rings, and screen-reader-friendly star ratings.
 
 ### Title detail (`/title/[slug]`)
 
@@ -227,8 +267,11 @@ titles can change without breaking links. Invalid slugs use Next.js
   Server Components via `cookies()`; no client-side auth state.
 - **Media metadata**: integrate real catalogs (e.g. TMDB, OpenLibrary) behind
   the `MediaItem` type so the UI keeps working through the transition.
-- **Activity & lists**: persist per-user activity, follows, and lists in a
-  database; feed becomes a real query rather than a static array.
+- **Activity, diary & lists**: persist per-user activity, diary/log entries,
+  follows, and lists in a database, keyed to the authenticated user; the feed
+  and diary become real queries rather than static arrays. Diary write actions
+  (log / rate / review a title) are intentionally out of scope until the write
+  path and authentication exist.
 - **Reviews & ratings**: server actions for create/update; optimistic UI in
   the few Client Components that need it.
 - **Recommendations & stats**: derived views built on top of activity —
