@@ -5,6 +5,8 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { siteConfig } from "@/lib/site-config";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const inter = Inter({
   variable: "--font-sans-family",
@@ -76,6 +78,8 @@ export default function RootLayout({
         <main className="flex-1">{children}</main>
         <SiteFooter />
         <MobileNav />
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

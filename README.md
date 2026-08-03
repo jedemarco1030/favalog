@@ -40,7 +40,7 @@ app/                     App Router routes, layouts, and global styles
   layout.tsx             Root layout — fonts, metadata, header, footer
   page.tsx               Home page (hero collage, Trending this week, From your circle, Popular reviews, Because you liked …, and a Build your Favalog CTA)
   globals.css            Tailwind entry + design tokens
-  explore/page.tsx       Explore placeholder
+  explore/page.tsx       Explore — search, media-type filter, and editorial shelves
   diary/page.tsx         Diary placeholder
   lists/page.tsx         Lists placeholder
   title/[slug]/page.tsx  Title detail placeholder, keyed by `MediaItem.slug`
@@ -114,7 +114,7 @@ and lightweight placeholders** for every primary destination:
 - Reusable primitives: `Container`, `Badge`, `StarRating`, `RatingDisplay`,
   `SearchInput`, `SectionHeader`, `EmptyState`, `Skeleton`
 - Media components: `MediaCard`, `MediaPoster`, `MediaTypeBadge`,
-  `HorizontalMediaRow`
+  `HorizontalMediaRow`, `ExploreDiscovery`
 - Social components: `ActivityCard`, `ReviewCard`, `UserAvatar`,
   `ProfileStats`
 - Loading states: `MediaCardSkeleton`, `MediaRowSkeleton`,
@@ -133,13 +133,48 @@ and lightweight placeholders** for every primary destination:
 | Route              | Status                                                        |
 | ------------------ | -------------------------------------------------------------- |
 | `/`                | Implemented (home)                                              |
-| `/explore`         | Placeholder — media-type filter (All, Movies, TV, Books) is next |
+| `/explore`         | Implemented — local search, All / Movies / TV / Books filter, editorial shelves |
 | `/diary`           | Placeholder — personal activity log is next                     |
 | `/lists`           | Placeholder — building and sharing lists is next                |
 | `/title/[slug]`    | Placeholder — shows title, artwork, and synopsis; full detail page (cast, reviews, ratings breakdown) is next |
 
 Movies, TV, and books are **not** top-level destinations. They are media
 types that will be filtered inside `/explore`.
+
+### Explore
+
+`/explore` is the primary discovery surface for movies, TV, and books.
+
+- **Local search.** The interactive search field filters the mock catalog
+  as the user types, matching against title, subtitle, the credit
+  appropriate to each kind (director for movies, creators for TV,
+  authors for books), and genre tags. The searchable "haystack" for each
+  `MediaItem` is built in `lib/data` via `searchTermsFor` and pre-joined
+  on the server so the Client Component never has to understand which
+  discriminant carries which credit.
+- **Media-type filter.** All / Movies / TV / Books, implemented as
+  `aria-pressed` toggle buttons. `All` is the default. The filter also
+  applies while a search query is active, so results always respect both
+  axes.
+- **Editorial shelves.** When no search query is active, Explore renders
+  Trending now (mixed), Popular movies, Popular books, Popular
+  television, Critically acclaimed, New & noteworthy, and Hidden gems.
+  Every shelf is derived from the existing mock catalog via helpers in
+  `lib/data` (`getTrendingMedia`, `getPopular*`, `getCriticallyAcclaimed`,
+  `getNewAndNoteworthy`, `getHiddenGems`), which keeps the UI free of any
+  storage-shape assumptions.
+- **URL state.** Search and filter mirror to the URL as `?q=…&type=…`
+  via a debounced `router.replace`. Sharing `/explore?q=dune&type=book`
+  restores the same view; `type=all` is omitted so the default URL stays
+  clean.
+- **Server-first.** Only the search input, filter toggles, and their
+  results grid are a Client Component (`ExploreDiscovery`). The page
+  header and every editorial shelf render as Server Components using the
+  shared `HorizontalMediaRow` and `MediaCard`.
+- **Mock-data limitations.** The catalog is intentionally small; "trending"
+  is a deterministic interleave, "popular" sorts by `averageRating`, and
+  "hidden gems" is a curated id list in the data layer. All of these are
+  drop-in replaceable once a real backend exists.
 
 ---
 

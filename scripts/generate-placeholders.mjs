@@ -12,17 +12,30 @@ const posters = [
   ["duneparttwo", "Dune: Part Two", "#3a2410", "#e0a760"],
   ["quietsignal", "Quiet Signal", "#141a2e", "#8fb3ff"],
   ["thecartographer", "The Cartographer", "#1a2a1a", "#c7d68f"],
+  ["nightferry", "Night Ferry", "#101a2f", "#7f9dd9"],
+  ["arclighthouse", "Arc Lighthouse", "#0f1a24", "#f2e6b0"],
+  ["bluehourrun", "Blue Hour Run", "#0d1420", "#5aa8f2"],
+  ["slowmountain", "Slow Mountain", "#1a241e", "#a8c9a0"],
   // TV
   ["northlight", "Northlight", "#0e1f3a", "#a78bff"],
   ["gildedroom", "The Gilded Room", "#2b1a0e", "#d9a76b"],
   ["harbourlines", "Harbour Lines", "#0f2530", "#7fd1c1"],
   ["latecheckin", "Late Check-In", "#2e1420", "#f291b8"],
+  ["signalglass", "Signal Glass", "#1a1a2e", "#c0b3ff"],
+  ["ridgeandriver", "Ridge and River", "#1a2820", "#8fbfa1"],
+  ["paperwatch", "Paper Watch", "#241a14", "#e0c99a"],
+  ["undertheeaves", "Under the Eaves", "#2a1e2a", "#f2b3d1"],
   // Books
   ["smallhours", "The Small Hours", "#1a1420", "#c7bfd6"],
   ["orbitalnotes", "Orbital Notes", "#0f1a24", "#7fb2d1"],
   ["brightindex", "The Bright Index", "#241a2e", "#f2c26b"],
   ["salttide", "Salt Tide", "#0f2028", "#a0d8e0"],
   ["theweightofsand", "The Weight of Sand", "#2a1e10", "#e6c99a"],
+  ["thenorthroom", "The North Room", "#141a2a", "#b0c3f2"],
+  ["paperbirds", "Paper Birds", "#241a14", "#f2d9a8"],
+  ["quietinstruments", "Quiet Instruments", "#1a2028", "#9fc0d1"],
+  ["seasofglass", "Seas of Glass", "#0f2028", "#8fd1e0"],
+  ["theslowdial", "The Slow Dial", "#241e14", "#e0c087"],
 ];
 
 const backdrops = [
