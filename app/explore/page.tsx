@@ -77,44 +77,70 @@ export default async function ExplorePage({
   const newAndNoteworthy = getNewAndNoteworthy(5);
   const hiddenGems = getHiddenGems();
 
+  const shelves: Array<{
+    key: string;
+    title: string;
+    description: string;
+    items: MediaItem[];
+    priorityFirst?: boolean;
+  }> = [
+    {
+      key: "trending",
+      title: "Trending now",
+      description:
+        "Movies, shows, and books rising across Favalog this week.",
+      items: trending,
+      priorityFirst: true,
+    },
+    {
+      key: "popular-movies",
+      title: "Popular movies",
+      description: "What people are watching on the big screen right now.",
+      items: popularMovies,
+    },
+    {
+      key: "popular-books",
+      title: "Popular books",
+      description: "Novels and nonfiction that keep coming back to the top.",
+      items: popularBooks,
+    },
+    {
+      key: "popular-tv",
+      title: "Popular television",
+      description: "Series with the strongest recent word of mouth.",
+      items: popularTV,
+    },
+    {
+      key: "critically-acclaimed",
+      title: "Critically acclaimed",
+      description: "Highly rated across films, series, and books.",
+      items: criticallyAcclaimed,
+    },
+    {
+      key: "new-and-noteworthy",
+      title: "New & noteworthy",
+      description: "Fresh releases worth a look.",
+      items: newAndNoteworthy,
+    },
+    {
+      key: "hidden-gems",
+      title: "Hidden gems",
+      description: "Quieter titles we think deserve a bigger audience.",
+      items: hiddenGems,
+    },
+  ];
+
   const defaultSections = (
-    <div className="flex flex-col gap-16">
-      <HorizontalMediaRow
-        title="Trending now"
-        description="Movies, shows, and books rising across Favalog this week."
-        items={trending}
-        priorityFirst
-      />
-      <HorizontalMediaRow
-        title="Popular movies"
-        description="What people are watching on the big screen right now."
-        items={popularMovies}
-      />
-      <HorizontalMediaRow
-        title="Popular books"
-        description="Novels and nonfiction that keep coming back to the top."
-        items={popularBooks}
-      />
-      <HorizontalMediaRow
-        title="Popular television"
-        description="Series with the strongest recent word of mouth."
-        items={popularTV}
-      />
-      <HorizontalMediaRow
-        title="Critically acclaimed"
-        description="Highly rated across films, series, and books."
-        items={criticallyAcclaimed}
-      />
-      <HorizontalMediaRow
-        title="New & noteworthy"
-        description="Fresh releases worth a look."
-        items={newAndNoteworthy}
-      />
-      <HorizontalMediaRow
-        title="Hidden gems"
-        description="Quieter titles we think deserve a bigger audience."
-        items={hiddenGems}
-      />
+    <div key="default-sections" className="flex flex-col gap-16">
+      {shelves.map((shelf) => (
+        <HorizontalMediaRow
+          key={shelf.key}
+          title={shelf.title}
+          description={shelf.description}
+          items={shelf.items}
+          priorityFirst={shelf.priorityFirst}
+        />
+      ))}
     </div>
   );
 

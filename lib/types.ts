@@ -82,6 +82,21 @@ export interface Rating {
   createdAt: string;
 }
 
+/**
+ * Bucketed rating counts for a `MediaItem`, indexed by star bucket.
+ * Buckets are the integer star values 1..5; half-star ratings are folded
+ * into the nearest whole-star bucket for display in the histogram.
+ */
+export interface RatingDistribution {
+  mediaId: string;
+  /** Total number of ratings across all buckets. */
+  count: number;
+  /** Community average rating (0–5). */
+  average: number;
+  /** Count of ratings per whole-star bucket (index 0 -> 1★ … index 4 -> 5★). */
+  buckets: [number, number, number, number, number];
+}
+
 export interface Review {
   id: string;
   userId: string;

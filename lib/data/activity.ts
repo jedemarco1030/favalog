@@ -1,4 +1,11 @@
-import type { ActivityItem, List, Review } from "@/lib/types";
+import type {
+  ActivityItem,
+  List,
+  MediaItem,
+  RatingDistribution,
+  Review,
+} from "@/lib/types";
+import { getMediaById, mediaItems } from "./media";
 
 export const reviews: Review[] = [
   {
@@ -196,4 +203,151 @@ export const recommendationShelves: RecommendationShelf[] = [
       "b_salt_tide",
     ],
   },
+  {
+    id: "rec_afterglow",
+    seedMediaId: "m_afterglow",
+    mediaIds: [
+      "m_nightferry",
+      "b_smallhours",
+      "t_harbourlines",
+      "m_slowmountain",
+      "b_salt_tide",
+    ],
+  },
+  {
+    id: "rec_northlight",
+    seedMediaId: "t_northlight",
+    mediaIds: [
+      "t_signalglass",
+      "m_quietsignal",
+      "b_bright_index",
+      "m_arclighthouse",
+      "b_seasofglass",
+    ],
+  },
+  {
+    id: "rec_smallhours",
+    seedMediaId: "b_smallhours",
+    mediaIds: [
+      "b_northroom",
+      "m_afterglow",
+      "t_harbourlines",
+      "b_salt_tide",
+      "m_lowcountry",
+    ],
+  },
+  {
+    id: "rec_bright_index",
+    seedMediaId: "b_bright_index",
+    mediaIds: [
+      "b_seasofglass",
+      "t_signalglass",
+      "m_thecartographer",
+      "b_orbital_notes",
+      "m_quietsignal",
+    ],
+  },
+  {
+    id: "rec_harbourlines",
+    seedMediaId: "t_harbourlines",
+    mediaIds: [
+      "m_nightferry",
+      "b_salt_tide",
+      "t_paperwatch",
+      "m_lowcountry",
+      "b_smallhours",
+    ],
+  },
 ];
+
+/**
+ * Returns reviews associated with a specific media item, newest first.
+ * Kept in the data layer so the UI never has to know the underlying array
+ * ordering.
+ */
+export function getReviewsForMedia(mediaId: string): Review[] {
+  return reviews
+    .filter((review) => review.mediaId === mediaId)
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+}
+
+/**
+ * Related titles for a media item, drawn from curated `recommendationShelves`
+ * when available and otherwise a deterministic fallback across kinds.
+ *
+ * Related titles intentionally may span movie / tv / book — that cross-media
+ * discovery is a core Favalog product idea.
+ */
+export function getRelatedMedia(mediaId: string, limit = 6): MediaItem[] {
+  const shelf = recommendationShelves.find((s) => s.seedMediaId === mediaId);
+  const seedIds: string[] = shelf ? [...shelf.mediaIds] : [];
+
+  if (seedIds.length < limit) {
+    // Deterministic fallback: same-genre neighbours, then anything else,
+    // always excluding the item itself and anything already picked.
+    const seed = getMediaById(mediaId);
+    const seedGenres = new Set(seed?.genres ?? []);
+    const remainder = mediaItems
+      .filter((item) => item.id !== mediaId && !seedIds.includes(item.id))
+      .sort((a, b) => {
+        const aShared = a.genres.some((g) => seedGenres.has(g)) ? 1 : 0;
+        const bShared = b.genres.some((g) => seedGenres.has(g)) ? 1 : 0;
+        if (aShared !== bShared) return bShared - aShared;
+        return (b.averageRating ?? 0) - (a.averageRating ?? 0);
+      });
+    for (const item of remainder) {
+      if (seedIds.length >= limit) break;
+      seedIds.push(item.id);
+    }
+  }
+
+  return seedIds
+    .slice(0, limit)
+    .map((id) => getMediaById(id))
+    .filter((item): item is MediaItem => Boolean(item));
+}
+
+/**
+ * Deterministic mock rating distribution for a media item.
+ *
+ * We do not carry per-user rating rows in the mock catalog, so this synthesises
+ * a plausible-looking histogram from the item's `averageRating`. The result is
+ * stable for a given media id so snapshots stay reproducible. If a media item
+ * has no `averageRating`, we return `undefined` and the UI omits the section.
+ */
+export function getRatingDistribution(
+  mediaId: string,
+): RatingDistribution | undefined {
+  const item = getMediaById(mediaId);
+  if (!item || item.averageRating == null) return undefined;
+
+  // Deterministic pseudo-random count from the id, roughly 80–1200 ratings.
+  let hash = 0;
+  for (let i = 0; i < mediaId.length; i++) {
+    hash = (hash * 31 + mediaId.charCodeAt(i)) | 0;
+  }
+  const count = 80 + (Math.abs(hash) % 1120);
+
+  // Build a bell-ish distribution centred on the rounded average.
+  const center = Math.min(5, Math.max(1, Math.round(item.averageRating)));
+  const weights: [number, number, number, number, number] = [1, 1, 1, 1, 1];
+  for (let star = 1; star <= 5; star++) {
+    const distance = Math.abs(star - center);
+    // Base weight falls off with distance; skew slightly toward the average.
+    weights[star - 1] = Math.max(0.02, 1 / Math.pow(distance + 1, 1.8));
+  }
+  const weightSum = weights.reduce((a, b) => a + b, 0);
+  const raw = weights.map((w) => (w / weightSum) * count);
+  const rounded = raw.map((n) => Math.round(n));
+  // Adjust rounding drift so buckets sum exactly to `count`.
+  const drift = count - rounded.reduce((a, b) => a + b, 0);
+  const centerIdx = center - 1;
+  rounded[centerIdx] += drift;
+
+  return {
+    mediaId,
+    count,
+    average: item.averageRating,
+    buckets: rounded as [number, number, number, number, number],
+  };
+}

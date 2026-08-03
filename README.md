@@ -43,7 +43,8 @@ app/                     App Router routes, layouts, and global styles
   explore/page.tsx       Explore — search, media-type filter, and editorial shelves
   diary/page.tsx         Diary placeholder
   lists/page.tsx         Lists placeholder
-  title/[slug]/page.tsx  Title detail placeholder, keyed by `MediaItem.slug`
+  title/[slug]/page.tsx  Unified movie / TV / book detail page, keyed by `MediaItem.slug`
+  not-found.tsx          Site-wide 404 for unmatched routes and `notFound()`
 
 components/
   brand/                 Wordmark and brand-only assets
@@ -52,7 +53,8 @@ components/
                          StarRating, RatingDisplay, SearchInput,
                          SectionHeader, EmptyState, Skeleton)
   media/                 MediaCard, MediaPoster, MediaTypeBadge,
-                         HorizontalMediaRow
+                         HorizontalMediaRow, MediaHero, MediaActions,
+                         MediaDetails, RatingBreakdown
   activity/              ActivityCard used by the feed
   reviews/               ReviewCard
   user/                  UserAvatar, ProfileStats
@@ -136,7 +138,7 @@ and lightweight placeholders** for every primary destination:
 | `/explore`         | Implemented — local search, All / Movies / TV / Books filter, editorial shelves |
 | `/diary`           | Placeholder — personal activity log is next                     |
 | `/lists`           | Placeholder — building and sharing lists is next                |
-| `/title/[slug]`    | Placeholder — shows title, artwork, and synopsis; full detail page (cast, reviews, ratings breakdown) is next |
+| `/title/[slug]`    | Implemented — unified detail page for movies, TV, and books with adaptive credits, community rating breakdown, popular reviews, and cross-media "More like this" |
 
 Movies, TV, and books are **not** top-level destinations. They are media
 types that will be filtered inside `/explore`.
@@ -175,6 +177,44 @@ types that will be filtered inside `/explore`.
   is a deterministic interleave, "popular" sorts by `averageRating`, and
   "hidden gems" is a curated id list in the data layer. All of these are
   drop-in replaceable once a real backend exists.
+
+### Title detail (`/title/[slug]`)
+
+One route serves every `MediaItem` kind — no separate `/movie`, `/tv`, or
+`/book` trees. The URL is keyed on the stable `MediaItem.slug` so display
+titles can change without breaking links. Invalid slugs use Next.js
+`notFound()` and render `app/not-found.tsx`.
+
+- **Media-type-specific rendering.** `MediaHero` and `MediaDetails` narrow on
+  the discriminated `MediaItem` union so each kind only shows the fields
+  that logically belong to it: director / runtime / cast for movies;
+  creators / seasons / episode count / run status for TV; author(s) / page
+  count / publisher for books. The page structure is shared; only these
+  small components specialize.
+- **Dynamic metadata.** `generateMetadata` is per-title: page title,
+  description, Open Graph title/description/url/image, and Twitter card
+  are all derived from the item's own data. URLs are built from
+  `lib/site-config.ts` (no hard-coded canonical domain).
+- **Community rating.** `RatingBreakdown` renders the average, rating
+  count, and a semantic 5-row histogram. Counts and percentages are
+  visible text — bar width alone never carries the meaning. The
+  underlying distribution is produced by `getRatingDistribution` in
+  `lib/data`, which synthesises a deterministic bell-shaped histogram
+  from the item's `averageRating` so no per-user rating rows are needed
+  in the mock catalog.
+- **Popular reviews.** Reviews are looked up through `getReviewsForMedia`
+  and resolved to users via the shared mock user layer, then rendered
+  with the existing `ReviewCard`. When a title has no reviews the
+  section falls back to `EmptyState` rather than fabricating content.
+- **Cross-media "More like this".** `getRelatedMedia` prefers curated
+  relationships in `recommendationShelves` and falls back to a
+  deterministic same-genre / rating-ordered walk across the full
+  catalog. Related items intentionally may span films, series, and
+  books, and always link back to `/title/[slug]` through the existing
+  `MediaCard`.
+- **Actions.** Log / Rate / Review / Add to list are presentation-only
+  buttons (`aria-disabled`) that communicate the shape of the future
+  product. No persistence, no fake success states.
 
 ---
 
