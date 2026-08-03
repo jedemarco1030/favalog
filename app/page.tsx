@@ -50,9 +50,9 @@ export default function HomePage() {
   const shelf = recommendationShelves[0];
   const seed = shelf ? getMediaById(shelf.seedMediaId) : undefined;
   const recommendations = shelf
-    ? (shelf.mediaIds
+    ? shelf.mediaIds
         .map((id) => getMediaById(id))
-        .filter((m): m is MediaItem => Boolean(m)))
+        .filter((m): m is MediaItem => Boolean(m))
     : [];
 
   return (
@@ -101,7 +101,12 @@ export default function HomePage() {
               className="relative mx-auto hidden aspect-[5/4] w-full max-w-md sm:block lg:mx-0 lg:max-w-none"
             >
               <div className="absolute left-[2%] top-[8%] w-[30%] rotate-[-6deg]">
-                <MediaPoster item={collage[0]} sizes="200px" decorative priority />
+                <MediaPoster
+                  item={collage[0]}
+                  sizes="200px"
+                  decorative
+                  priority
+                />
               </div>
               <div className="absolute left-[24%] top-0 w-[30%] rotate-[3deg]">
                 <MediaPoster item={collage[2]} sizes="200px" decorative />
@@ -247,7 +252,6 @@ export default function HomePage() {
           </div>
         </section>
       </Container>
-
     </>
   );
 }

@@ -25,10 +25,7 @@ export function ProfileStats({
   return (
     <dl
       aria-label={label}
-      className={cn(
-        "flex flex-wrap items-center gap-x-8 gap-y-3",
-        className,
-      )}
+      className={cn("flex flex-wrap items-center gap-x-8 gap-y-3", className)}
     >
       {stats.map((stat) => (
         <div key={stat.label} className="flex flex-col">

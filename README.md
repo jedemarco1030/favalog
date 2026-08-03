@@ -17,15 +17,21 @@ pieces can drop in later without rewriting the UI.
 
 ## Tech stack
 
-| Concern            | Choice                                        |
-| ------------------ | --------------------------------------------- |
-| Framework          | Next.js 16 (App Router, React Server Components) |
-| Language           | TypeScript (strict)                           |
-| UI                 | React 19                                      |
-| Styling            | Tailwind CSS v4 with CSS design tokens        |
-| Icons              | `lucide-react`                                |
-| Fonts              | Inter (sans), Fraunces (editorial serif), JetBrains Mono |
-| Linting            | ESLint (flat config, `eslint-config-next`)    |
+| Concern    | Choice                                                   |
+| ---------- | -------------------------------------------------------- |
+| Framework  | Next.js 16 (App Router, React Server Components)         |
+| Language   | TypeScript (strict)                                      |
+| UI         | React 19                                                 |
+| Styling    | Tailwind CSS v4 with CSS design tokens                   |
+| Icons      | `lucide-react`                                           |
+| Fonts      | Inter (sans), Fraunces (editorial serif), JetBrains Mono |
+| Linting    | ESLint (flat config, `eslint-config-next`)               |
+| Formatting | Prettier (+ `eslint-config-prettier`)                    |
+| Unit tests | Vitest + React Testing Library + jsdom                   |
+| E2E tests  | Playwright (Chromium)                                    |
+| Components | Storybook (`@storybook/nextjs-vite`) + a11y addon        |
+| Git hooks  | Husky + lint-staged                                      |
+| CI         | GitHub Actions                                           |
 
 No component library, no CSS-in-JS runtime, no state manager. Interactivity
 is opt-in via Client Components; every other component is a Server Component
@@ -89,12 +95,35 @@ once and reused.
 ## Commands
 
 ```bash
-npm install
-npm run dev       # Start the dev server on http://localhost:3000
-npm run build     # Production build
-npm run start     # Serve the production build
-npm run lint      # ESLint
-npx tsc --noEmit  # TypeScript check
+npm install                # Install dependencies (also sets up Husky hooks)
+
+# Development
+npm run dev                # Start the dev server on http://localhost:3000
+npm run build              # Production build
+npm run start              # Serve the production build
+
+# Static quality
+npm run lint               # ESLint (code quality)
+npm run typecheck          # TypeScript (tsc --noEmit)
+npm run format             # Prettier — write
+npm run format:check       # Prettier — check only
+
+# Unit / component tests
+npm run test               # Vitest (single run)
+npm run test:watch         # Vitest (watch mode)
+npm run test:coverage      # Vitest with coverage report
+
+# End-to-end tests
+npm run test:e2e           # Playwright against a production build
+npm run test:e2e:ui        # Playwright interactive UI mode
+
+# Component development
+npm run storybook          # Storybook dev server on http://localhost:6006
+npm run build-storybook    # Static Storybook build
+
+# Aggregate gates
+npm run validate           # format:check + lint + typecheck + test
+npm run validate:full      # validate + build + test:e2e
 ```
 
 To regenerate the placeholder artwork after editing the mock catalog:
@@ -102,6 +131,70 @@ To regenerate the placeholder artwork after editing the mock catalog:
 ```bash
 node scripts/generate-placeholders.mjs
 ```
+
+---
+
+## Quality & testing
+
+Favalog ships with a layered quality stack. Each tool owns one concern and
+they are wired together so `npm run validate` is a reliable local gate.
+
+| Tool                      | Role                                                                                    |
+| ------------------------- | --------------------------------------------------------------------------------------- |
+| **ESLint**                | Code quality (flat config, `eslint-config-next`)                                        |
+| **TypeScript**            | Strict static types (`npm run typecheck`)                                               |
+| **Prettier**              | Formatting only; `eslint-config-prettier` disables ESLint's overlapping stylistic rules |
+| **Vitest**                | Unit + component test runner (jsdom, `@/*` alias via `vite-tsconfig-paths`)             |
+| **React Testing Library** | Component testing via accessible queries (`@testing-library/jest-dom`, `user-event`)    |
+| **Playwright**            | End-to-end user flows against the production build (Chromium)                           |
+| **Storybook**             | Isolated component states, visual review, accessibility (`@storybook/addon-a11y`)       |
+| **Husky + lint-staged**   | Pre-commit: Prettier + ESLint on staged files only                                      |
+| **GitHub Actions**        | CI: format, lint, typecheck, unit tests, build, Storybook build, E2E                    |
+
+### Testing strategy
+
+- **Unit tests** cover deterministic domain/data logic in `lib/` — selectors,
+  search matching, filtering, related-media, and rating math. These are the
+  highest-value tests and are exercised directly (see `lib/**/*.test.ts`).
+- **React Testing Library** covers interactive and conditional Client
+  Components (Explore search/filter, Diary filtering, MobileNav, cards, and
+  rating displays). Tests assert observable behavior through accessible
+  queries — never internal state or class names.
+- **Playwright** covers complete user journeys (home → explore → title,
+  search, media-type filtering, movie vs. book detail, the custom 404, and the
+  diary) against `next build` + `next start`, using semantic locators.
+- **Storybook** documents genuine component states (media/review/activity
+  cards, badges, ratings, empty states) on the Favalog dark theme and provides
+  an accessibility panel for visual/a11y review.
+
+Async App Router **Server Components** are intentionally _not_ forced into the
+unit toolchain (Vitest does not support them cleanly). Their underlying data
+logic is unit-tested and their rendered routes are covered by Playwright.
+
+### Coverage
+
+`npm run test:coverage` uses the V8 provider with thresholds of **70%**
+statements / lines / functions and **60%** branches. Coverage is scoped (via
+`vitest.config.mts` `coverage.include`) to the deterministic domain logic and
+the interactive/conditional components that are actually tested, so the numbers
+stay meaningful rather than diluted by purely presentational or
+Server-Component-only surfaces (which are covered by Playwright instead).
+
+### Contributing standard
+
+New work should include quality coverage **where it adds real value** — the
+rule is _not_ "every component needs a test and a story". Use this guide:
+
+| Change                                         | Expected coverage              |
+| ---------------------------------------------- | ------------------------------ |
+| New deterministic business/domain logic        | Unit tests (Vitest)            |
+| New interactive component                      | RTL tests                      |
+| New reusable visual component with real states | Storybook stories              |
+| New critical user flow                         | Playwright E2E                 |
+| Bug fix                                        | Regression test when practical |
+
+Do not add test-only IDs or snapshots to hit a number; prefer accessible,
+behavior-focused assertions.
 
 ---
 
@@ -134,13 +227,13 @@ and lightweight placeholders** for every primary destination:
 
 ### Primary navigation
 
-| Route              | Status                                                        |
-| ------------------ | -------------------------------------------------------------- |
-| `/`                | Implemented (home)                                              |
-| `/explore`         | Implemented — local search, All / Movies / TV / Books filter, editorial shelves |
-| `/diary`           | Implemented — unified newest-first diary of movies, TV, and books, grouped by month, with All / Movies / TV / Books local filtering and a derived activity summary |
-| `/lists`           | Placeholder — building and sharing lists is next                |
-| `/title/[slug]`    | Implemented — unified detail page for movies, TV, and books with adaptive credits, community rating breakdown, popular reviews, and cross-media "More like this" |
+| Route           | Status                                                                                                                                                             |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/`             | Implemented (home)                                                                                                                                                 |
+| `/explore`      | Implemented — local search, All / Movies / TV / Books filter, editorial shelves                                                                                    |
+| `/diary`        | Implemented — unified newest-first diary of movies, TV, and books, grouped by month, with All / Movies / TV / Books local filtering and a derived activity summary |
+| `/lists`        | Placeholder — building and sharing lists is next                                                                                                                   |
+| `/title/[slug]` | Implemented — unified detail page for movies, TV, and books with adaptive credits, community rating breakdown, popular reviews, and cross-media "More like this"   |
 
 Movies, TV, and books are **not** top-level destinations. They are media
 types that will be filtered inside `/explore`.

@@ -5,5 +5,7 @@
 export function cn(
   ...classes: Array<string | number | false | null | undefined>
 ): string {
-  return classes.filter((value): value is string | number => Boolean(value)).join(" ");
+  return classes
+    .filter((value): value is string | number => Boolean(value))
+    .join(" ");
 }

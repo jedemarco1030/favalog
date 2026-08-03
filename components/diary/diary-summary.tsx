@@ -29,8 +29,7 @@ export function DiarySummary({ summary, className }: DiarySummaryProps) {
         <span className="font-medium tabular-nums text-foreground">
           {summary.total}
         </span>{" "}
-        logged in{" "}
-        <span className="tabular-nums">{summary.year}</span>
+        logged in <span className="tabular-nums">{summary.year}</span>
       </span>
       <span aria-hidden="true">·</span>
       {parts.map((part, index) => (

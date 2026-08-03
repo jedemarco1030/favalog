@@ -13,7 +13,11 @@ interface StarRatingProps {
  * Non-interactive 5-star rating display in half-star increments.
  * Interactive rating input is intentionally out of scope for the MVP foundation.
  */
-export function StarRating({ value, showNumeric = false, className }: StarRatingProps) {
+export function StarRating({
+  value,
+  showNumeric = false,
+  className,
+}: StarRatingProps) {
   const clamped = Math.max(0, Math.min(5, value));
   const full = Math.floor(clamped);
   const hasHalf = clamped - full >= 0.5;
@@ -26,11 +30,21 @@ export function StarRating({ value, showNumeric = false, className }: StarRating
     >
       <span className="inline-flex items-center" aria-hidden="true">
         {Array.from({ length: full }).map((_, i) => (
-          <Star key={`f-${i}`} className="size-3.5 fill-current" strokeWidth={0} />
+          <Star
+            key={`f-${i}`}
+            className="size-3.5 fill-current"
+            strokeWidth={0}
+          />
         ))}
-        {hasHalf && <StarHalf className="size-3.5 fill-current" strokeWidth={0} />}
+        {hasHalf && (
+          <StarHalf className="size-3.5 fill-current" strokeWidth={0} />
+        )}
         {Array.from({ length: empty }).map((_, i) => (
-          <Star key={`e-${i}`} className="size-3.5 text-foreground/20" strokeWidth={1.5} />
+          <Star
+            key={`e-${i}`}
+            className="size-3.5 text-foreground/20"
+            strokeWidth={1.5}
+          />
         ))}
       </span>
       {showNumeric && (

@@ -18,7 +18,10 @@ const percentFormatter = new Intl.NumberFormat("en", {
  * with one row per whole-star bucket. The bar width is decorative — screen
  * readers get percentages and counts via visible text, not bar width alone.
  */
-export function RatingBreakdown({ distribution, className }: RatingBreakdownProps) {
+export function RatingBreakdown({
+  distribution,
+  className,
+}: RatingBreakdownProps) {
   const { average, count, buckets } = distribution;
   const max = Math.max(1, ...buckets);
 
@@ -39,8 +42,7 @@ export function RatingBreakdown({ distribution, className }: RatingBreakdownProp
           </div>
         </div>
         <p className="text-sm text-foreground/60 tabular-nums">
-          {countFormatter.format(count)}{" "}
-          {count === 1 ? "rating" : "ratings"}
+          {countFormatter.format(count)} {count === 1 ? "rating" : "ratings"}
         </p>
       </div>
 

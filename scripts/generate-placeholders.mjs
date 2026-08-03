@@ -107,7 +107,10 @@ for (const [slug, title, bg, accent] of posters) {
   writeFileSync(join(posterDir, `${slug}.svg`), posterSvg(title, bg, accent));
 }
 for (const [slug, bg1, bg2, accent] of backdrops) {
-  writeFileSync(join(backdropDir, `${slug}.svg`), backdropSvg(bg1, bg2, accent));
+  writeFileSync(
+    join(backdropDir, `${slug}.svg`),
+    backdropSvg(bg1, bg2, accent),
+  );
 }
 for (const [slug, initials, bg] of avatars) {
   writeFileSync(join(avatarDir, `${slug}.svg`), avatarSvg(initials, bg));

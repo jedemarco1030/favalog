@@ -22,7 +22,12 @@ const dateFormatter = new Intl.DateTimeFormat("en", {
  * A single review, laid out as a small editorial block: user, rating,
  * optional title, body, and a subtle link back to the reviewed title.
  */
-export function ReviewCard({ review, user, media, className }: ReviewCardProps) {
+export function ReviewCard({
+  review,
+  user,
+  media,
+  className,
+}: ReviewCardProps) {
   return (
     <article
       className={cn(

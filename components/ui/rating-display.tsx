@@ -31,9 +31,7 @@ export function RatingDisplay({
       )}
     >
       <StarRating value={value} showNumeric />
-      {caption && (
-        <span className="text-foreground/50">{caption}</span>
-      )}
+      {caption && <span className="text-foreground/50">{caption}</span>}
     </div>
   );
 }

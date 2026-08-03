@@ -121,11 +121,7 @@ export interface List {
 }
 
 export type ActivityKind =
-  | "rated"
-  | "reviewed"
-  | "listed"
-  | "finished"
-  | "started";
+  "rated" | "reviewed" | "listed" | "finished" | "started";
 
 export interface ActivityItem {
   id: string;

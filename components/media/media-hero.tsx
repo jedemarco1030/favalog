@@ -1,7 +1,10 @@
 import Image from "next/image";
 import type { MediaItem } from "@/lib/types";
 import { MediaPoster } from "@/components/media/media-poster";
-import { MediaTypeBadge, mediaKindLabel } from "@/components/media/media-type-badge";
+import {
+  MediaTypeBadge,
+  mediaKindLabel,
+} from "@/components/media/media-type-badge";
 import { StarRating } from "@/components/ui/star-rating";
 import { cn } from "@/lib/cn";
 

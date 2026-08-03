@@ -1,0 +1,23 @@
+# Dependencies
+node_modules
+
+# Next.js build output
+.next
+out
+next-env.d.ts
+
+# Test & coverage artifacts
+coverage
+playwright-report
+test-results
+
+# Storybook build output
+storybook-static
+
+# Generated / lockfiles / logs
+tsconfig.tsbuildinfo
+package-lock.json
+*.log
+
+# Static assets that are not meaningfully formattable
+public

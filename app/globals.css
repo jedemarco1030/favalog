@@ -11,12 +11,12 @@
   color-scheme: dark;
 
   /* Base surfaces */
-  --background: #0b0b0f;      /* near-black charcoal */
-  --surface-1: #14141a;       /* first elevation */
-  --surface-2: #1c1c24;       /* second elevation, chips / poster bg */
+  --background: #0b0b0f; /* near-black charcoal */
+  --surface-1: #14141a; /* first elevation */
+  --surface-2: #1c1c24; /* second elevation, chips / poster bg */
 
   /* Text */
-  --foreground: #f4efe6;      /* warm off-white */
+  --foreground: #f4efe6; /* warm off-white */
   --foreground-muted: #a6a19a;
 
   /* Borders */
@@ -51,7 +51,12 @@ body {
 }
 
 body {
-  font-family: var(--font-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family:
+    var(--font-sans),
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }

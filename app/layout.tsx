@@ -35,14 +35,7 @@ export const metadata: Metadata = {
   },
   description: siteConfig.shortDescription,
   applicationName: siteConfig.name,
-  keywords: [
-    "movies",
-    "tv shows",
-    "books",
-    "reviews",
-    "tracking",
-    "social",
-  ],
+  keywords: ["movies", "tv shows", "books", "reviews", "tracking", "social"],
   authors: [{ name: siteConfig.name }],
   openGraph: {
     type: "website",

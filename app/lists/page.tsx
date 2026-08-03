@@ -20,8 +20,8 @@ export default function ListsPage() {
           Lists
         </h1>
         <p className="mt-3 text-foreground/70">
-          Ranked favorites, watchlists, shelves — build them across movies,
-          TV, and books, and share them with people who get it.
+          Ranked favorites, watchlists, shelves — build them across movies, TV,
+          and books, and share them with people who get it.
         </p>
       </div>
       <EmptyState

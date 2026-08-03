@@ -29,12 +29,7 @@ export function SectionHeader({
   children,
 }: SectionHeaderProps) {
   return (
-    <div
-      className={cn(
-        "mb-6 flex items-end justify-between gap-4",
-        className,
-      )}
-    >
+    <div className={cn("mb-6 flex items-end justify-between gap-4", className)}>
       <div className="min-w-0">
         <Heading className="font-display text-2xl tracking-tight text-foreground">
           {title}

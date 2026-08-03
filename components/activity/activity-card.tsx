@@ -29,7 +29,12 @@ const dateFormatter = new Intl.DateTimeFormat("en", {
  * A single feed row: who did what to which title, with optional rating
  * and review excerpt. The media title links to `/title/[slug]`.
  */
-export function ActivityCard({ activity, user, media, className }: ActivityCardProps) {
+export function ActivityCard({
+  activity,
+  user,
+  media,
+  className,
+}: ActivityCardProps) {
   return (
     <article
       className={cn(

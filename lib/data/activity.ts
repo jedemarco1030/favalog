@@ -123,7 +123,12 @@ export const lists: List[] = [
     ownerId: "u_ari",
     title: "Long books I keep finishing on trains",
     description: "A running log. Updated whenever a station has bad Wi-Fi.",
-    mediaIds: ["b_smallhours", "b_orbital_notes", "b_bright_index", "b_salt_tide"],
+    mediaIds: [
+      "b_smallhours",
+      "b_orbital_notes",
+      "b_bright_index",
+      "b_salt_tide",
+    ],
     createdAt: "2026-04-01T00:00:00.000Z",
     updatedAt: "2026-07-28T00:00:00.000Z",
     isRanked: false,
@@ -147,7 +152,8 @@ export const activity: ActivityItem[] = [
     kind: "reviewed",
     createdAt: "2026-08-01T20:10:00.000Z",
     rating: 4.5,
-    excerpt: "Bigger than the first where it needed to be, smaller where it mattered.",
+    excerpt:
+      "Bigger than the first where it needed to be, smaller where it mattered.",
   },
   {
     id: "a_2",
@@ -178,7 +184,8 @@ export const activity: ActivityItem[] = [
     kind: "reviewed",
     createdAt: "2026-07-30T18:03:00.000Z",
     rating: 4.5,
-    excerpt: "Salim films every kitchen like it's been abandoned for a hundred years.",
+    excerpt:
+      "Salim films every kitchen like it's been abandoned for a hundred years.",
   },
   {
     id: "a_6",

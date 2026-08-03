@@ -87,8 +87,7 @@ export default async function ExplorePage({
     {
       key: "trending",
       title: "Trending now",
-      description:
-        "Movies, shows, and books rising across Favalog this week.",
+      description: "Movies, shows, and books rising across Favalog this week.",
       items: trending,
       priorityFirst: true,
     },

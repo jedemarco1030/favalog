@@ -27,10 +27,7 @@ export function MediaActions({ item, className }: MediaActionsProps) {
     <div
       role="group"
       aria-label={`Actions for ${item.title}`}
-      className={cn(
-        "flex flex-wrap items-center gap-2",
-        className,
-      )}
+      className={cn("flex flex-wrap items-center gap-2", className)}
     >
       <ActionButton icon={Eye} label={LOG_LABELS[item.kind]} tone="primary" />
       <ActionButton icon={Star} label="Rate" />
@@ -46,7 +43,11 @@ interface ActionButtonProps {
   tone?: "primary" | "neutral";
 }
 
-function ActionButton({ icon: Icon, label, tone = "neutral" }: ActionButtonProps): ReactNode {
+function ActionButton({
+  icon: Icon,
+  label,
+  tone = "neutral",
+}: ActionButtonProps): ReactNode {
   return (
     <button
       type="button"

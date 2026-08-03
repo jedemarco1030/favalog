@@ -1,7 +1,10 @@
 import Link from "next/link";
 import type { MediaItem } from "@/lib/types";
 import { MediaPoster } from "@/components/media/media-poster";
-import { MediaTypeBadge, mediaKindLabel } from "@/components/media/media-type-badge";
+import {
+  MediaTypeBadge,
+  mediaKindLabel,
+} from "@/components/media/media-type-badge";
 import { RatingDisplay } from "@/components/ui/rating-display";
 import { cn } from "@/lib/cn";
 

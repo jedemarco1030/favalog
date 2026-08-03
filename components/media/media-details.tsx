@@ -16,7 +16,10 @@ function detailsFor(item: MediaItem): DetailRow[] {
   switch (item.kind) {
     case "movie":
       rows.push({ label: "Director", value: item.director });
-      rows.push({ label: "Runtime", value: formatRuntime(item.runtimeMinutes) });
+      rows.push({
+        label: "Runtime",
+        value: formatRuntime(item.runtimeMinutes),
+      });
       rows.push({ label: "Release year", value: String(item.year) });
       if (item.genres.length) {
         rows.push({ label: "Genres", value: item.genres.join(", ") });
@@ -96,10 +99,7 @@ export function MediaDetails({ item, className }: MediaDetailsProps) {
       )}
     >
       {rows.map((row) => (
-        <div
-          key={row.label}
-          className="sm:contents"
-        >
+        <div key={row.label} className="sm:contents">
           <dt className="text-[11px] font-medium uppercase tracking-wide text-foreground/50">
             {row.label}
           </dt>

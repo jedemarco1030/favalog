@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { MessageSquare } from "lucide-react";
 import { MediaPoster } from "@/components/media/media-poster";
-import { MediaTypeBadge, mediaKindLabel } from "@/components/media/media-type-badge";
+import {
+  MediaTypeBadge,
+  mediaKindLabel,
+} from "@/components/media/media-type-badge";
 import { StarRating } from "@/components/ui/star-rating";
 import type { DiaryEntryView } from "@/components/diary/diary-view";
 import { diaryActionLabel } from "@/components/diary/diary-view";
@@ -84,7 +87,9 @@ export function DiaryEntry({ entry, className }: DiaryEntryProps) {
 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="text-sm text-foreground/60">{action}</span>
-          {entry.rating != null && <StarRating value={entry.rating} showNumeric />}
+          {entry.rating != null && (
+            <StarRating value={entry.rating} showNumeric />
+          )}
         </div>
 
         {entry.review && (
