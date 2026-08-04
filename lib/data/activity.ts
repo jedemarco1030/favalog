@@ -1,6 +1,5 @@
 import type {
   ActivityItem,
-  List,
   MediaItem,
   RatingDistribution,
   Review,
@@ -114,33 +113,6 @@ export const reviews: Review[] = [
     createdAt: "2026-03-30T19:55:00.000Z",
     likeCount: 21,
     containsSpoilers: false,
-  },
-];
-
-export const lists: List[] = [
-  {
-    id: "l_1",
-    ownerId: "u_ari",
-    title: "Long books I keep finishing on trains",
-    description: "A running log. Updated whenever a station has bad Wi-Fi.",
-    mediaIds: [
-      "b_smallhours",
-      "b_orbital_notes",
-      "b_bright_index",
-      "b_salt_tide",
-    ],
-    createdAt: "2026-04-01T00:00:00.000Z",
-    updatedAt: "2026-07-28T00:00:00.000Z",
-    isRanked: false,
-  },
-  {
-    id: "l_2",
-    ownerId: "u_jules",
-    title: "Cold-weather noirs",
-    mediaIds: ["m_lowcountry", "t_northlight", "m_afterglow", "t_harbourlines"],
-    createdAt: "2026-05-14T00:00:00.000Z",
-    updatedAt: "2026-07-30T00:00:00.000Z",
-    isRanked: true,
   },
 ];
 

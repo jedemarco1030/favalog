@@ -48,7 +48,8 @@ app/                     App Router routes, layouts, and global styles
   globals.css            Tailwind entry + design tokens
   explore/page.tsx       Explore — search, media-type filter, and editorial shelves
   diary/page.tsx         Diary — unified newest-first log of watched / read titles with a media-type filter
-  lists/page.tsx         Lists placeholder
+  lists/page.tsx         Lists — cross-media collection discovery index with curated sections and local search
+  list/[slug]/page.tsx   Individual list/collection page, keyed by the stable `List.slug`
   title/[slug]/page.tsx  Unified movie / TV / book detail page, keyed by `MediaItem.slug`
   not-found.tsx          Site-wide 404 for unmatched routes and `notFound()`
 
@@ -64,6 +65,9 @@ components/
   activity/              ActivityCard used by the feed
   diary/                 DiaryTimeline, DiaryEntry, DiarySummary, and the
                          shared diary view-model/helpers
+  lists/                 ListCard, ListPreviewCovers, ListItemRow, ListHeader,
+                         ListActions, ListSection, ListsBrowser, and the
+                         shared list view-model/helpers
   reviews/               ReviewCard
   user/                  UserAvatar, ProfileStats
   skeletons/             Media, activity/feed, and profile skeletons
@@ -72,7 +76,7 @@ lib/
   types.ts               Strongly typed domain models
   site-config.ts         Centralized brand name, tagline, and site URL
   cn.ts                  Class name joiner utility
-  data/                  Mock data layer (users, media, activity, diary, index)
+  data/                  Mock data layer (users, media, activity, diary, lists, index)
 
 public/media/            Local SVG placeholder posters, backdrops, avatars
 
@@ -161,8 +165,10 @@ they are wired together so `npm run validate` is a reliable local gate.
   rating displays). Tests assert observable behavior through accessible
   queries — never internal state or class names.
 - **Playwright** covers complete user journeys (home → explore → title,
-  search, media-type filtering, movie vs. book detail, the custom 404, and the
-  diary) against `next build` + `next start`, using semantic locators.
+  search, media-type filtering, movie vs. book detail, the custom 404, the
+  diary, and the lists flow — index → list → title, list search, and the
+  invalid-list-slug 404) against `next build` + `next start`, using semantic
+  locators.
 - **Storybook** documents genuine component states (media/review/activity
   cards, badges, ratings, empty states) on the Favalog dark theme and provides
   an accessibility panel for visual/a11y review.
@@ -201,7 +207,8 @@ behavior-focused assertions.
 ## MVP scope (current)
 
 The current implementation covers the **application shell, shared UI layer,
-and lightweight placeholders** for every primary destination:
+and fully built Home, Explore, Diary, Lists, title-detail, and list-detail
+experiences**:
 
 - Design system: dark-first tokens, editorial typography, accent color
 - Root layout with deployment-aware SEO metadata and Open Graph tags,
@@ -217,8 +224,8 @@ and lightweight placeholders** for every primary destination:
 - Loading states: `MediaCardSkeleton`, `MediaRowSkeleton`,
   `ActivityCardSkeleton`, `FeedSkeleton`, `ProfileSkeleton`
 - Typed domain models: `User`, `MediaItem`, `Movie`, `TVShow`, `Book`,
-  `Review`, `Rating`, `List`, `ActivityItem`, `DiaryEntry` (every
-  `MediaItem` has a stable `slug`, distinct from its display title)
+  `Review`, `Rating`, `List`, `ActivityItem`, `DiaryEntry` (both `MediaItem`
+  and `List` carry a stable `slug`, distinct from the display title)
 - Mock data layer at `lib/data`
 - Home page composed of a hero (with a mixed movie / TV / book collage),
   a unified **Trending this week** row, a **From your circle** social feed,
@@ -232,7 +239,8 @@ and lightweight placeholders** for every primary destination:
 | `/`             | Implemented (home)                                                                                                                                                 |
 | `/explore`      | Implemented — local search, All / Movies / TV / Books filter, editorial shelves                                                                                    |
 | `/diary`        | Implemented — unified newest-first diary of movies, TV, and books, grouped by month, with All / Movies / TV / Books local filtering and a derived activity summary |
-| `/lists`        | Placeholder — building and sharing lists is next                                                                                                                   |
+| `/lists`        | Implemented — cross-media collection discovery with curated sections (Popular, From your circle, Recently updated, Staff picks) and lightweight local search       |
+| `/list/[slug]`  | Implemented — individual collection page keyed by the stable `List.slug`, with mixed-media contents, ranks/notes, presentation-only Like/Share, and related lists  |
 | `/title/[slug]` | Implemented — unified detail page for movies, TV, and books with adaptive credits, community rating breakdown, popular reviews, and cross-media "More like this"   |
 
 Movies, TV, and books are **not** top-level destinations. They are media
@@ -310,6 +318,46 @@ there are no per-kind diary routes.
   responsive list/timeline (no wide desktop table) with compact artwork and a
   readable date rail on mobile, meaningful link names, `aria-pressed` filter
   state, visible focus rings, and screen-reader-friendly star ratings.
+
+### Lists (`/lists` and `/list/[slug]`)
+
+Lists let people organize and share **cross-media** collections of movies, TV,
+and books. A single list may freely mix all three kinds — there is deliberately
+no per-kind list system.
+
+- **Typed list model.** A `List` (`lib/types.ts`) has stable identity and a
+  stable `slug` (distinct from the display `title`, so renaming never breaks a
+  URL). It references its titles by an **ordered** `mediaIds` array and never
+  embeds a full `MediaItem`; when `isRanked`, that order is the ranking. It also
+  carries a `description`, a sparse per-title `notes` map, `createdAt` /
+  `updatedAt`, a `likeCount`, and a reserved `visibility` field for a future
+  access model. Mock lists and their selectors live in `lib/data/lists.ts`:
+  `getLists`, `getListBySlug`, `getListById`, `getListsByUser`, `getListMedia`,
+  `getListItemNote`, `getListOwner`, `getPopularLists`,
+  `getRecentlyUpdatedLists`, `getFeaturedLists`, `getListsFromCircle`, and
+  `listSearchTermsFor`. All storage-shape knowledge stays in the data layer.
+- **Mixed-media by design.** Movies, TV, and books share **one** `ListItemRow`
+  renderer and **one** `ListCard`. There is no `MovieListCard` / `BookListCard`
+  fork; the shared `MediaItem` union drives everything, and every list item and
+  card links to the existing `/title/[slug]` and `/list/[slug]` routes.
+- **Discovery index (`/lists`).** A concise header ("Collections made by people
+  who love what you love.") over curated sections — Popular, From your circle,
+  Recently updated, and Staff picks — each rendered with `ListCard`. Cards are
+  editorial rather than dashboard-like: an overlapping fan of cover art
+  (`ListPreviewCovers`, fully decorative), the title, creator, description, item
+  count, like count, and mixed-media / ranked hints.
+- **Lightweight local search.** The only Client Component on the index
+  (`ListsBrowser`) filters lists by title, description, or creator against a
+  server-built haystack. It is intentionally discovery-first — no tags, no
+  advanced filtering, no search library, no URL state.
+- **List detail (`/list/[slug]`).** `ListHeader` shows the single `h1`, the
+  creator, description, item/updated metadata, and presentation-only Like /
+  Share actions (`ListActions` — the like toggle is optimistic/in-memory and
+  Share copies the URL to the clipboard; nothing is persisted). The ordered
+  contents render as `ListItemRow`s with a rank (for ranked lists), artwork,
+  title, year, media type, community rating, and an optional curator note. A
+  restrained "More lists from this creator" (or "More collections") section
+  closes the page. Unknown slugs call `notFound()` and render the site-wide 404.
 
 ### Title detail (`/title/[slug]`)
 

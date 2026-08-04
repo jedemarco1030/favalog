@@ -109,15 +109,47 @@ export interface Review {
   containsSpoilers: boolean;
 }
 
+/**
+ * Reserved access model for a list. Unused by MVP rendering (every mock list
+ * is treated as public) but carried on the type so the storage shape does not
+ * have to change when real visibility rules and authentication arrive.
+ */
+export type ListVisibility = "public" | "unlisted" | "private";
+
+/**
+ * A user-authored, cross-media collection of titles.
+ *
+ * A list is intentionally media-agnostic: a single list can mix movies, TV,
+ * and books. Titles are referenced by `mediaIds` (resolved against the
+ * catalog) rather than embedded, so a list stays a thin record and can never
+ * drift from the canonical `MediaItem`.
+ */
 export interface List {
   id: string;
+  /**
+   * Stable, URL-safe identifier used for `/list/[slug]` routes. Distinct from
+   * `id` and from the display `title` so that renaming a list never breaks a
+   * shared URL.
+   */
+  slug: string;
   ownerId: string;
   title: string;
   description?: string;
+  /** Ordered media references. When `isRanked`, the order is a deliberate ranking. */
   mediaIds: string[];
+  /**
+   * Optional short curator note per title, keyed by media id. Only a subset of
+   * items typically carry a note; the map is sparse on purpose.
+   */
+  notes?: Record<string, string>;
   createdAt: string;
   updatedAt: string;
+  /** When true, `mediaIds` order is a ranking that should be shown to users. */
   isRanked: boolean;
+  /** Community like count. Presentation-only in the current MVP. */
+  likeCount: number;
+  /** Reserved future access model; unused by MVP rendering. */
+  visibility?: ListVisibility;
 }
 
 export type ActivityKind =
