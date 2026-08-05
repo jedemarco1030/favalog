@@ -69,8 +69,8 @@ export const movies: Movie[] = [
     averageRating: 4.7,
     genres: ["Science Fiction", "Epic"],
     runtimeMinutes: 166,
-    director: "Denis V. (mock)",
-    cast: ["Paul A.", "Chani F.", "Feyd R."],
+    director: "Marek Halloran",
+    cast: ["Nadia Reyes", "Idris Kane", "Soraya Bloom"],
   },
   {
     id: "m_quietsignal",
@@ -100,7 +100,7 @@ export const movies: Movie[] = [
     genres: ["Drama", "Mystery"],
     runtimeMinutes: 109,
     director: "Adaeze Umeh",
-    cast: ["Naomi Ackie‑style lead", "Colm Bergin"],
+    cast: ["Thea Marlowe", "Colm Bergin"],
   },
   {
     id: "m_nightferry",

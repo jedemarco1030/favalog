@@ -124,6 +124,32 @@ describe("getHiddenGems", () => {
   });
 });
 
+describe("catalog copy integrity", () => {
+  // Regression guard: no user-facing catalog string should leak
+  // developer-facing placeholder text such as "(mock)" or "style lead".
+  const PLACEHOLDER = /\(mock\)|style lead|placeholder|lorem|tbd|todo|xxx/i;
+
+  it("has no placeholder text in any user-facing field", () => {
+    const offenders: string[] = [];
+    for (const item of mediaItems) {
+      const strings: string[] = [
+        item.title,
+        item.subtitle ?? "",
+        item.synopsis,
+        ...item.genres,
+      ];
+      if (item.kind === "movie") strings.push(item.director, ...item.cast);
+      if (item.kind === "tv") strings.push(...item.creators);
+      if (item.kind === "book")
+        strings.push(...item.authors, item.publisher ?? "");
+      for (const value of strings) {
+        if (PLACEHOLDER.test(value)) offenders.push(`${item.id}: "${value}"`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});
+
 describe("searchTermsFor", () => {
   it("includes a movie's director and cast alongside title and genres", () => {
     const terms = searchTermsFor(movies[0]);

@@ -65,3 +65,19 @@ body {
   background: color-mix(in oklch, var(--accent) 40%, transparent);
   color: var(--foreground);
 }
+
+/*
+ * Respect the visitor's "reduce motion" system preference. Favalog leans on
+ * subtle hover/scale transitions and pulsing skeletons; for people who opt
+ * out of motion, collapse these to near-instant so nothing animates.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
