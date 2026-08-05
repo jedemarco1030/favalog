@@ -8,7 +8,7 @@ interface ProfileSkeletonProps {
 
 /**
  * Full profile-shaped skeleton: avatar + name + stats + a favorites rail.
- * Sized to match the eventual `/@[handle]` layout so hydration doesn't
+ * Sized to match the `/profile/[username]` layout so hydration doesn't
  * shift content around.
  */
 export function ProfileSkeleton({ className }: ProfileSkeletonProps) {

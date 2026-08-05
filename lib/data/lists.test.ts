@@ -138,7 +138,7 @@ describe("getListsFromCircle", () => {
 });
 
 describe("listSearchTermsFor", () => {
-  it("includes the title, description, and the creator's name and handle", () => {
+  it("includes the title, description, and the creator's name and username", () => {
     const list = getListBySlug("favorite-sci-fi")!;
     const terms = listSearchTermsFor(list);
     expect(terms).toContain("Favorite Sci-Fi");

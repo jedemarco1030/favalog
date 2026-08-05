@@ -304,13 +304,13 @@ export function getListsFromCircle(limit = lists.length): List[] {
 
 /**
  * The searchable strings for a list: its title, description, and its owner's
- * display name and handle. Kept in the data layer so the discovery UI never
+ * display name and username. Kept in the data layer so the discovery UI never
  * has to know that a creator is resolved from a separate user record.
  */
 export function listSearchTermsFor(list: List): string[] {
   const terms: string[] = [list.title];
   if (list.description) terms.push(list.description);
   const owner = getListOwner(list);
-  if (owner) terms.push(owner.displayName, owner.handle);
+  if (owner) terms.push(owner.displayName, owner.username);
   return terms;
 }

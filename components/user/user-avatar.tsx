@@ -4,7 +4,7 @@ import { cn } from "@/lib/cn";
 
 interface UserAvatarProps {
   user: Pick<User, "displayName" | "avatarUrl">;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
   className?: string;
   /** Empty alt when the user's name is already shown next to the avatar. */
   decorative?: boolean;
@@ -14,12 +14,14 @@ const SIZE_PX: Record<NonNullable<UserAvatarProps["size"]>, number> = {
   sm: 28,
   md: 36,
   lg: 56,
+  xl: 96,
 };
 
 const SIZE_CLASS: Record<NonNullable<UserAvatarProps["size"]>, string> = {
   sm: "size-7",
   md: "size-9",
   lg: "size-14",
+  xl: "size-20 sm:size-24",
 };
 
 /**

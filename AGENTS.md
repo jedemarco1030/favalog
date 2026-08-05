@@ -85,6 +85,10 @@ Book`. Keep shared fields in `MediaItemBase`; keep media-specific fields in
 - Media and lists carry stable `slug`s in the domain/data layer, distinct from
   mutable display titles. Do not derive route slugs from display titles inside
   UI components.
+- Users carry a stable `username` (distinct from the mutable `displayName`);
+  `/profile/[username]` routes off it. Do not derive usernames from display
+  names inside UI components. Keep stored identity fields separate from derived
+  profile statistics (which come from diary/reviews/lists via `@/lib/data`).
 - Current data is deterministic mock data. Keep storage and query logic behind
   `@/lib/data`; UI components and routes must not read or recreate hard-coded
   catalog arrays. Add or update typed selectors in the data layer instead.
@@ -101,6 +105,7 @@ Current primary routes:
 - `/lists`
 - `/list/[slug]`
 - `/title/[slug]`
+- `/profile/[username]`
 
 Do not add separate top-level routes such as `/movies`, `/tv`, or `/books`
 without an explicit product decision.

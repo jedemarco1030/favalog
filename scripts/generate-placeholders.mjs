@@ -47,7 +47,7 @@ const backdrops = [
 ];
 
 const avatars = [
-  ["ari", "AO", "#3a2450"],
+  ["jamie", "JD", "#3a2450"],
   ["mira", "MB", "#1e3a3a"],
   ["jules", "JM", "#3a2a1e"],
   ["sana", "SI", "#1e2a3a"],

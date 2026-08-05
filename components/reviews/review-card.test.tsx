@@ -8,7 +8,7 @@ const user = getUserById(review.userId)!;
 const media = getMediaById(review.mediaId)!;
 
 describe("ReviewCard", () => {
-  it("shows the reviewer, handle, title, and body", () => {
+  it("shows the reviewer, username, title, and body", () => {
     render(<ReviewCard review={review} user={user} media={media} />);
     expect(screen.getByText("Mira Bhatt")).toBeInTheDocument();
     expect(screen.getByText("@mira")).toBeInTheDocument();

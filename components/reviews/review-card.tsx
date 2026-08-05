@@ -42,7 +42,7 @@ export function ReviewCard({
             {user.displayName}
           </p>
           <p className="text-xs text-foreground/50">
-            <span>@{user.handle}</span>
+            <span>@{user.username}</span>
             <span aria-hidden="true"> · </span>
             <time dateTime={review.createdAt}>
               {dateFormatter.format(new Date(review.createdAt))}

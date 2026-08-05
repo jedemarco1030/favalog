@@ -63,12 +63,46 @@ export type MediaItem = Movie | TVShow | Book;
 
 export interface User {
   id: string;
-  handle: string;
+  /**
+   * Stable, URL-safe identifier used for `/profile/[username]` routes.
+   * Distinct from the mutable `displayName` so renaming never breaks a URL.
+   */
+  username: string;
   displayName: string;
   avatarUrl: string;
   bio?: string;
+  /** Optional free-form location, e.g. "Boston, MA". */
+  location?: string;
+  /** ISO date the account was created; drives the "Joined …" line. */
+  joinedAt: string;
   followerCount: number;
   followingCount: number;
+}
+
+/**
+ * A title a user has marked as a favorite.
+ *
+ * A thin record: it references the `MediaItem` by `mediaId` (never embedding
+ * it) and its position in a user's favorites array is the deliberate order
+ * shown on the profile. Favorites are a curated cross-media shelf and are not
+ * derivable from diary/reviews, so they are stored rather than computed.
+ */
+export interface Favorite {
+  userId: string;
+  mediaId: string;
+}
+
+/**
+ * A lightweight "currently enjoying" marker — what a user is watching or
+ * reading right now.
+ *
+ * Deliberately minimal: it references the title by `mediaId` and the verb
+ * (watching / reading) is derived from the media kind. This is a status hint
+ * for the profile, not a progress-tracking system.
+ */
+export interface CurrentlyEnjoying {
+  userId: string;
+  mediaId: string;
 }
 
 /** A 0–5 rating in half-star increments. */

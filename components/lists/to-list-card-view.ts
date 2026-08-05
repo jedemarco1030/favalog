@@ -31,7 +31,7 @@ export function toListCardView(list: List): ListCardView | null {
     isRanked: list.isRanked,
     owner: {
       displayName: owner.displayName,
-      handle: owner.handle,
+      username: owner.username,
       avatarUrl: owner.avatarUrl,
     },
     covers: media.slice(0, PREVIEW_COVER_COUNT).map((item) => ({

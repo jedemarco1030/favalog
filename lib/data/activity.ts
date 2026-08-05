@@ -183,6 +183,39 @@ export const activity: ActivityItem[] = [
     createdAt: "2026-07-28T21:44:00.000Z",
     rating: 5,
   },
+  // Activity for the primary demo user (Jamie, `u_ari`). Deliberately drawn
+  // from the same titles as Jamie's diary/reviews so nothing is duplicated —
+  // these are the social-feed view of logging, rating, and curating.
+  {
+    id: "a_9",
+    userId: "u_ari",
+    mediaId: "m_duneparttwo",
+    kind: "rated",
+    createdAt: "2026-08-02T21:35:00.000Z",
+    rating: 4.5,
+  },
+  {
+    id: "a_10",
+    userId: "u_ari",
+    mediaId: "b_northroom",
+    kind: "finished",
+    createdAt: "2026-08-01T08:20:00.000Z",
+  },
+  {
+    id: "a_11",
+    userId: "u_ari",
+    mediaId: "t_latecheckin",
+    kind: "rated",
+    createdAt: "2026-07-28T22:10:00.000Z",
+    rating: 4,
+  },
+  {
+    id: "a_12",
+    userId: "u_ari",
+    mediaId: "b_salt_tide",
+    kind: "listed",
+    createdAt: "2026-07-28T00:05:00.000Z",
+  },
 ];
 
 /**
@@ -286,6 +319,20 @@ export function getReviewsForMedia(mediaId: string): Review[] {
  * only hold a `reviewId` (such as diary entries) never touch the raw array. */
 export function getReviewById(id: string): Review | undefined {
   return reviews.find((review) => review.id === id);
+}
+
+/** Reviews written by a user, newest first. */
+export function getReviewsByUser(userId: string): Review[] {
+  return reviews
+    .filter((review) => review.userId === userId)
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+}
+
+/** A user's own activity feed, newest first. */
+export function getActivityForUser(userId: string): ActivityItem[] {
+  return activity
+    .filter((item) => item.userId === userId)
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
 /**

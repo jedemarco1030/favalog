@@ -5,7 +5,7 @@ import { Logo } from "@/components/brand/logo";
 import { SearchInput } from "@/components/ui/search-input";
 import { UserAvatar } from "@/components/user/user-avatar";
 import { PrimaryNavLinks } from "@/components/layout/primary-nav-links";
-import { users } from "@/lib/data";
+import { getCurrentUser } from "@/lib/data";
 
 /**
  * Application shell top bar. A Server Component: wordmark, primary nav
@@ -14,12 +14,13 @@ import { users } from "@/lib/data";
  * in the tab bar's search sheet), notifications button, and an avatar menu
  * placeholder. Both breakpoints get notifications and the avatar here.
  *
- * `SearchInput`, `Bell`, and the avatar are intentionally presentation-only
- * — no backend, no auth, no notifications yet.
+ * `SearchInput` and `Bell` are intentionally presentation-only — no backend,
+ * no auth, no notifications yet. The avatar links to the mock viewer's own
+ * profile so the profile route is reachable from every page.
  */
 export function SiteHeader() {
-  // Purely visual: pick a stable mock viewer so the avatar has a real image.
-  const viewer = users[0];
+  // No auth yet: the mock "current viewer" whose profile the avatar opens.
+  const viewer = getCurrentUser();
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-md">
@@ -51,13 +52,15 @@ export function SiteHeader() {
           >
             <Bell className="size-4" aria-hidden="true" />
           </button>
-          <button
-            type="button"
-            aria-label="Account menu"
-            className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          >
-            <UserAvatar user={viewer} size="md" decorative />
-          </button>
+          {viewer && (
+            <Link
+              href={`/profile/${viewer.username}`}
+              aria-label="Your profile"
+              className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
+              <UserAvatar user={viewer} size="md" decorative />
+            </Link>
+          )}
         </div>
       </Container>
     </header>

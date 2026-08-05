@@ -11,7 +11,7 @@ function view(overrides: Partial<ListCardView> & { id: string }): ListCardView {
     itemCount: 3,
     likeCount: 10,
     isRanked: false,
-    owner: { displayName: "Owner", handle: "owner", avatarUrl: "/a.svg" },
+    owner: { displayName: "Owner", username: "owner", avatarUrl: "/a.svg" },
     covers: [],
     kinds: ["movie"],
     ...overrides,
@@ -25,7 +25,7 @@ const lists: ListCardView[] = [
     title: "Favorite Sci-Fi",
     owner: {
       displayName: "Jules Marchetti",
-      handle: "jules",
+      username: "jules",
       avatarUrl: "/j.svg",
     },
   }),
@@ -33,7 +33,7 @@ const lists: ListCardView[] = [
     id: "l_comfort",
     slug: "comfort-watches",
     title: "Comfort Watches",
-    owner: { displayName: "Sana Iyer", handle: "sana", avatarUrl: "/s.svg" },
+    owner: { displayName: "Sana Iyer", username: "sana", avatarUrl: "/s.svg" },
   }),
 ];
 

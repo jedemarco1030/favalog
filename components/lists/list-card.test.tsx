@@ -13,7 +13,7 @@ const baseView: ListCardView = {
   isRanked: true,
   owner: {
     displayName: "Jules Marchetti",
-    handle: "jules",
+    username: "jules",
     avatarUrl: "/media/avatars/jules.svg",
   },
   covers: [

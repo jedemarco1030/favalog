@@ -51,6 +51,7 @@ app/                     App Router routes, layouts, and global styles
   lists/page.tsx         Lists — cross-media collection discovery index with curated sections and local search
   list/[slug]/page.tsx   Individual list/collection page, keyed by the stable `List.slug`
   title/[slug]/page.tsx  Unified movie / TV / book detail page, keyed by `MediaItem.slug`
+  profile/[username]/page.tsx  A person's Favalog — profile experience keyed by the stable `User.username`
   not-found.tsx          Site-wide 404 for unmatched routes and `notFound()`
 
 components/
@@ -69,14 +70,15 @@ components/
                          ListActions, ListSection, ListsBrowser, and the
                          shared list view-model/helpers
   reviews/               ReviewCard
-  user/                  UserAvatar, ProfileStats
+  user/                  UserAvatar, ProfileStats, ProfileHeader,
+                         ProfileSection, FavoriteMediaGrid
   skeletons/             Media, activity/feed, and profile skeletons
 
 lib/
   types.ts               Strongly typed domain models
   site-config.ts         Centralized brand name, tagline, and site URL
   cn.ts                  Class name joiner utility
-  data/                  Mock data layer (users, media, activity, diary, lists, index)
+  data/                  Mock data layer (users, media, activity, diary, lists, profile, index)
 
 public/media/            Local SVG placeholder posters, backdrops, avatars
 
@@ -166,8 +168,10 @@ they are wired together so `npm run validate` is a reliable local gate.
   queries — never internal state or class names.
 - **Playwright** covers complete user journeys (home → explore → title,
   search, media-type filtering, movie vs. book detail, the custom 404, the
-  diary, and the lists flow — index → list → title, list search, and the
-  invalid-list-slug 404) against `next build` + `next start`, using semantic
+  diary, the lists flow — index → list → title, list search, and the
+  invalid-list-slug 404, and the profile flow — app-shell avatar → profile,
+  derived statistics, favorite title, one of the user's lists, and the
+  unknown-username 404) against `next build` + `next start`, using semantic
   locators.
 - **Storybook** documents genuine component states (media/review/activity
   cards, badges, ratings, empty states) on the Favalog dark theme and provides
@@ -207,25 +211,28 @@ behavior-focused assertions.
 ## MVP scope (current)
 
 The current implementation covers the **application shell, shared UI layer,
-and fully built Home, Explore, Diary, Lists, title-detail, and list-detail
-experiences**:
+and fully built Home, Explore, Diary, Lists, title-detail, list-detail, and
+profile experiences**:
 
 - Design system: dark-first tokens, editorial typography, accent color
 - Root layout with deployment-aware SEO metadata and Open Graph tags,
   centralized in `lib/site-config.ts`
 - Responsive top navigation: wordmark, primary nav, search field,
-  notifications, avatar menu, and a dedicated mobile sheet
+  notifications, a profile avatar linking to the current viewer's
+  `/profile/[username]`, and a dedicated mobile sheet
 - Reusable primitives: `Container`, `Badge`, `StarRating`, `RatingDisplay`,
   `SearchInput`, `SectionHeader`, `EmptyState`, `Skeleton`
 - Media components: `MediaCard`, `MediaPoster`, `MediaTypeBadge`,
   `HorizontalMediaRow`, `ExploreDiscovery`
 - Social components: `ActivityCard`, `ReviewCard`, `UserAvatar`,
-  `ProfileStats`
+  `ProfileStats`, `ProfileHeader`, `ProfileSection`, `FavoriteMediaGrid`
 - Loading states: `MediaCardSkeleton`, `MediaRowSkeleton`,
   `ActivityCardSkeleton`, `FeedSkeleton`, `ProfileSkeleton`
 - Typed domain models: `User`, `MediaItem`, `Movie`, `TVShow`, `Book`,
-  `Review`, `Rating`, `List`, `ActivityItem`, `DiaryEntry` (both `MediaItem`
-  and `List` carry a stable `slug`, distinct from the display title)
+  `Review`, `Rating`, `List`, `ActivityItem`, `DiaryEntry`, `Favorite`,
+  `CurrentlyEnjoying` (both `MediaItem` and `List` carry a stable `slug`,
+  distinct from the display title; `User` carries a stable `username`,
+  distinct from the display name)
 - Mock data layer at `lib/data`
 - Home page composed of a hero (with a mixed movie / TV / book collage),
   a unified **Trending this week** row, a **From your circle** social feed,
@@ -234,14 +241,15 @@ experiences**:
 
 ### Primary navigation
 
-| Route           | Status                                                                                                                                                             |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `/`             | Implemented (home)                                                                                                                                                 |
-| `/explore`      | Implemented — local search, All / Movies / TV / Books filter, editorial shelves                                                                                    |
-| `/diary`        | Implemented — unified newest-first diary of movies, TV, and books, grouped by month, with All / Movies / TV / Books local filtering and a derived activity summary |
-| `/lists`        | Implemented — cross-media collection discovery with curated sections (Popular, From your circle, Recently updated, Staff picks) and lightweight local search       |
-| `/list/[slug]`  | Implemented — individual collection page keyed by the stable `List.slug`, with mixed-media contents, ranks/notes, presentation-only Like/Share, and related lists  |
-| `/title/[slug]` | Implemented — unified detail page for movies, TV, and books with adaptive credits, community rating breakdown, popular reviews, and cross-media "More like this"   |
+| Route                 | Status                                                                                                                                                                                                                                            |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`                   | Implemented (home)                                                                                                                                                                                                                                |
+| `/explore`            | Implemented — local search, All / Movies / TV / Books filter, editorial shelves                                                                                                                                                                   |
+| `/diary`              | Implemented — unified newest-first diary of movies, TV, and books, grouped by month, with All / Movies / TV / Books local filtering and a derived activity summary                                                                                |
+| `/lists`              | Implemented — cross-media collection discovery with curated sections (Popular, From your circle, Recently updated, Staff picks) and lightweight local search                                                                                      |
+| `/list/[slug]`        | Implemented — individual collection page keyed by the stable `List.slug`, with mixed-media contents, ranks/notes, presentation-only Like/Share, and related lists                                                                                 |
+| `/title/[slug]`       | Implemented — unified detail page for movies, TV, and books with adaptive credits, community rating breakdown, popular reviews, and cross-media "More like this"                                                                                  |
+| `/profile/[username]` | Implemented — a person's Favalog profile keyed by the stable `User.username`: identity header, derived taste statistics, favorites, currently enjoying, recently watched/read, recent reviews, lists, and recent activity (e.g. `/profile/jamie`) |
 
 Movies, TV, and books are **not** top-level destinations. They are media
 types that will be filtered inside `/explore`.
@@ -396,6 +404,45 @@ titles can change without breaking links. Invalid slugs use Next.js
 - **Actions.** Log / Rate / Review / Add to list are presentation-only
   buttons (`aria-disabled`) that communicate the shape of the future
   product. No persistence, no fake success states.
+
+### Profile (`/profile/[username]`)
+
+A person's Favalog profile is their entertainment identity in one editorial,
+single-`h1` page. The route is keyed on the stable `User.username` (distinct
+from the mutable `displayName`), so `/profile/jamie` is the primary demo
+(Jamie DeMarco). Unknown usernames call `notFound()` and render the site-wide 404. The app-shell avatar links here for the mock current viewer.
+
+- **Stored identity vs. derived statistics.** `User` stores only identity
+  (`username`, `displayName`, `avatarUrl`, `bio`, optional `location`,
+  `joinedAt`, follower/following counts). Every headline statistic — movies
+  watched, shows watched, books read, reviews, lists, and average rating — is
+  **derived** from the existing diary, reviews, and lists via
+  `getUserProfileStats` in `lib/data/profile.ts`, never hardcoded, so the
+  numbers can never drift from the underlying records.
+- **Data layer.** Profile selectors live behind `@/lib/data`:
+  `getUserByUsername`, `getCurrentUser`, `getUserFavorites`,
+  `getUserCurrentlyEnjoying`, `getReviewsByUser`, `getActivityForUser`,
+  `getUserProfileStats`, `getUserRecentlyWatched`, `getUserRecentlyRead`, and
+  `getUserRecentActivity`. Favorites and "currently enjoying" are thin,
+  ordered `Favorite` / `CurrentlyEnjoying` records that reference media by
+  `mediaId` — no media, review, list, diary, or activity data is duplicated.
+- **Sections.** A cinematic `ProfileHeader` (avatar, name, `@username`, bio,
+  location, join date, follower/following counts, decorative cover collage,
+  and a presentation-only **Edit profile** action for the current viewer),
+  a restrained derived-statistics band (`ProfileStats`), a prominent
+  cross-media **Favorites** shelf (`FavoriteMediaGrid`), **Currently
+  enjoying**, **Recently watched** / **Recently read** rows drawn from the
+  diary, **Recent reviews** (`ReviewCard`, `EmptyState` when none), **Lists**
+  (`ListCard` with a "Browse all lists" link), and a lightweight **Recent
+  activity** feed (`ActivityCard`). Sections are composed with focused
+  `ProfileHeader`, `ProfileSection`, and `FavoriteMediaGrid` components rather
+  than one enormous page.
+- **Dynamic metadata.** `generateMetadata` derives the title
+  (`Display Name (@username)`), description (the bio), and Open Graph / Twitter
+  tags from the user, with the canonical URL built from `lib/site-config.ts`.
+- **Editing is out of scope.** No authentication, editing, avatar uploads,
+  following/unfollowing, or persistence — the profile is read-only against the
+  mock data layer.
 
 ---
 

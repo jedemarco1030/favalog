@@ -29,7 +29,7 @@ export interface ListCardView {
   isRanked: boolean;
   owner: {
     displayName: string;
-    handle: string;
+    username: string;
     avatarUrl: string;
   };
   /** Up to a handful of covers for the editorial preview, in list order. */
