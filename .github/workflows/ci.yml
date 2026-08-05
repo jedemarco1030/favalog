@@ -57,6 +57,38 @@ jobs:
           path: .next
           retention-days: 1
 
+  # Database schema + RLS tests against a throwaway local Supabase stack.
+  #
+  # This job is intentionally ISOLATED (no `needs`, and it does not gate the
+  # verify/e2e pipeline) and requires NO remote Supabase credentials — it spins
+  # up the local stack via the Supabase CLI (Docker is available on
+  # GitHub-hosted `ubuntu-latest` runners) and runs the pgTAP tests. Ordinary
+  # PR CI therefore never depends on secrets.
+  database:
+    name: Supabase schema & RLS tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start local Supabase stack
+        run: npx supabase start
+
+      - name: Run database tests (pgTAP)
+        run: npm run db:test
+
+      - name: Stop local Supabase stack
+        if: ${{ always() }}
+        run: npx supabase stop --no-backup
+
   # End-to-end tests run against the production server, reusing the build
   # produced by the `verify` job.
   e2e:

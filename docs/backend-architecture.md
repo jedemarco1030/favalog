@@ -1,0 +1,284 @@
+# Backend architecture
+
+> **Status:** infrastructure established. The deployed frontend still runs
+> entirely on the typed mock-data layer (`@/lib/data`). Nothing in the
+> consumer-facing UI reads from Supabase yet. Authentication and persistence
+> are deliberately out of scope for this phase.
+
+This document describes the Supabase/PostgreSQL foundation added in Phase 2:
+why it exists, the schema, the security model, and the boundaries that keep the
+existing architecture intact.
+
+## Why Supabase / PostgreSQL
+
+Favalog needs authentication, a per-user persistence layer, and eventually a
+real media catalog. Supabase provides managed PostgreSQL, authentication,
+Row Level Security (RLS), auto-generated APIs, and TypeScript type generation
+with a first-class local development story via the Supabase CLI. That lets us:
+
+- keep the data model in **plain SQL migrations** (portable, reviewable, and not
+  locked to an ORM);
+- push authorization **into the database** with RLS rather than trusting
+  application code;
+- develop and test the whole stack locally with the CLI (no cloud dependency
+  for ordinary work).
+
+See [ADR 0001](./adr/0001-supabase-backend.md) for the decision, alternatives,
+and consequences.
+
+## Schema overview
+
+All application tables live in the `public` schema. Migrations under
+`supabase/migrations/` are the **single source of truth** — the database is
+never edited out of band.
+
+| Table           | Purpose                                             |
+| --------------- | --------------------------------------------------- |
+| `profiles`      | Public identity, 1:1 with `auth.users`              |
+| `media_items`   | Unified catalog of movies / TV / books              |
+| `diary_entries` | Chronological per-user log events (watched / read)  |
+| `reviews`       | Long-form reviews, optionally tied to a diary entry |
+| `lists`         | User-authored cross-media collections               |
+| `list_items`    | Ordered membership of media in a list               |
+| `favorites`     | A user's ordered, cross-media favorites shelf       |
+| `follows`       | Directed follower → following relationships         |
+
+### Enums
+
+PostgreSQL enums are used only for stable, bounded domains:
+
+- `media_kind` — `movie | tv | book`
+- `list_visibility` — `public | followers | private`
+
+Values expected to evolve (genres, review moods, etc.) are **not** enums.
+
+### Keys, constraints, and indexes
+
+- **UUID primary keys** (`gen_random_uuid()`) everywhere except `follows`,
+  which uses a composite `(follower_id, following_id)` primary key.
+- **Unique identity:** `media_items (source, external_id)` and a unique `slug`;
+  `profiles.username` unique **case-insensitively** (via `citext`);
+  `lists (user_id, slug)`; `list_items (list_id, media_id)` and
+  `(list_id, position)`; `favorites (user_id, media_id)` and
+  `(user_id, position)`.
+- **Check constraints:** half-star rating ranges (0.5–5.0) on
+  `diary_entries.rating` and `reviews.rating`; username format; slug format;
+  non-negative positions; `follows` self-follow prevention; and a
+  rating-source-of-truth guard on `reviews`.
+- **Indexes** cover the real access patterns: media by `kind`/`year`, a GIN
+  index on `genres`, diary by `(user_id, logged_at desc)`, reviews by
+  `(media_id, created_at desc)` and `(user_id, created_at desc)`, list/favorite
+  ownership, and the follows reverse lookup.
+- **Timestamps:** every table carries `created_at`; every mutable table also
+  carries `updated_at`, kept fresh by the shared `public.set_updated_at()`
+  trigger function (pinned `search_path`, no elevated privileges).
+
+### ER diagram
+
+```mermaid
+erDiagram
+    auth_users ||--|| profiles : "1:1 (trigger provisions)"
+    profiles ||--o{ diary_entries : "logs"
+    profiles ||--o{ reviews : "writes"
+    profiles ||--o{ lists : "owns"
+    profiles ||--o{ favorites : "curates"
+    profiles ||--o{ follows : "follower"
+    profiles ||--o{ follows : "following"
+    media_items ||--o{ diary_entries : "logged as"
+    media_items ||--o{ reviews : "reviewed as"
+    media_items ||--o{ list_items : "appears in"
+    media_items ||--o{ favorites : "favorited as"
+    lists ||--o{ list_items : "contains"
+    diary_entries |o--o{ reviews : "optional rating source"
+```
+
+## Ownership relationships
+
+- A `profiles` row is owned by the auth user with the same `id`.
+- `diary_entries`, `reviews`, `lists`, and `favorites` are owned by
+  `user_id`.
+- `list_items` are owned transitively: a user owns a list item when they own
+  its parent `lists` row.
+- A `follows` row is written only by the `follower_id`.
+
+## RLS strategy
+
+RLS is **enabled on every public application table**. Policies are explicit and
+least-privilege; there are deliberately no `using (true) with check (true)`
+policies for user-owned writes.
+
+**Public read** (`select using (true)` or a visibility check):
+
+- `media_items`, `profiles`, `reviews`, `diary_entries`, `favorites`, `follows`
+- `lists` — only when `visibility = 'public'`, plus the owner always sees their
+  own lists
+- `list_items` — readable when the parent list is readable
+
+**Owner write** (`auth.uid()` checks on INSERT / UPDATE / DELETE):
+
+- profile owner (`profiles.id`)
+- diary-entry / review / list / favorites owner (`user_id`)
+- follow relationship creator (`follower_id`)
+- `list_items`: writable only when the caller owns the parent list (enforced by
+  an `EXISTS` sub-select against `lists`)
+
+**Catalog writes** (`media_items`) have **no** anon/authenticated write policy.
+They are performed exclusively by trusted server-side processes using the
+**secret (service-role) key**, which bypasses RLS. Privileged writes are never
+exposed to a browser client.
+
+`UPDATE` policies always pair a `using` (row visibility) clause with a
+`with check` (post-image) clause.
+
+### Public-read decisions and deferred visibility
+
+- **Diary entries are publicly readable.** They back the public-profile
+  concept. If per-entry privacy is introduced later, add a privacy column and
+  tighten the SELECT policy.
+- **`followers` and `private` lists are treated as private** for now: a list is
+  publicly readable only when `visibility = 'public'`. Real followers-only
+  access is **not faked** — it will be added once the `follows` relationship
+  powers a proper policy (a `followers` list becomes readable when
+  `EXISTS (select 1 from follows where following_id = lists.user_id and
+follower_id = auth.uid())`).
+
+## Ratings source of truth
+
+To avoid representing the same rating inconsistently:
+
+- `diary_entries.rating` records the user's rating **at log time** and is the
+  source of truth for a logged event.
+- A `reviews` row that references a `diary_entry_id` **must not** carry its own
+  `rating` (enforced by a check constraint); its displayed rating resolves from
+  the linked diary entry.
+- A **standalone** review (no `diary_entry_id`) may carry its own `rating`, so
+  an opinion can exist without a formal log event.
+
+## Likes / activity — deferred by design
+
+- **Likes.** The UI shows presentation-only like counts on reviews and lists.
+  No `review_likes` / `list_likes` tables are added yet; those counts remain
+  mock values until a dedicated persistence task, at which point they can be
+  modeled securely (owner-scoped rows + a derived count).
+- **Activity.** No generic `activity` table is created. The social feed and
+  profile activity are **derivable** from diary entries, reviews, list
+  create/update, favorites, and follows. A dedicated event table becomes
+  justified only if/when derivation becomes too expensive (e.g. a high-volume
+  fan-out feed needing precomputed timelines) — deferred until then.
+
+## Catalog strategy
+
+`media_items` is a unified table for all three media kinds. Commonly queried
+fields are normal columns; kind-specific fields live in a `details` JSONB
+payload validated at the mapping boundary. A `source` column marks provenance
+(`favalog` for curated/internal seed rows) and `(source, external_id)` is the
+unique external identity, so a real provider (TMDB, Open Library, Google Books,
+…) can be ingested later **without a schema change** and **without** committing
+to any provider now.
+
+## Generated types & the domain boundary
+
+- `lib/database.types.ts` is the **database** representation. It is produced by
+  `npm run supabase:types` (`supabase gen types typescript --local`). It must
+  not be hand-maintained once generation can run.
+  > The version committed in this phase is a **clearly-labeled placeholder**
+  > authored by hand to match the migrations, because Docker (required for the
+  > local stack) was unavailable when the foundation was created. Regenerate it
+  > with `npm run supabase:types` as soon as the local stack can run.
+- `lib/types.ts` remains the **framework-agnostic domain model** used by the UI.
+  Generated row types do **not** replace it.
+- `lib/supabase/mappers.ts` is the boundary: it maps `media_items` rows onto the
+  `MediaItem` union. It is a small proof of concept (with tests), not a full
+  repository layer — building fetchers/repositories is future work.
+
+```
+Postgres row  ──(lib/database.types.ts)──▶  mapper  ──▶  domain model (lib/types.ts)  ──▶  UI
+```
+
+## Supabase clients
+
+Per current `@supabase/ssr` guidance (the deprecated `@supabase/auth-helpers-*`
+packages are **not** used):
+
+- `lib/supabase/client.ts` — `createBrowserClient` for Client Components.
+- `lib/supabase/server.ts` — `createServerClient` bound to request cookies via
+  `next/headers`, created **per request** (no shared global server client).
+- `lib/supabase/session.ts` + root `proxy.ts` — session-cookie **refresh only**
+  (Next.js 16 renamed the `middleware` convention to `proxy`). It performs no
+  authorization/redirects and is a no-op when Supabase is unconfigured. The
+  matcher excludes Next internals and static assets.
+
+## Environment variables
+
+Only public configuration uses the `NEXT_PUBLIC_` prefix:
+
+| Variable                               | Scope           | Required for app startup |
+| -------------------------------------- | --------------- | ------------------------ |
+| `NEXT_PUBLIC_SUPABASE_URL`             | browser+server  | No (mock-data phase)     |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | browser+server  | No (mock-data phase)     |
+| `SUPABASE_SECRET_KEY`                  | **server only** | No — future admin only   |
+
+`lib/supabase/env.ts` never throws at import time, so the app keeps building and
+rendering on Vercel with none of these set. `.env.example` documents the names
+(no secrets). The secret key is never read from shared/client code.
+
+## Local development commands
+
+Requires Docker Desktop (or a compatible runtime) running.
+
+```bash
+npm run supabase:start    # start the local stack (Postgres, Auth, Studio, …)
+npm run supabase:status   # print local URLs + keys (fill .env.local from here)
+npm run supabase:reset    # drop, re-apply all migrations, then run seed.sql
+npm run supabase:types    # regenerate lib/database.types.ts from the local DB
+npm run db:test           # run the pgTAP tests in supabase/tests/
+npm run supabase:stop     # stop the local stack
+```
+
+Typical first run:
+
+```bash
+npm run supabase:start
+npm run supabase:status          # copy URL + publishable key
+cp .env.example .env.local       # then paste the values in
+npm run supabase:reset           # apply migrations + seed
+npm run db:test                  # verify constraints + RLS
+```
+
+## Remote project linking / deployment
+
+Not required for local development. When a hosted project is created:
+
+```bash
+supabase login
+supabase link --project-ref <your-project-ref>
+supabase db push                 # apply local migrations to the linked project
+```
+
+CI/PR builds must **not** require remote Supabase credentials (see the CI
+section in the README). The secret key, database password, and privileged
+connection strings are configured only in server-side deployment settings and
+are never committed or logged.
+
+## Seed assumptions
+
+`supabase/seed.sql` loads a **small, representative** dataset (not a migration
+of the full mock catalog):
+
+- Three **local test users** are inserted directly into `auth.users` using the
+  documented Supabase local-dev pattern (bcrypt via `pgcrypto`); the profile
+  trigger then provisions their `profiles`. All use `@example.com` emails and
+  the password `password123`. This direct insert is **local only** — remote
+  environments should provision users through the Auth API.
+- A five-title cross-media catalog (movie, movie, TV, book, book), diary entries
+  (including a rewatch), one diary-linked review and one standalone review,
+  a ranked public list and a private list with items, favorites, and follows.
+
+## Deferred decisions
+
+- Authentication UI (login/signup), route protection, and login redirects.
+- Migrating the frontend off mock data to Supabase-backed fetchers.
+- Real media-catalog provider integration.
+- Persistent user actions (log / rate / review / add-to-list writes).
+- Real likes persistence and any dedicated activity/event table.
+- Full followers-only list visibility enforcement.

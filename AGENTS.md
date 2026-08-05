@@ -110,6 +110,33 @@ Current primary routes:
 Do not add separate top-level routes such as `/movies`, `/tv`, or `/books`
 without an explicit product decision.
 
+## Backend & database (Supabase)
+
+A Supabase/PostgreSQL foundation exists under `supabase/` and `lib/supabase/`.
+The consumer-facing UI still runs on the `@/lib/data` mock layer; do not migrate
+it to Supabase without an explicit task. The following rules are permanent:
+
+- SQL migrations under `supabase/migrations/` are the single source of truth for
+  the database schema. Never edit a live database out of band; every schema
+  change is a new migration.
+- Row Level Security must be enabled on every public application table, with
+  explicit least-privilege policies. Never add `using (true) with check (true)`
+  policies for user-owned writes, and never rely on hidden UI as authorization.
+- Browser code must never receive privileged credentials. Only public
+  `NEXT_PUBLIC_` Supabase config may reach the client; the secret/service-role
+  key, database password, and privileged connection strings are server-only and
+  must not be required for normal app startup or static build.
+- Generated database types (`lib/database.types.ts`, via `npm run supabase:types`)
+  are the DB representation only. They do not replace the framework-agnostic
+  domain types in `lib/types.ts`; map between them at a boundary
+  (`lib/supabase/mappers.ts`).
+- Database changes require the relevant migration plus meaningful database tests
+  (pgTAP under `supabase/tests/`) covering constraints and RLS.
+- Use the current `@supabase/ssr` patterns (browser client, per-request server
+  client, `proxy.ts` session refresh). Never use the deprecated
+  `@supabase/auth-helpers-*` packages, and never create a shared global server
+  client.
+
 ## Design
 
 Favalog's visual direction is: dark-first, premium, editorial, cinematic,
@@ -192,11 +219,13 @@ claim a command passed unless it was actually executed successfully.
 
 ## Scope / product behavior
 
-The project remains frontend/mock-data based. Do **not** introduce any of the
-following without an explicit task: authentication, Supabase, databases,
-external catalog APIs (TMDB, Open Library, Google Books), persistent writes, AI
-functionality, real notifications, real social relationships, or real
-recommendation algorithms.
+The consumer-facing app remains frontend/mock-data based. A Supabase backend
+**foundation** exists (schema, RLS, clients) but is not wired into the UI. Do
+**not** introduce any of the following without an explicit task: authentication
+UI, route protection, migrating the frontend off mock data, external catalog
+APIs (TMDB, Open Library, Google Books), persistent writes, AI functionality,
+real notifications, real social relationships, or real recommendation
+algorithms.
 
 ## Workflow
 

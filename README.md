@@ -98,6 +98,82 @@ once and reused.
 
 ---
 
+## Backend (Supabase) — infrastructure only
+
+> **Current status: infrastructure established; the frontend still uses mock
+> data.** A Supabase/PostgreSQL foundation (migrations, Row Level Security,
+> seed, generated-type config, and cookie-based clients) has been added so a
+> future authentication/persistence task can build on it. **No** part of the
+> deployed, consumer-facing UI reads from Supabase yet, and the app builds and
+> runs with **no** Supabase environment variables set. Authentication, route
+> protection, and persistent user actions are **not** active.
+
+Full detail lives in [`docs/backend-architecture.md`](docs/backend-architecture.md)
+and [`docs/adr/0001-supabase-backend.md`](docs/adr/0001-supabase-backend.md).
+
+### Layout
+
+```
+supabase/
+  config.toml           Supabase CLI project config
+  migrations/           Version-controlled SQL — the schema source of truth
+  seed.sql              Small deterministic local seed (movie/TV/book + relations)
+  tests/database/       pgTAP tests for constraints + RLS
+lib/
+  database.types.ts     Generated DB types (regenerate via npm run supabase:types)
+  supabase/
+    env.ts              Safe, non-throwing env access + validation
+    client.ts           Browser client (Client Components)
+    server.ts           Per-request cookie-aware server client
+    session.ts          Session-cookie refresh helper (used by proxy.ts)
+    mappers.ts          DB row -> domain model boundary (proof of concept)
+proxy.ts                Root Proxy (Next.js 16) — Supabase session refresh only
+```
+
+### Environment variables
+
+Copy `.env.example` to `.env.local` (git-ignored) and fill in the values. None
+are required for the current mock-data app to build or run.
+
+| Variable                               | Exposure        | Notes                                    |
+| -------------------------------------- | --------------- | ---------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`             | browser+server  | Public project URL                       |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | browser+server  | Public publishable key (formerly "anon") |
+| `SUPABASE_SECRET_KEY`                  | **server only** | Privileged; future admin use; optional   |
+
+Never expose the secret key, database password, or privileged connection
+strings to browser code.
+
+### Local setup
+
+Requires **Docker** running. The Supabase CLI ships as a dev dependency.
+
+```bash
+npm run supabase:start     # start local stack (Postgres, Auth, Studio, …)
+npm run supabase:status    # print local URLs + keys → paste into .env.local
+npm run supabase:reset     # apply all migrations, then run seed.sql
+npm run supabase:types     # regenerate lib/database.types.ts from local DB
+npm run db:test            # run pgTAP schema + RLS tests
+npm run supabase:stop      # stop the local stack
+```
+
+> The committed `lib/database.types.ts` is a clearly-labeled hand-authored
+> **placeholder** matching the migrations, because Docker was unavailable when
+> the foundation was created. Run `npm run supabase:types` once a local stack is
+> available to replace it with the CLI-generated file.
+
+### Remote linking (later)
+
+```bash
+supabase login
+supabase link --project-ref <your-project-ref>
+supabase db push
+```
+
+Remote/PR CI does **not** require Supabase credentials.
+
+---
+
 ## Commands
 
 ```bash
@@ -130,6 +206,14 @@ npm run build-storybook    # Static Storybook build
 # Aggregate gates
 npm run validate           # format:check + lint + typecheck + test
 npm run validate:full      # validate + build + test:e2e
+
+# Supabase / database (require Docker; see the Backend section above)
+npm run supabase:start     # Start the local Supabase stack
+npm run supabase:status    # Print local URLs + keys
+npm run supabase:reset     # Re-apply migrations, then run seed.sql
+npm run supabase:types     # Regenerate lib/database.types.ts from the local DB
+npm run supabase:stop      # Stop the local stack
+npm run db:test            # Run pgTAP schema + RLS tests
 ```
 
 To regenerate the placeholder artwork after editing the mock catalog:

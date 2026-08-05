@@ -34,6 +34,12 @@ export default defineConfig({
         // Deterministic domain / data logic.
         "lib/data/**/*.ts",
         "lib/cn.ts",
+        // Pure backend utilities: env validation + DB->domain mapper. The
+        // Supabase clients / session refresh / generated types are runtime
+        // integration surfaces (Next.js request context, Supabase network)
+        // and are intentionally NOT included here.
+        "lib/supabase/env.ts",
+        "lib/supabase/mappers.ts",
         // Interactive and conditional UI under test.
         "components/media/explore-discovery.tsx",
         "components/media/media-card.tsx",
