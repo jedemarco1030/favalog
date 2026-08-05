@@ -190,6 +190,41 @@ supabase db push
 
 Remote/PR CI does **not** require Supabase credentials.
 
+### Hosted verification status (2026-08-05)
+
+The hosted development project was verified directly (read-only schema
+introspection plus disposable-account auth flows over the Supabase client);
+`supabase link`/`db push`/`gen types` could not be run here because the local
+Docker stack was unavailable and no CLI access token was present.
+
+- **Schema & migrations**: all 8 committed migrations are recorded in the
+  remote `schema_migrations` ledger — no drift. All expected tables, both enums
+  (`media_kind`, `list_visibility`), the `set_updated_at` + `handle_new_user`
+  functions, the `on_auth_user_created` trigger, constraints (rating half-steps,
+  self-follow prevention, duplicate list-item/username uniqueness), indexes, and
+  **RLS on every table** are present and match the intended owner-write /
+  public-read model.
+- **Fix applied**: `handle_new_user()` cast `::citext` unqualified under a pinned
+  empty `search_path`; because `citext` lives in the `extensions` schema this
+  raised `type "citext" does not exist`, so **every** hosted sign-up failed with
+  "Database error creating new user". Forward-only migration
+  `20260805175500_fix_handle_new_user_citext_qualification.sql` qualifies the
+  cast as `extensions.citext`. This is the exact path the local pgTAP trigger
+  test exercises, so it also unblocks the CI `database` job.
+- **Auth verified end-to-end** against the hosted project (disposable accounts,
+  cleaned up): automatic profile creation via the trigger (id/username/
+  display-name/timestamps), sign-in, wrong-password rejection, owner onboarding
+  update, case-insensitive duplicate-username rejection, RLS cross-user-update
+  block, and sign-out.
+- **Still a placeholder**: `lib/database.types.ts` remains the hand-authored
+  placeholder — genuine `supabase gen types` needs Docker or a CLI access token,
+  neither available here. Regenerate and commit it from a Docker-capable
+  environment or the CI `database` job.
+- **Not exercised here** (require a browser / real email inbox / dashboard):
+  the sign-up UI + email-confirmation link, browser session-restore-on-refresh,
+  the recovery email link, the Google OAuth consent screen, and Vercel
+  environment/deploy verification. Backend equivalents were verified above.
+
 ---
 
 ## Authentication & onboarding
