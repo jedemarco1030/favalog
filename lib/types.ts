@@ -80,6 +80,31 @@ export interface User {
 }
 
 /**
+ * The authenticated user's public identity, backed 1:1 by the `public.profiles`
+ * table (see `supabase/migrations`). This is deliberately distinct from the
+ * mock {@link User} above: it carries only stored identity fields and never the
+ * derived profile *statistics* (follower counts, ratings, etc.) that the mock
+ * demo computes from diary/reviews/lists. Authentication credentials live only
+ * in `auth.users` and never appear here.
+ *
+ * Used by the Supabase-backed auth/onboarding surfaces during the transitional
+ * phase while the rest of the product still renders from `@/lib/data`.
+ */
+export interface Profile {
+  id: string;
+  /** Case-insensitive, stable handle that `/profile/[username]` routes off. */
+  username: string;
+  displayName: string;
+  bio?: string;
+  location?: string;
+  avatarUrl?: string;
+  /** ISO timestamp the profile row was created. */
+  createdAt: string;
+  /** ISO timestamp the profile row was last updated. */
+  updatedAt: string;
+}
+
+/**
  * A title a user has marked as a favorite.
  *
  * A thin record: it references the `MediaItem` by `mediaId` (never embedding

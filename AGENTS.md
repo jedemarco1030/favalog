@@ -137,6 +137,27 @@ it to Supabase without an explicit task. The following rules are permanent:
   `@supabase/auth-helpers-*` packages, and never create a shared global server
   client.
 
+### Authentication & authorization (permanent rules)
+
+- Treat every Server Action and Route Handler as a public endpoint. It must
+  authenticate and authorize independently — re-validate the current user via
+  the server-only auth DAL (`lib/auth/data.ts`) and rely on RLS as a second
+  layer. The proxy is only an optimistic UX redirect, never the security
+  boundary.
+- Never trust client-provided ownership identifiers (hidden `userId`/`id`
+  fields, etc.). Scope every user-owned write to the authenticated
+  `auth.uid()` in both application code and RLS.
+- Determine the authenticated user with Supabase's validating
+  `supabase.auth.getUser()` for authorization decisions — never with the
+  unverified `getSession()` cookie contents.
+- Safe return-to validation is mandatory: route every caller-supplied redirect
+  target through `getSafeRedirectPath` (same-origin relative paths only).
+- Auth UI must work through SSR cookies (`@supabase/ssr`), read on the server —
+  never via a client-side `localStorage`/session check that causes an auth
+  flash. Do not leak raw Supabase errors or unvalidated query params to the
+  browser; map them to safe messages, and keep account-existence neutral in
+  sign-up and password-reset flows.
+
 ## Design
 
 Favalog's visual direction is: dark-first, premium, editorial, cinematic,
@@ -219,13 +240,16 @@ claim a command passed unless it was actually executed successfully.
 
 ## Scope / product behavior
 
-The consumer-facing app remains frontend/mock-data based. A Supabase backend
-**foundation** exists (schema, RLS, clients) but is not wired into the UI. Do
-**not** introduce any of the following without an explicit task: authentication
-UI, route protection, migrating the frontend off mock data, external catalog
-APIs (TMDB, Open Library, Google Books), persistent writes, AI functionality,
-real notifications, real social relationships, or real recommendation
-algorithms.
+The consumer-facing product pages remain frontend/mock-data based. A Supabase
+backend foundation exists (schema, RLS, clients) and **authentication +
+onboarding are wired to it** (sign in/up, email confirmation, password reset,
+optional Google OAuth, session-aware shell, `/onboarding`). Everything else is
+still mock-data. Do **not** introduce any of the following without an explicit
+task: migrating the product pages off mock data, persistent user actions
+(diary/ratings/reviews/lists/favorites), a follows UI, external catalog APIs
+(TMDB, Open Library, Google Books), AI functionality, real notifications, real
+social relationships, real recommendation algorithms, additional OAuth
+providers, MFA/passkeys, or full account settings.
 
 ## Workflow
 

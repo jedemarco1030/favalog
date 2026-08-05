@@ -1,27 +1,25 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { Bell } from "lucide-react";
 import { Container } from "@/components/ui/container";
 import { Logo } from "@/components/brand/logo";
 import { SearchInput } from "@/components/ui/search-input";
-import { UserAvatar } from "@/components/user/user-avatar";
 import { PrimaryNavLinks } from "@/components/layout/primary-nav-links";
-import { getCurrentUser } from "@/lib/data";
+import { HeaderAuth } from "@/components/layout/header-auth";
 
 /**
  * Application shell top bar. A Server Component: wordmark, primary nav
- * (desktop only — primary destinations move to `MobileNav`'s bottom tab
- * bar on small screens), search field (desktop only — mobile search lives
- * in the tab bar's search sheet), notifications button, and an avatar menu
- * placeholder. Both breakpoints get notifications and the avatar here.
+ * (desktop only — primary destinations move to `MobileNav`'s bottom tab bar on
+ * small screens), search field (desktop only), a presentation-only
+ * notifications button, and the session-aware auth cluster.
  *
- * `SearchInput` and `Bell` are intentionally presentation-only — no backend,
- * no auth, no notifications yet. The avatar links to the mock viewer's own
- * profile so the profile route is reachable from every page.
+ * `HeaderAuth` reads the session on the server (validated `getUser()`), so the
+ * correct signed-in / signed-out control is in the initial HTML with no
+ * client-side auth flash. It is wrapped in `Suspense` with a stable-sized
+ * placeholder so the rest of the shell renders immediately while the session
+ * resolves.
  */
 export function SiteHeader() {
-  // No auth yet: the mock "current viewer" whose profile the avatar opens.
-  const viewer = getCurrentUser();
-
   return (
     <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-md">
       <Container className="flex h-16 items-center gap-4">
@@ -43,7 +41,7 @@ export function SiteHeader() {
           <SearchInput hint="⌘K" />
         </div>
 
-        {/* Right-hand utility cluster (notifications + avatar) */}
+        {/* Right-hand utility cluster (notifications + auth) */}
         <div className="ml-auto flex items-center gap-2 md:ml-0">
           <button
             type="button"
@@ -52,15 +50,16 @@ export function SiteHeader() {
           >
             <Bell className="size-4" aria-hidden="true" />
           </button>
-          {viewer && (
-            <Link
-              href={`/profile/${viewer.username}`}
-              aria-label="Your profile"
-              className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              <UserAvatar user={viewer} size="md" decorative />
-            </Link>
-          )}
+          <Suspense
+            fallback={
+              <span
+                aria-hidden="true"
+                className="size-9 rounded-full bg-surface-1"
+              />
+            }
+          >
+            <HeaderAuth />
+          </Suspense>
         </div>
       </Container>
     </header>

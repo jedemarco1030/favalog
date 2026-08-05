@@ -1,15 +1,25 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// `HeaderAuth` is an async Server Component that reads the session; stub it so
+// this unit test exercises only the synchronous shell composition. The
+// signed-out / signed-in controls are covered by their own component tests.
+vi.mock("@/components/layout/header-auth", () => ({
+  HeaderAuth: () => <div data-testid="header-auth-slot" />,
+}));
+
 import { SiteHeader } from "@/components/layout/site-header";
-import { getCurrentUser } from "@/lib/data";
 
 describe("SiteHeader", () => {
-  it("links the profile avatar to the current viewer's profile", () => {
+  it("renders the shell: home link, notifications, and the auth cluster slot", () => {
     render(<SiteHeader />);
-    const viewer = getCurrentUser()!;
-    expect(screen.getByRole("link", { name: "Your profile" })).toHaveAttribute(
-      "href",
-      `/profile/${viewer.username}`,
-    );
+
+    expect(
+      screen.getByRole("link", { name: "Favalog — home" }),
+    ).toHaveAttribute("href", "/");
+    expect(
+      screen.getByRole("button", { name: "Notifications" }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("header-auth-slot")).toBeInTheDocument();
   });
 });

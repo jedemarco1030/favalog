@@ -15,9 +15,31 @@
  */
 
 import type { Database, Json } from "@/lib/database.types";
-import type { Book, MediaItem, Movie, TVShow } from "@/lib/types";
+import type { Book, MediaItem, Movie, Profile, TVShow } from "@/lib/types";
 
 export type MediaItemRow = Database["public"]["Tables"]["media_items"]["Row"];
+export type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+
+/**
+ * Map a `profiles` row to the {@link Profile} domain identity.
+ *
+ * Nullable database columns collapse to `undefined` so the domain type stays
+ * clean (optional rather than nullable), matching how the rest of the domain
+ * model expresses "absent". Derived statistics are deliberately NOT part of a
+ * profile — they come from diary/reviews/lists elsewhere.
+ */
+export function mapProfileRowToDomain(row: ProfileRow): Profile {
+  return {
+    id: row.id,
+    username: row.username,
+    displayName: row.display_name,
+    bio: row.bio ?? undefined,
+    location: row.location ?? undefined,
+    avatarUrl: row.avatar_url ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
 
 /** Narrow an unknown JSONB payload to a plain object for safe field access. */
 function asRecord(details: Json): Record<string, Json | undefined> {

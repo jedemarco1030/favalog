@@ -9,10 +9,11 @@ import { isSupabaseConfigured } from "./env";
  * Refresh the Supabase auth session cookies for an incoming request.
  *
  * This is the session-refresh infrastructure invoked from the root `proxy.ts`
- * (Next.js 16's renamed middleware convention). Its ONLY job is to keep the
- * auth cookies fresh so Server Components see a valid session — it intentionally
- * performs NO route authorization or redirects. Route protection is a later
- * authentication task.
+ * (Next.js 16's renamed middleware convention). Its primary job is to keep the
+ * auth cookies fresh so Server Components see a valid session. It ALSO performs
+ * a single, optimistic UX redirect for the account-only `/onboarding` route —
+ * this is deliberately not the security boundary (the protected Server
+ * Component and Server Action re-check authorization via the DAL).
  *
  * If Supabase is not configured (the current mock-data deployment), it is a
  * no-op that simply forwards the request, so the app keeps working with no
@@ -47,9 +48,21 @@ export async function updateSession(request: NextRequest) {
   );
 
   // Touch the auth state so `@supabase/ssr` rotates/refreshes cookies as needed.
-  // Do NOT run any logic between client creation and this call, and do NOT gate
-  // on the result here (no redirects) — this is refresh-only.
-  await supabase.auth.getUser();
+  // Do NOT run any logic between client creation and this call.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // OPTIMISTIC redirect only — this is a UX convenience, NOT the security
+  // boundary. Real authorization is enforced again in the protected Server
+  // Component / Server Action (see `requireUser`). We keep the account-only
+  // surface here deliberately tiny: `/onboarding`. Public routes stay public.
+  const { pathname } = request.nextUrl;
+  if (!user && pathname.startsWith("/onboarding")) {
+    const signInUrl = new URL("/auth/sign-in", request.url);
+    signInUrl.searchParams.set("returnTo", pathname);
+    return NextResponse.redirect(signInUrl);
+  }
 
   return response;
 }

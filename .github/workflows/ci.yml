@@ -85,6 +85,16 @@ jobs:
       - name: Run database tests (pgTAP)
         run: npm run db:test
 
+      # Drift guard (secret-free): regenerate types from the local stack and
+      # fail if the committed `lib/database.types.ts` is out of date with the
+      # migrations. This also flags the initial hand-authored placeholder as
+      # needing a real generation. No remote credentials are involved.
+      - name: Check generated types are up to date
+        run: |
+          npm run supabase:types
+          git diff --exit-code -- lib/database.types.ts \
+            || { echo "::error::lib/database.types.ts is out of date. Run 'npm run supabase:types' and commit the result."; exit 1; }
+
       - name: Stop local Supabase stack
         if: ${{ always() }}
         run: npx supabase stop --no-backup

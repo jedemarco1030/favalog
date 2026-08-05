@@ -98,15 +98,18 @@ once and reused.
 
 ---
 
-## Backend (Supabase) — infrastructure only
+## Backend (Supabase) — foundation + authentication
 
-> **Current status: infrastructure established; the frontend still uses mock
-> data.** A Supabase/PostgreSQL foundation (migrations, Row Level Security,
-> seed, generated-type config, and cookie-based clients) has been added so a
-> future authentication/persistence task can build on it. **No** part of the
-> deployed, consumer-facing UI reads from Supabase yet, and the app builds and
-> runs with **no** Supabase environment variables set. Authentication, route
-> protection, and persistent user actions are **not** active.
+> **Current status: authentication & onboarding are implemented on top of the
+> Supabase foundation; the rest of the product still uses mock data.** Sign up,
+> sign in, email confirmation, password reset, Google OAuth (optional),
+> session-aware navigation, and first-time profile onboarding are wired to
+> Supabase Auth. The catalog, diary, reviews, lists, and profiles pages still
+> render from the `@/lib/data` mock layer, and **persistent user actions**
+> (logging, rating, reviewing, lists) are **not** active. The app still builds
+> and runs with **no** Supabase environment variables set — public browsing
+> keeps working and the auth entry points show a controlled unavailable state.
+> See [Authentication & onboarding](#authentication--onboarding) below.
 
 Full detail lives in [`docs/backend-architecture.md`](docs/backend-architecture.md)
 and [`docs/adr/0001-supabase-backend.md`](docs/adr/0001-supabase-backend.md).
@@ -126,8 +129,21 @@ lib/
     client.ts           Browser client (Client Components)
     server.ts           Per-request cookie-aware server client
     session.ts          Session-cookie refresh helper (used by proxy.ts)
-    mappers.ts          DB row -> domain model boundary (proof of concept)
-proxy.ts                Root Proxy (Next.js 16) — Supabase session refresh only
+    mappers.ts          DB row -> domain model boundary (+ profile mapper)
+    profiles.ts         Public profile lookup selector (server-only)
+  auth/
+    data.ts             Server-only DAL: getCurrentUser/Profile, requireUser/…
+    validation.ts       Pure input validation + normalization
+    safe-redirect.ts    Same-origin-only return-to validation
+    errors.ts           Supabase error -> safe user-facing messages
+    capability.ts       Auth/Google availability detection
+    profile.ts          Profile-completeness rule
+    urls.ts             Trusted absolute-URL builder for callbacks/emails
+app/
+  auth/                 Sign in/up, forgot/update password, callback, confirm
+  onboarding/           First-time profile completion (account-only)
+proxy.ts                Root Proxy (Next.js 16) — session refresh + optimistic
+                        /onboarding redirect (NOT the security boundary)
 ```
 
 ### Environment variables
@@ -135,11 +151,13 @@ proxy.ts                Root Proxy (Next.js 16) — Supabase session refresh onl
 Copy `.env.example` to `.env.local` (git-ignored) and fill in the values. None
 are required for the current mock-data app to build or run.
 
-| Variable                               | Exposure        | Notes                                    |
-| -------------------------------------- | --------------- | ---------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`             | browser+server  | Public project URL                       |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | browser+server  | Public publishable key (formerly "anon") |
-| `SUPABASE_SECRET_KEY`                  | **server only** | Privileged; future admin use; optional   |
+| Variable                               | Exposure        | Notes                                       |
+| -------------------------------------- | --------------- | ------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`             | browser+server  | Public project URL                          |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | browser+server  | Public publishable key (formerly "anon")    |
+| `NEXT_PUBLIC_SITE_URL`                 | browser+server  | Optional canonical origin for callback URLs |
+| `NEXT_PUBLIC_SUPABASE_GOOGLE_ENABLED`  | browser+server  | Optional `"true"` to show Google sign-in    |
+| `SUPABASE_SECRET_KEY`                  | **server only** | Privileged; future admin use; optional      |
 
 Never expose the secret key, database password, or privileged connection
 strings to browser code.
@@ -171,6 +189,77 @@ supabase db push
 ```
 
 Remote/PR CI does **not** require Supabase credentials.
+
+---
+
+## Authentication & onboarding
+
+Phase 2 wires Supabase Auth into the app shell and adds a first-time onboarding
+flow. The rest of the product still renders from the `@/lib/data` mock layer;
+**persistent** user actions (logging, rating, reviewing, lists) remain out of
+scope. Everything degrades gracefully with no Supabase env: public browsing
+works and the auth entry points show a controlled "accounts aren't available
+yet" state.
+
+### What's implemented
+
+- Email/password **sign up** (display name, username, email, password) with
+  server-side validation and a "check your email" confirmation state.
+- Email/password **sign in** with a safe post-sign-in redirect.
+- **Email confirmation** and **password reset → update** via token-hash
+  verification (no deprecated implicit-flow fragments).
+- **Google OAuth** (PKCE) — optional, shown only when configured.
+- **Sign out**, session-aware header (signed-out controls vs. account menu).
+- First-time **onboarding** to complete a username + display name.
+- **Safe return-to** validation, and route protection for `/onboarding`.
+
+### Auth routes
+
+| Route                   | Kind          | Purpose                                        |
+| ----------------------- | ------------- | ---------------------------------------------- |
+| `/auth/sign-in`         | Page + Action | Email/password sign in (+ optional Google)     |
+| `/auth/sign-up`         | Page + Action | Create account with profile metadata           |
+| `/auth/forgot-password` | Page + Action | Request a reset email (neutral response)       |
+| `/auth/update-password` | Page + Action | Set a new password (recovery context required) |
+| `/auth/callback`        | Route Handler | OAuth/PKCE code exchange                       |
+| `/auth/confirm`         | Route Handler | Email confirmation / recovery token verify     |
+| `/onboarding`           | Page + Action | Complete profile (account-only)                |
+
+Sign out is a Server Action invoked from the header account menu.
+
+### Supabase dashboard configuration
+
+For a hosted project (Authentication → URL Configuration, and Providers):
+
+- **Site URL**: your canonical origin (e.g. `https://favalog.vercel.app`; locally
+  `http://127.0.0.1:3000`).
+- **Redirect URLs** (allow-list): `http://127.0.0.1:3000/**` for local, plus your
+  production and any Vercel preview origins you want to permit, e.g.
+  `https://favalog.vercel.app/**`. Prefer explicit origins over a broad wildcard;
+  a wildcard trades safety for preview convenience.
+- **Email templates**: point the confirmation and recovery links at
+  `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type={{ .Type }}&next=/onboarding`
+  (use `next=/auth/update-password` for the recovery template).
+- **Google provider**: create OAuth credentials in Google Cloud, set the
+  authorized redirect URI to `https://<project-ref>.supabase.co/auth/v1/callback`,
+  paste the client id/secret into Supabase, then set
+  `NEXT_PUBLIC_SUPABASE_GOOGLE_ENABLED=true` to reveal the button. The client
+  secret lives only in Supabase — never in this repo.
+
+Local defaults live in `supabase/config.toml` (`[auth]` `site_url` +
+`additional_redirect_urls`).
+
+### Transitional profile behavior
+
+`/profile/[username]` is intentionally hybrid during this phase:
+
+- A **mock demo username** (e.g. `jamie`) renders the full mock profile exactly
+  as before.
+- A username that resolves to a **real Supabase profile** renders a minimal
+  real identity (name, @handle, bio, location, join date) with honest empty
+  states — a newly-registered user is **never** attributed a mock user's diary,
+  reviews, or lists.
+- Anything else is a genuine 404.
 
 ---
 
@@ -253,10 +342,13 @@ they are wired together so `npm run validate` is a reliable local gate.
 - **Playwright** covers complete user journeys (home → explore → title,
   search, media-type filtering, movie vs. book detail, the custom 404, the
   diary, the lists flow — index → list → title, list search, and the
-  invalid-list-slug 404, and the profile flow — app-shell avatar → profile,
-  derived statistics, favorite title, one of the user's lists, and the
-  unknown-username 404) against `next build` + `next start`, using semantic
-  locators.
+  invalid-list-slug 404, the profile flow — profile, derived statistics,
+  favorite title, one of the user's lists, and the unknown-username 404, and
+  the secret-free auth flow — signed-out header, sign-in/up/forgot pages render
+  accessibly, the controlled no-config state, and `/onboarding` not being
+  publicly reachable) against `next build` + `next start`, using semantic
+  locators. Supabase-enabled auth E2E (real sign-up/in/onboarding) is a
+  separate, gated concern requiring a disposable test project.
 - **Storybook** documents genuine component states (media/review/activity
   cards, badges, ratings, empty states) on the Favalog dark theme and provides
   an accessibility panel for visual/a11y review.

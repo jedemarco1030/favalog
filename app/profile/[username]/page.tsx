@@ -15,6 +15,7 @@ import { ReviewCard } from "@/components/reviews/review-card";
 import { ActivityCard } from "@/components/activity/activity-card";
 import { ListCard } from "@/components/lists/list-card";
 import { toListCardView } from "@/components/lists/to-list-card-view";
+import { RealProfileIdentity } from "@/components/user/real-profile-identity";
 import {
   currentUserId,
   getListsByUser,
@@ -28,6 +29,9 @@ import {
   getUserRecentlyRead,
   getUserRecentlyWatched,
 } from "@/lib/data";
+import { isAuthAvailable } from "@/lib/auth/capability";
+import { getCurrentUser } from "@/lib/auth/data";
+import { getPublicProfileByUsername } from "@/lib/supabase/profiles";
 import { siteConfig } from "@/lib/site-config";
 
 interface ProfilePageProps {
@@ -49,6 +53,26 @@ export async function generateMetadata({
   const { username } = await params;
   const user = getUserByUsername(username);
   if (!user) {
+    // Fall back to a real Supabase profile for non-mock usernames.
+    if (isAuthAvailable()) {
+      const profile = await getPublicProfileByUsername(username);
+      if (profile) {
+        const realDescription =
+          profile.bio ??
+          `${profile.displayName}'s Favalog on ${siteConfig.name}.`;
+        return {
+          title: `${profile.displayName} (@${profile.username})`,
+          description: realDescription,
+          openGraph: {
+            type: "profile",
+            title: `${profile.displayName} (@${profile.username}) on ${siteConfig.name}`,
+            description: realDescription,
+            url: `/profile/${profile.username}`,
+            siteName: siteConfig.name,
+          },
+        };
+      }
+    }
     return { title: "Profile not found" };
   }
 
@@ -90,7 +114,25 @@ export async function generateMetadata({
 export default async function ProfilePage({ params }: ProfilePageProps) {
   const { username } = await params;
   const user = getUserByUsername(username);
-  if (!user) notFound();
+  if (!user) {
+    // Transitional strategy: mock demo usernames render the full mock profile
+    // above; a username that resolves to a REAL Supabase profile renders a
+    // minimal identity layer with honest empty states. Everything else is a
+    // genuine 404. A real user is never shown a mock user's activity.
+    if (isAuthAvailable()) {
+      const profile = await getPublicProfileByUsername(username);
+      if (profile) {
+        const viewer = await getCurrentUser();
+        return (
+          <RealProfileIdentity
+            profile={profile}
+            isCurrentUser={viewer?.id === profile.id}
+          />
+        );
+      }
+    }
+    notFound();
+  }
 
   const isCurrentUser = user.id === currentUserId;
   const firstName = user.displayName.split(" ")[0];

@@ -1,16 +1,11 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("Profile", () => {
-  test("open Jamie's profile from the app shell and explore it", async ({
-    page,
-  }) => {
-    await page.goto("/");
-
-    // 1. Open the profile from the application-shell avatar control.
-    await page
-      .getByRole("banner")
-      .getByRole("link", { name: "Your profile" })
-      .click();
+  test("open Jamie's profile and explore it", async ({ page }) => {
+    // The app shell is now session-aware; with no auth configured it shows the
+    // signed-out controls rather than a mock viewer avatar, so we open Jamie's
+    // public mock profile directly.
+    await page.goto("/profile/jamie");
     await expect(page).toHaveURL(/\/profile\/jamie$/);
 
     // 2. Verify identity and derived statistics.

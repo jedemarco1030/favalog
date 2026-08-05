@@ -40,6 +40,23 @@ export default defineConfig({
         // and are intentionally NOT included here.
         "lib/supabase/env.ts",
         "lib/supabase/mappers.ts",
+        // Pure auth helpers (framework-agnostic, deterministic). The
+        // server-only DAL, URL builder, actions, and Supabase-backed selectors
+        // are runtime integration surfaces and are intentionally excluded, like
+        // the Supabase clients above.
+        "lib/auth/safe-redirect.ts",
+        "lib/auth/validation.ts",
+        "lib/auth/errors.ts",
+        "lib/auth/capability.ts",
+        "lib/auth/profile.ts",
+        // Interactive / conditional auth UI under test.
+        "components/auth/auth-message.tsx",
+        "components/auth/auth-field.tsx",
+        "components/auth/sign-in-form.tsx",
+        "components/auth/onboarding-form.tsx",
+        "components/layout/signed-out-controls.tsx",
+        "components/layout/account-menu.tsx",
+        "components/user/profile-avatar.tsx",
         // Interactive and conditional UI under test.
         "components/media/explore-discovery.tsx",
         "components/media/media-card.tsx",
