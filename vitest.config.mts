@@ -40,6 +40,7 @@ export default defineConfig({
         // and are intentionally NOT included here.
         "lib/supabase/env.ts",
         "lib/supabase/mappers.ts",
+        "lib/supabase/log-input.ts",
         // Pure auth helpers (framework-agnostic, deterministic). The
         // server-only DAL, URL builder, actions, and Supabase-backed selectors
         // are runtime integration surfaces and are intentionally excluded, like

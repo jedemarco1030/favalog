@@ -15,10 +15,23 @@
  */
 
 import type { Database, Json } from "@/lib/database.types";
-import type { Book, MediaItem, Movie, Profile, TVShow } from "@/lib/types";
+import type {
+  Book,
+  DiaryEntry,
+  MediaItem,
+  Movie,
+  Profile,
+  RatingValue,
+  Review,
+  TVShow,
+} from "@/lib/types";
+import { deriveDiaryAction } from "./log-input";
 
 export type MediaItemRow = Database["public"]["Tables"]["media_items"]["Row"];
 export type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+export type DiaryEntryRow =
+  Database["public"]["Tables"]["diary_entries"]["Row"];
+export type ReviewRow = Database["public"]["Tables"]["reviews"]["Row"];
 
 /**
  * Map a `profiles` row to the {@link Profile} domain identity.
@@ -139,4 +152,64 @@ export function mapMediaRowToDomain(row: MediaItemRow): MediaItem {
 /** Map many rows, preserving order. */
 export function mapMediaRowsToDomain(rows: MediaItemRow[]): MediaItem[] {
   return rows.map(mapMediaRowToDomain);
+}
+
+/**
+ * Coerce a nullable DB `numeric(2,1)` rating into a domain {@link RatingValue}.
+ *
+ * Returns `undefined` for a null/out-of-range value so the domain stays clean
+ * (optional rather than nullable). The DB CHECK already guarantees half-star
+ * values, but this stays defensive against a malformed row.
+ */
+export function toRatingValue(
+  value: number | null | undefined,
+): RatingValue | undefined {
+  if (value === null || value === undefined) return undefined;
+  if (value < 0.5 || value > 5 || value * 2 !== Math.floor(value * 2)) {
+    return undefined;
+  }
+  return value as RatingValue;
+}
+
+/**
+ * Map a `reviews` row to the {@link Review} domain type. `likeCount` is not a
+ * persisted column in this phase, so it maps to 0 (likes are out of scope).
+ */
+export function mapReviewRowToDomain(row: ReviewRow): Review {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    mediaId: row.media_id,
+    rating: toRatingValue(row.rating),
+    title: row.title ?? undefined,
+    body: row.body,
+    createdAt: row.created_at,
+    likeCount: 0,
+    containsSpoilers: row.contains_spoilers,
+  };
+}
+
+/**
+ * Map a `diary_entries` row to the {@link DiaryEntry} domain type.
+ *
+ * The media-aware `action` verb is derived from the referenced title's `kind`
+ * plus the row's `is_revisit` flag (watched/rewatched for movies & TV,
+ * read/reread for books) rather than stored on the row. Pass the resolved
+ * media (already fetched alongside the entry to avoid an N+1) and, when the
+ * entry has a linked review, its id.
+ */
+export function mapDiaryRowToDomain(
+  row: DiaryEntryRow,
+  media: Pick<MediaItem, "kind">,
+  reviewId?: string,
+): DiaryEntry {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    mediaId: row.media_id,
+    loggedAt: row.logged_at,
+    action: deriveDiaryAction(media.kind, row.is_revisit),
+    rating: toRatingValue(row.rating),
+    reviewId,
+  };
 }

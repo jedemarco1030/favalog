@@ -77,53 +77,15 @@ update public.profiles set
 where id = '00000000-0000-0000-0000-0000000000a3';
 
 -- ---------------------------------------------------------------------------
--- Media catalog (small cross-media sample: movie, movie, tv, book, book)
+-- Media catalog
 -- ---------------------------------------------------------------------------
-insert into public.media_items (
-  id, kind, source, external_id, slug, title, subtitle, synopsis, year,
-  poster_url, backdrop_url, average_rating, genres, details
-)
-values
-  (
-    '00000000-0000-0000-0000-0000000000b1', 'movie', 'favalog', 'dune-part-two',
-    'dune-part-two', 'Dune: Part Two', null,
-    'The second half of a desert epic. A young heir chooses which prophecy to inhabit and which one to burn.',
-    2024, '/media/posters/duneparttwo.svg', '/media/backdrops/duneparttwo.svg',
-    4.70, array['Science Fiction','Epic'],
-    '{"runtimeMinutes":166,"director":"Marek Halloran","cast":["Nadia Reyes","Idris Kane","Soraya Bloom"]}'::jsonb
-  ),
-  (
-    '00000000-0000-0000-0000-0000000000b2', 'movie', 'favalog', 'afterglow',
-    'afterglow', 'Afterglow', null,
-    'A composer returns to the coastal town where she grew up and confronts a summer that has quietly refused to end.',
-    2023, '/media/posters/afterglow.svg', '/media/backdrops/afterglow.svg',
-    4.30, array['Drama','Romance'],
-    '{"runtimeMinutes":118,"director":"Noor Salim","cast":["Iris Vale","Teodoro Bassi","Hana Lundgren"]}'::jsonb
-  ),
-  (
-    '00000000-0000-0000-0000-0000000000b3', 'tv', 'favalog', 'northlight',
-    'northlight', 'Northlight', null,
-    'A remote research station picks up a signal that seems to remember the people who hear it.',
-    2022, '/media/posters/northlight.svg', null,
-    4.10, array['Science Fiction','Mystery'],
-    '{"seasons":2,"episodes":16,"creators":["Lena Voss"],"status":"ongoing"}'::jsonb
-  ),
-  (
-    '00000000-0000-0000-0000-0000000000b4', 'book', 'favalog', 'the-north-room',
-    'the-north-room', 'The North Room', null,
-    'A translator inherits a house whose rooms rearrange themselves around the stories told inside them.',
-    2021, '/media/posters/northroom.svg', null,
-    4.40, array['Literary Fiction'],
-    '{"authors":["Camille Roux"],"pageCount":328,"publisher":"Harbour & Vale"}'::jsonb
-  ),
-  (
-    '00000000-0000-0000-0000-0000000000b5', 'book', 'favalog', 'the-bright-index',
-    'the-bright-index', 'The Bright Index', 'A Field Guide',
-    'A cataloguer of vanishing things assembles an index that begins to predict what disappears next.',
-    2020, '/media/posters/brightindex.svg', null,
-    4.20, array['Speculative','Essays'],
-    '{"authors":["Devon Halle"],"pageCount":274}'::jsonb
-  );
+-- Catalog identity is owned by the forward-only migration
+-- `20260806160100_catalog_media_items.sql`, NOT by this seed. The demo rows
+-- below therefore REFERENCE those curated catalog rows by their stable,
+-- deterministic UUID — md5('favalog:' || <immutable mock id>)::uuid — instead of
+-- redefining catalog rows here (which would collide on the unique slug). This
+-- keeps a single source of truth for catalog identity and lets the same demo
+-- data resolve against the real curated catalog in any environment.
 
 -- ---------------------------------------------------------------------------
 -- Diary entries (chronological log; supports a rewatch)
@@ -132,23 +94,23 @@ insert into public.diary_entries (id, user_id, media_id, logged_at, rating, is_r
 values
   (
     '00000000-0000-0000-0000-0000000000d1',
-    '00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000b1',
+    '00000000-0000-0000-0000-0000000000a1', md5('favalog:m_duneparttwo')::uuid,
     '2026-01-15T20:00:00Z', 4.5, false
   ),
   (
     '00000000-0000-0000-0000-0000000000d2',
-    '00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000b4',
+    '00000000-0000-0000-0000-0000000000a1', md5('favalog:b_northroom')::uuid,
     '2026-02-02T09:30:00Z', 5.0, false
   ),
   -- A rewatch of the same movie proves the "no unique per user/media" rule.
   (
     '00000000-0000-0000-0000-0000000000d3',
-    '00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000b1',
+    '00000000-0000-0000-0000-0000000000a1', md5('favalog:m_duneparttwo')::uuid,
     '2026-03-10T21:15:00Z', 5.0, true
   ),
   (
     '00000000-0000-0000-0000-0000000000d4',
-    '00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000b3',
+    '00000000-0000-0000-0000-0000000000a2', md5('favalog:t_northlight')::uuid,
     '2026-02-20T22:00:00Z', 4.0, false
   );
 
@@ -161,7 +123,7 @@ insert into public.reviews (
 values
   (
     '00000000-0000-0000-0000-0000000000e1',
-    '00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000b1',
+    '00000000-0000-0000-0000-0000000000a1', md5('favalog:m_duneparttwo')::uuid,
     '00000000-0000-0000-0000-0000000000d1',
     'A desert that keeps its promises',
     'Every frame earns its scale. The rating for this one lives on the diary entry, not here.',
@@ -169,7 +131,7 @@ values
   ),
   (
     '00000000-0000-0000-0000-0000000000e2',
-    '00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000b4',
+    '00000000-0000-0000-0000-0000000000a2', md5('favalog:b_northroom')::uuid,
     null,
     'Quietly unforgettable',
     'A standalone review with its own rating because it is not tied to a specific log event.',
@@ -196,20 +158,20 @@ values
 
 insert into public.list_items (list_id, media_id, position, note)
 values
-  ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000b1', 0, 'Top of the year.'),
-  ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000b4', 1, null),
-  ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000b3', 2, 'Slow burn, worth it.'),
-  ('00000000-0000-0000-0000-0000000000f2', '00000000-0000-0000-0000-0000000000b5', 0, null);
+  ('00000000-0000-0000-0000-0000000000f1', md5('favalog:m_duneparttwo')::uuid, 0, 'Top of the year.'),
+  ('00000000-0000-0000-0000-0000000000f1', md5('favalog:b_northroom')::uuid, 1, null),
+  ('00000000-0000-0000-0000-0000000000f1', md5('favalog:t_northlight')::uuid, 2, 'Slow burn, worth it.'),
+  ('00000000-0000-0000-0000-0000000000f2', md5('favalog:b_bright_index')::uuid, 0, null);
 
 -- ---------------------------------------------------------------------------
 -- Favorites (ordered cross-media shelf)
 -- ---------------------------------------------------------------------------
 insert into public.favorites (user_id, media_id, position)
 values
-  ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000b1', 0),
-  ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000b4', 1),
-  ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000b3', 2),
-  ('00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000b5', 0);
+  ('00000000-0000-0000-0000-0000000000a1', md5('favalog:m_duneparttwo')::uuid, 0),
+  ('00000000-0000-0000-0000-0000000000a1', md5('favalog:b_northroom')::uuid, 1),
+  ('00000000-0000-0000-0000-0000000000a1', md5('favalog:t_northlight')::uuid, 2),
+  ('00000000-0000-0000-0000-0000000000a2', md5('favalog:b_bright_index')::uuid, 0);
 
 -- ---------------------------------------------------------------------------
 -- Follows (directed relationships between profiles)

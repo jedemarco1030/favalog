@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import type { MediaItemRow } from "./mappers";
-import { mapMediaRowsToDomain, mapMediaRowToDomain } from "./mappers";
+import type { DiaryEntryRow, MediaItemRow, ReviewRow } from "./mappers";
+import {
+  mapDiaryRowToDomain,
+  mapMediaRowsToDomain,
+  mapMediaRowToDomain,
+  mapReviewRowToDomain,
+  toRatingValue,
+} from "./mappers";
 
 /**
  * Base row factory — every media_items column with sensible defaults, so each
@@ -127,5 +133,110 @@ describe("mapMediaRowToDomain", () => {
     ]);
     expect(items.map((i) => i.kind)).toEqual(["movie", "book"]);
     expect(items.map((i) => i.id)).toEqual(["a", "b"]);
+  });
+});
+
+function makeDiaryRow(overrides: Partial<DiaryEntryRow> = {}): DiaryEntryRow {
+  return {
+    id: "d1",
+    user_id: "u1",
+    media_id: "m1",
+    logged_at: "2026-08-02T21:30:00Z",
+    rating: 4.5,
+    is_revisit: false,
+    created_at: "2026-08-02T21:30:00Z",
+    updated_at: "2026-08-02T21:30:00Z",
+    ...overrides,
+  };
+}
+
+function makeReviewRow(overrides: Partial<ReviewRow> = {}): ReviewRow {
+  return {
+    id: "r1",
+    user_id: "u1",
+    media_id: "m1",
+    diary_entry_id: "d1",
+    title: "A tidy little chase",
+    body: "Rival cartographers, one map, zero chill.",
+    rating: null,
+    contains_spoilers: false,
+    created_at: "2026-08-02T21:30:00Z",
+    updated_at: "2026-08-02T21:30:00Z",
+    ...overrides,
+  };
+}
+
+describe("toRatingValue", () => {
+  it("passes through valid half-star ratings", () => {
+    expect(toRatingValue(0.5)).toBe(0.5);
+    expect(toRatingValue(4.5)).toBe(4.5);
+    expect(toRatingValue(5)).toBe(5);
+  });
+
+  it("returns undefined for null or out-of-range / non-half-star values", () => {
+    expect(toRatingValue(null)).toBeUndefined();
+    expect(toRatingValue(undefined)).toBeUndefined();
+    expect(toRatingValue(0)).toBeUndefined();
+    expect(toRatingValue(4.3)).toBeUndefined();
+    expect(toRatingValue(6)).toBeUndefined();
+  });
+});
+
+describe("mapReviewRowToDomain", () => {
+  it("maps a linked review, keeping rating undefined and likeCount 0", () => {
+    const review = mapReviewRowToDomain(makeReviewRow({ rating: null }));
+    expect(review.rating).toBeUndefined();
+    expect(review.likeCount).toBe(0);
+    expect(review.title).toBe("A tidy little chase");
+    expect(review.body).toContain("Rival cartographers");
+    expect(review.containsSpoilers).toBe(false);
+  });
+
+  it("maps a standalone review's own rating and a missing title", () => {
+    const review = mapReviewRowToDomain(
+      makeReviewRow({ diary_entry_id: null, title: null, rating: 4.5 }),
+    );
+    expect(review.rating).toBe(4.5);
+    expect(review.title).toBeUndefined();
+  });
+});
+
+describe("mapDiaryRowToDomain", () => {
+  it("derives watched/rewatched for movies & TV", () => {
+    expect(mapDiaryRowToDomain(makeDiaryRow(), { kind: "movie" }).action).toBe(
+      "watched",
+    );
+    expect(
+      mapDiaryRowToDomain(makeDiaryRow({ is_revisit: true }), { kind: "tv" })
+        .action,
+    ).toBe("rewatched");
+  });
+
+  it("derives read/reread for books", () => {
+    expect(mapDiaryRowToDomain(makeDiaryRow(), { kind: "book" }).action).toBe(
+      "read",
+    );
+    expect(
+      mapDiaryRowToDomain(makeDiaryRow({ is_revisit: true }), { kind: "book" })
+        .action,
+    ).toBe("reread");
+  });
+
+  it("maps rating and an optional linked review id", () => {
+    const entry = mapDiaryRowToDomain(
+      makeDiaryRow({ rating: 3.5 }),
+      { kind: "movie" },
+      "r1",
+    );
+    expect(entry.rating).toBe(3.5);
+    expect(entry.reviewId).toBe("r1");
+  });
+
+  it("leaves rating undefined when the row has no rating", () => {
+    const entry = mapDiaryRowToDomain(makeDiaryRow({ rating: null }), {
+      kind: "movie",
+    });
+    expect(entry.rating).toBeUndefined();
+    expect(entry.reviewId).toBeUndefined();
   });
 });
