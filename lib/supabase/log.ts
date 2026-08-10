@@ -2,7 +2,7 @@ import "server-only";
 
 import { revalidatePath } from "next/cache";
 
-import { getCurrentUser } from "@/lib/auth/data";
+import { getCurrentProfile, getCurrentUser } from "@/lib/auth/data";
 import { createClient } from "./server";
 import { isSupabaseConfigured } from "./env";
 import {
@@ -107,16 +107,35 @@ export async function logMedia(input: LogMediaInput): Promise<LogMediaResult> {
   }
 
   const result = (data ?? {}) as LogMediaRpcResult;
+  const diaryEntryId =
+    typeof result.diary_entry_id === "string"
+      ? result.diary_entry_id.trim()
+      : "";
 
-  // Refresh the surfaces that now reflect the new entry. The profile route is
-  // keyed by username, which we don't need here; revalidating the diary and the
-  // title page covers the pages the user navigates back to.
+  // Defensive success contract: the RPC MUST return a real diary-entry id. A
+  // missing / malformed identifier means the response shape was unexpected —
+  // we never report success for an incomplete write, so the UI can't show a
+  // "logged" confirmation for an entry that may not exist. Surface a safe
+  // generic error instead (the raw RPC output is never exposed).
+  if (diaryEntryId === "") {
+    return { status: "error", message: GENERIC_LOG_ERROR };
+  }
+
+  const reviewId =
+    typeof result.review_id === "string" && result.review_id.trim() !== ""
+      ? result.review_id.trim()
+      : null;
+
+  // Refresh every surface that now reflects the new entry: the diary, the
+  // title page, and the author's own real public profile. The username is
+  // resolved from the server-side auth DAL — never from a client-supplied
+  // value — so a caller can't trigger revalidation of another user's route.
   revalidatePath("/diary");
   revalidatePath(`/title/${value.mediaSlug}`);
+  const profile = await getCurrentProfile();
+  if (profile) {
+    revalidatePath(`/profile/${profile.username}`);
+  }
 
-  return {
-    status: "success",
-    diaryEntryId: result.diary_entry_id ?? "",
-    reviewId: result.review_id ?? null,
-  };
+  return { status: "success", diaryEntryId, reviewId };
 }

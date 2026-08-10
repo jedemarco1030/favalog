@@ -240,16 +240,34 @@ claim a command passed unless it was actually executed successfully.
 
 ## Scope / product behavior
 
-The consumer-facing product pages remain frontend/mock-data based. A Supabase
-backend foundation exists (schema, RLS, clients) and **authentication +
-onboarding are wired to it** (sign in/up, email confirmation, password reset,
-optional Google OAuth, session-aware shell, `/onboarding`). Everything else is
-still mock-data. Do **not** introduce any of the following without an explicit
-task: migrating the product pages off mock data, persistent user actions
-(diary/ratings/reviews/lists/favorites), a follows UI, external catalog APIs
-(TMDB, Open Library, Google Books), AI functionality, real notifications, real
-social relationships, real recommendation algorithms, additional OAuth
-providers, MFA/passkeys, or full account settings.
+Most consumer-facing product pages remain frontend/mock-data based, but the
+first persistent product loop is now real. A Supabase backend foundation exists
+(schema, RLS, clients) and the following are wired to it:
+
+- **Authentication + onboarding** (sign in/up, email confirmation, password
+  reset, optional Google OAuth, session-aware shell, `/onboarding`).
+- **Title logging.** On `/title/[slug]`, a signed-in, onboarded user can
+  **Log / Rate / Review**; all three open one accessible dialog and persist
+  through the `logTitleAction` Server Action (`app/title/[slug]/actions.ts`) →
+  the atomic `public.log_media(...)` RPC (`lib/supabase/log.ts`). Rate creates
+  a diary entry; Review creates a diary entry with a linked review. Signed-out
+  users route through the safe sign-in `returnTo` flow.
+- **Real reads.** The title page shows the viewer's personal state
+  (`getMyLatestLogForSlug`), `/diary` renders the authenticated user's real
+  diary (`getMyDiary`) while signed-out/no-env visitors see a clearly labelled
+  **example diary**, and a real `/profile/[username]` shows derived stats /
+  recently watched-read / real reviews (`getRealProfileActivity`). A
+  diary-linked review's displayed rating resolves from its diary entry.
+
+Everything else is still mock-data. Do **not** introduce any of the following
+without an explicit task: migrating the remaining product pages off mock data,
+**edit/delete of logs**, Add-to-list / list persistence, favorites, a follows
+UI, likes, external catalog APIs (TMDB, Open Library, Google Books), AI
+functionality, real notifications, real social relationships, real
+recommendation algorithms, additional OAuth providers, MFA/passkeys, or full
+account settings. Mock demo usernames (`jamie`, `mira`, …) still render their
+full mock profiles; other usernames resolve through Supabase; unknown ones
+`notFound()`. A real profile never inherits mock data.
 
 ## Workflow
 

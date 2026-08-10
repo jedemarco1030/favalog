@@ -16,6 +16,7 @@ import { ActivityCard } from "@/components/activity/activity-card";
 import { ListCard } from "@/components/lists/list-card";
 import { toListCardView } from "@/components/lists/to-list-card-view";
 import { RealProfileIdentity } from "@/components/user/real-profile-identity";
+import { RealProfile } from "@/components/user/real-profile";
 import {
   currentUserId,
   getListsByUser,
@@ -32,6 +33,7 @@ import {
 import { isAuthAvailable } from "@/lib/auth/capability";
 import { getCurrentUser } from "@/lib/auth/data";
 import { getPublicProfileByUsername } from "@/lib/supabase/profiles";
+import { getRealProfileActivity } from "@/lib/supabase/profile-activity";
 import { siteConfig } from "@/lib/site-config";
 
 interface ProfilePageProps {
@@ -123,10 +125,27 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
       const profile = await getPublicProfileByUsername(username);
       if (profile) {
         const viewer = await getCurrentUser();
+        const isCurrentUser = viewer?.id === profile.id;
+
+        // Derive the profile's real activity from its OWN diary/review rows.
+        // A real profile never inherits mock data; when the read is
+        // unavailable (no Supabase) or errors, we fall back to the minimal
+        // identity view with honest empty states rather than faking activity.
+        const activityResult = await getRealProfileActivity(profile.id);
+        if (activityResult.status === "ok") {
+          return (
+            <RealProfile
+              profile={profile}
+              activity={activityResult.activity}
+              isCurrentUser={isCurrentUser}
+            />
+          );
+        }
+
         return (
           <RealProfileIdentity
             profile={profile}
-            isCurrentUser={viewer?.id === profile.id}
+            isCurrentUser={isCurrentUser}
           />
         );
       }

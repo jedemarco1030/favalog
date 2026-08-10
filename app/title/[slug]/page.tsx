@@ -18,6 +18,9 @@ import {
   getUserById,
 } from "@/lib/data";
 import { mediaKindLabel } from "@/components/media/media-type-badge";
+import { isAuthAvailable } from "@/lib/auth/capability";
+import { getCurrentUser } from "@/lib/auth/data";
+import { getMyLatestLogForSlug } from "@/lib/supabase/diary";
 import { siteConfig } from "@/lib/site-config";
 
 interface TitlePageProps {
@@ -79,6 +82,19 @@ export default async function TitlePage({ params }: TitlePageProps) {
   const titleReviews = getReviewsForMedia(item.id);
   const related = getRelatedMedia(item.id, 6);
 
+  // Personal, per-viewer state. Community reviews/ratings above stay on the
+  // mock layer this phase; this is the viewer's OWN most-recent log (or null
+  // when signed out / not yet logged / unavailable), kept visually separate.
+  // Only touch the auth DAL when Supabase is configured so a no-env build
+  // never constructs a client (which would throw) — the actions then fall
+  // back to the safe signed-out sign-in flow.
+  const viewer = isAuthAvailable() ? await getCurrentUser() : null;
+  const personalResult = await getMyLatestLogForSlug(item.slug);
+  const personal =
+    personalResult.status === "logged" ? personalResult.entry : null;
+  const returnTo = `/title/${item.slug}`;
+  const signInHref = `/auth/sign-in?returnTo=${encodeURIComponent(returnTo)}`;
+
   return (
     <article>
       <Container>
@@ -89,7 +105,13 @@ export default async function TitlePage({ params }: TitlePageProps) {
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-12">
           <div className="flex flex-col gap-12">
             <section aria-label="Actions">
-              <MediaActions item={item} />
+              <MediaActions
+                item={item}
+                isAuthenticated={viewer !== null}
+                returnTo={returnTo}
+                signInHref={signInHref}
+                personal={personal}
+              />
             </section>
 
             <section>

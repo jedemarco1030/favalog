@@ -8,10 +8,16 @@ person's Favalog becomes a living record of their taste — the things they
 watch, read, and love, and eventually the games, music, and other interests
 that make up their taste.
 
-The current MVP scope is **movies, TV, and books**. This repository is built
-against a typed mock-data layer — there is no backend, no authentication, no
-external media API, and no AI yet. The architecture is designed so those
-pieces can drop in later without rewriting the UI.
+The current MVP scope is **movies, TV, and books**. A Supabase/PostgreSQL
+backend foundation is in place: **authentication + onboarding** and the first
+**persistent product loop — logging a title with an optional rating and
+review** — are wired to it, and an authenticated user's **Diary** and
+**Profile** now render real Supabase data. Everything else (catalog browsing,
+lists, favorites, follows, community reviews) still renders from a typed
+mock-data layer, and there is no external media API or AI yet. The app still
+builds and runs with **no** Supabase environment variables set. The
+architecture is designed so the remaining pieces can drop in without
+rewriting the UI.
 
 ---
 
@@ -100,15 +106,29 @@ once and reused.
 
 ## Backend (Supabase) — foundation + authentication
 
-> **Current status: authentication & onboarding are implemented on top of the
-> Supabase foundation; the rest of the product still uses mock data.** Sign up,
-> sign in, email confirmation, password reset, Google OAuth (optional),
-> session-aware navigation, and first-time profile onboarding are wired to
-> Supabase Auth. The catalog, diary, reviews, lists, and profiles pages still
-> render from the `@/lib/data` mock layer, and **persistent user actions**
-> (logging, rating, reviewing, lists) are **not** active. The app still builds
-> and runs with **no** Supabase environment variables set — public browsing
-> keeps working and the auth entry points show a controlled unavailable state.
+> **Current status: authentication + onboarding AND the first persistent
+> logging loop are implemented on top of the Supabase foundation; the rest of
+> the product still uses mock data.** Sign up, sign in, email confirmation,
+> password reset, Google OAuth (optional), session-aware navigation, and
+> first-time profile onboarding are wired to Supabase Auth. On a title page a
+> signed-in, onboarded user can **Log / Rate / Review** — each creates a diary
+> entry (Review adds a linked review) through the atomic `public.log_media(...)`
+> RPC. That entry then appears as the title's **personal state**, in the user's
+> real **`/diary`**, and on their real **`/profile/[username]`** (derived stats,
+> recently watched/read, and reviews). A diary-linked review stores its rating
+> as `null` by design; its displayed rating resolves from the diary entry.
+>
+> Signed-out visitors see Log/Rate/Review as real affordances that route
+> through the safe sign-in `returnTo` flow, and `/diary` shows a clearly
+> labelled **example diary** (never presented as their own). **Add to list,
+> edit/delete, lists, favorites, follows, and likes remain deferred**, and the
+> catalog / community reviews still render from the `@/lib/data` mock layer.
+> The generated database types (`lib/database.types.ts`) are real and
+> drift-checked, the catalog migration owns all **28** curated titles, and
+> `seed.sql` references that catalog and remains **local only**. The app still
+> builds and runs with **no** Supabase environment variables set — public
+> browsing keeps working and the auth/logging entry points show a controlled
+> unavailable state.
 > See [Authentication & onboarding](#authentication--onboarding) below.
 
 Full detail lives in [`docs/backend-architecture.md`](docs/backend-architecture.md)

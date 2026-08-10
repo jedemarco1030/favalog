@@ -100,6 +100,27 @@ function trimOrNull(value: string | null | undefined): string | null {
 }
 
 /**
+ * Convert a form-supplied local date/time into a UTC ISO timestamp, or `null`
+ * when the value is empty / unparseable.
+ *
+ * Timezone-safety: a bare `YYYY-MM-DD` string is parsed by `new Date()` as UTC
+ * midnight, which in a negative-offset timezone renders as the PREVIOUS day.
+ * A `datetime-local` value (`YYYY-MM-DDTHH:mm`) is instead parsed as LOCAL
+ * time, which is what we want. So we only append a local midnight time to a
+ * bare date, then let `Date` interpret the datetime-local form in local time
+ * before normalising to ISO. This keeps the diary date the user intended.
+ */
+export function datetimeLocalToISO(
+  value: string | null | undefined,
+): string | null {
+  const raw = trimOrNull(value);
+  if (!raw) return null;
+  const local = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? `${raw}T00:00` : raw;
+  const parsed = new Date(local);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+/**
  * Validate and normalize log input.
  *
  * Rules mirror the database:
@@ -129,17 +150,18 @@ export function validateLogInput(
     errors.rating = "Choose a rating from 0.5 to 5 stars in half-star steps.";
   }
 
-  // Logged date.
+  // Logged date. Route through the timezone-safe converter so a bare date is
+  // never shifted to the previous day by UTC parsing.
   let loggedAt: string | null = null;
   const rawLoggedAt = trimOrNull(input.loggedAt);
   if (rawLoggedAt) {
-    const parsed = new Date(rawLoggedAt);
-    if (Number.isNaN(parsed.getTime())) {
+    const iso = datetimeLocalToISO(rawLoggedAt);
+    if (iso === null) {
       errors.loggedAt = "Enter a valid date and time.";
-    } else if (parsed.getTime() > now.getTime() + 60_000) {
+    } else if (new Date(iso).getTime() > now.getTime() + 60_000) {
       errors.loggedAt = "You can't log a title in the future.";
     } else {
-      loggedAt = parsed.toISOString();
+      loggedAt = iso;
     }
   }
 

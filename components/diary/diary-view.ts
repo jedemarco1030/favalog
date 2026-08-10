@@ -56,3 +56,57 @@ const ACTION_LABEL: Record<DiaryAction, string> = {
 export function diaryActionLabel(action: DiaryAction): string {
   return ACTION_LABEL[action];
 }
+
+/**
+ * Trim a review body to a short, one-line excerpt on a word boundary. Shared
+ * by both the mock diary and the real Supabase-backed diary so the excerpt
+ * rendering is identical regardless of data source.
+ */
+export function excerptOf(body: string, max = 120): string {
+  if (body.length <= max) return body;
+  const clipped = body.slice(0, max);
+  const lastSpace = clipped.lastIndexOf(" ");
+  return `${clipped.slice(0, lastSpace > 0 ? lastSpace : max)}\u2026`;
+}
+
+/** The by-kind + total rollup rendered by the diary summary strip. */
+export interface DiaryViewSummary {
+  /** The most recent year present in the diary (0 when empty). */
+  year: number;
+  /** Total entries logged in `year`. */
+  total: number;
+  movies: number;
+  tv: number;
+  books: number;
+}
+
+/**
+ * Derive the activity summary for the most recent year present in a set of
+ * resolved diary views. Pure and source-agnostic: the numbers are computed
+ * from the entries themselves so they can never drift from the timeline,
+ * whether the entries come from mock data or a real Supabase query.
+ */
+export function summarizeDiaryViews(
+  views: readonly DiaryEntryView[],
+): DiaryViewSummary {
+  const year = views.reduce(
+    (latest, view) => Math.max(latest, new Date(view.loggedAt).getFullYear()),
+    0,
+  );
+
+  const summary: DiaryViewSummary = {
+    year,
+    total: 0,
+    movies: 0,
+    tv: 0,
+    books: 0,
+  };
+  for (const view of views) {
+    if (new Date(view.loggedAt).getFullYear() !== year) continue;
+    summary.total += 1;
+    if (view.kind === "movie") summary.movies += 1;
+    else if (view.kind === "tv") summary.tv += 1;
+    else summary.books += 1;
+  }
+  return summary;
+}

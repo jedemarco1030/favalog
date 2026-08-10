@@ -1,9 +1,18 @@
 # Backend architecture
 
-> **Status:** infrastructure established. The deployed frontend still runs
-> entirely on the typed mock-data layer (`@/lib/data`). Nothing in the
-> consumer-facing UI reads from Supabase yet. Authentication and persistence
-> are deliberately out of scope for this phase.
+> **Status:** infrastructure established, authentication wired, and the first
+> persistent product loop live. Authentication + onboarding and **title
+> logging** (Log / Rate / Review → the atomic `public.log_media(...)` RPC) are
+> wired to Supabase. An authenticated user's `/title/[slug]` personal state,
+> real `/diary`, and real `/profile/[username]` (derived statistics, recent
+> titles, and reviews) read from Supabase; signed-out / no-env visitors keep a
+> clearly labelled mock **example** diary and mock demo profiles. The remaining
+> product surfaces (catalog browsing, community reviews, lists, favorites,
+> follows) still run on the typed mock-data layer (`@/lib/data`), and
+> **edit/delete, Add-to-list, favorites, follows, and likes are deferred**. The
+> generated types (`lib/database.types.ts`) are real and drift-checked; the
+> catalog migration owns all **28** curated titles; `seed.sql` references that
+> catalog and is **local-only**. The app still builds with no Supabase env set.
 
 This document describes the Supabase/PostgreSQL foundation added in Phase 2:
 why it exists, the schema, the security model, and the boundaries that keep the
@@ -181,10 +190,9 @@ to any provider now.
 - `lib/database.types.ts` is the **database** representation. It is produced by
   `npm run supabase:types` (`supabase gen types typescript --local`). It must
   not be hand-maintained once generation can run.
-  > The version committed in this phase is a **clearly-labeled placeholder**
-  > authored by hand to match the migrations, because Docker (required for the
-  > local stack) was unavailable when the foundation was created. Regenerate it
-  > with `npm run supabase:types` as soon as the local stack can run.
+  > It is now **genuinely generated** from the local stack and guarded by a
+  > secret-free **type-drift check** (regeneration must produce no diff).
+  > Regenerate only when the schema actually changes; never hand-format it.
 - `lib/types.ts` remains the **framework-agnostic domain model** used by the UI.
   Generated row types do **not** replace it.
 - `lib/supabase/mappers.ts` is the boundary: it maps `media_items` rows onto the
@@ -194,6 +202,48 @@ to any provider now.
 ```
 Postgres row  ──(lib/database.types.ts)──▶  mapper  ──▶  domain model (lib/types.ts)  ──▶  UI
 ```
+
+## Persistent logging (`log_media`) and reads
+
+The first persistent product loop is the title **log**:
+
+- **Write.** `public.log_media(...)` (migration `20260806160200`) atomically
+  creates a `diary_entries` row and, when a non-empty review body is supplied,
+  a linked `reviews` row in one transaction. It is `SECURITY INVOKER`, derives
+  ownership from `auth.uid()` (no `user_id` argument), resolves the title from a
+  trusted **slug** server-side, and is EXECUTE-granted to `authenticated` only
+  (revoked from `public`/`anon`). A diary-linked review always stores
+  `rating = null`; the diary entry owns the rating.
+- **Application boundary.** `lib/supabase/log.ts` (`logMedia`) is the server
+  entry point: it refuses to run without Supabase configured, re-validates the
+  user via the auth DAL, re-validates input (`lib/supabase/log-input.ts`), calls
+  the RPC, and maps any error to a safe message. A success **must** carry a
+  non-empty `diary_entry_id`; a malformed RPC response becomes a generic error
+  rather than a false success. It then revalidates `/diary`, the title route,
+  and the author's `/profile/[username]` (username from the DAL, never the
+  client).
+- **Server Action.** `app/title/[slug]/actions.ts` (`logTitleAction`) is the
+  only Client-callable boundary. It reads only `LogMediaInput` fields, requires
+  an authenticated user with a complete profile, routes signed-out / incomplete
+  cases through the safe `returnTo` flow, and returns a serializable state for
+  `useActionState`. It does not duplicate the RPC call.
+- **Reads.** `lib/supabase/diary.ts` provides `getMyLatestLogForSlug` (the
+  title's per-viewer personal state) and `getMyDiary` (the authenticated user's
+  diary as `DiaryEntryView[]`). `lib/supabase/profile-activity.ts`
+  (`getRealProfileActivity`) derives a real profile's statistics, recent
+  titles, and reviews. All embed related rows (no N+1), map through the
+  mapper/view-model boundary, and resolve a linked review's effective rating
+  from its diary entry.
+
+### Mock vs. real boundary
+
+- `/diary`: authenticated + configured → real diary; signed-out or no-env →
+  clearly labelled mock **example** diary (never attributed to the visitor); a
+  query error → safe error state (no silent mock fallback).
+- `/profile/[username]`: mock demo usernames render full mock profiles; other
+  usernames resolve to a real profile with derived activity; unknown →
+  `notFound()`. A real profile never inherits mock data, and real reviews show
+  no fabricated like counts.
 
 ## Supabase clients
 
@@ -260,6 +310,36 @@ section in the README). The secret key, database password, and privileged
 connection strings are configured only in server-side deployment settings and
 are never committed or logged.
 
+**Applying the logging migrations to a hosted project.** The four new
+forward-only migrations — `20260806160000` (table grants), `20260806160100`
+(28-title catalog), `20260806160200` (`log_media` RPC), `20260806160300`
+(profile-trigger collision fix) — are committed but must reach the hosted
+project via `supabase db push`. **Never** use `supabase db reset --linked`,
+remote `seed.sql`, `--include-seed`, or out-of-band dashboard schema edits (the
+seed's `auth.users` inserts are local-only). Safe procedure:
+
+```bash
+supabase link --project-ref <hosted-dev-ref>   # confirm the exact project
+supabase migration list --linked               # inspect the remote ledger
+supabase db push --dry-run                      # review the plan (expect only
+                                                # the 4 migrations above)
+supabase db push                                # apply after review
+```
+
+After applying, verify: all four migrations appear in the remote ledger; exactly
+28 `source = 'favalog'` catalog rows exist with resolvable slugs; `authenticated`
+has the required table privileges while `anon` keeps read-only; `authenticated`
+can `execute log_media` while `anon`/`public` cannot; a disposable authenticated
+user can create a log (with an optional atomic linked review whose `rating`
+stays null and whose rating lives on the diary entry); a second user cannot
+mutate the first's rows; unknown media is rejected; and the browser never uses
+the service-role key. Clean up disposable test data afterward.
+
+> **Hosted status at time of writing:** these migrations have **not** yet been
+> confirmed applied to the hosted development project from this environment.
+> Apply and verify them with the procedure above before relying on the hosted
+> logging loop.
+
 ## Seed assumptions
 
 `supabase/seed.sql` loads a **small, representative** dataset (not a migration
@@ -270,15 +350,23 @@ of the full mock catalog):
   trigger then provisions their `profiles`. All use `@example.com` emails and
   the password `password123`. This direct insert is **local only** — remote
   environments should provision users through the Auth API.
-- A five-title cross-media catalog (movie, movie, TV, book, book), diary entries
-  (including a rewatch), one diary-linked review and one standalone review,
-  a ranked public list and a private list with items, favorites, and follows.
+- The curated cross-media catalog is owned by the **catalog migration**
+  (`20260806160100`), which inserts all **28** `source = 'favalog'` titles with
+  stable slugs. `seed.sql` **references** that catalog (it does not redefine a
+  smaller one) and adds local diary entries (including a rewatch), a
+  diary-linked review and a standalone review, a ranked public list and a
+  private list with items, favorites, and follows. The seed's direct
+  `auth.users` inserts are **local-only** and must never run against a remote
+  project.
 
 ## Deferred decisions
 
-- Authentication UI (login/signup), route protection, and login redirects.
-- Migrating the frontend off mock data to Supabase-backed fetchers.
+- **Edit / delete of diary entries and reviews** (the backend currently
+  guarantees only the atomic create path). This is the next focused persistence
+  task.
+- Add-to-list persistence, list creation/editing, favorites, follows UI, and
+  real likes persistence (and any dedicated activity/event table).
+- Migrating the remaining product surfaces (catalog browsing, community
+  reviews) off mock data to Supabase-backed fetchers.
 - Real media-catalog provider integration.
-- Persistent user actions (log / rate / review / add-to-list writes).
-- Real likes persistence and any dedicated activity/event table.
 - Full followers-only list visibility enforcement.

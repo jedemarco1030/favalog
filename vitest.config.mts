@@ -41,6 +41,9 @@ export default defineConfig({
         "lib/supabase/env.ts",
         "lib/supabase/mappers.ts",
         "lib/supabase/log-input.ts",
+        // Pure real-profile derivation + the pure log-form parsing contract.
+        "lib/supabase/profile-view-model.ts",
+        "app/title/[slug]/log-form.ts",
         // Pure auth helpers (framework-agnostic, deterministic). The
         // server-only DAL, URL builder, actions, and Supabase-backed selectors
         // are runtime integration surfaces and are intentionally excluded, like
