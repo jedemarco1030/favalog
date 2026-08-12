@@ -241,27 +241,40 @@ claim a command passed unless it was actually executed successfully.
 ## Scope / product behavior
 
 Most consumer-facing product pages remain frontend/mock-data based, but the
-first persistent product loop is now real. A Supabase backend foundation exists
-(schema, RLS, clients) and the following are wired to it:
+full persistent diary-entry lifecycle is now real. A Supabase backend foundation
+exists (schema, RLS, clients) and the following are wired to it:
 
 - **Authentication + onboarding** (sign in/up, email confirmation, password
   reset, optional Google OAuth, session-aware shell, `/onboarding`).
-- **Title logging.** On `/title/[slug]`, a signed-in, onboarded user can
-  **Log / Rate / Review**; all three open one accessible dialog and persist
+- **Title logging (create).** On `/title/[slug]`, a signed-in, onboarded user
+  can **Log / Rate / Review**; all three open one accessible dialog and persist
   through the `logTitleAction` Server Action (`app/title/[slug]/actions.ts`) →
   the atomic `public.log_media(...)` RPC (`lib/supabase/log.ts`). Rate creates
   a diary entry; Review creates a diary entry with a linked review. Signed-out
-  users route through the safe sign-in `returnTo` flow.
+  users see a neutral **Log** primary action (never a personalized
+  "Watched"/"Read") and route through the safe sign-in `returnTo` flow.
+- **Edit / delete of logs.** The owning user can edit an existing diary entry
+  and its optional linked review (add/update/remove, clear rating) via
+  `public.update_diary_entry(...)`, and delete an entry (with its linked review,
+  no orphan) via `public.delete_diary_entry(...)` — both `SECURITY INVOKER`,
+  ownership from `auth.uid()`, `authenticated`-only EXECUTE. The
+  `editDiaryEntryAction` / `deleteDiaryEntryAction` Server Actions
+  (`app/diary/actions.ts`) back owner-only controls on the title personal state
+  (`MediaActions`) and each real diary row (`DiaryEntryActions`), reusing the
+  shared `LogDialog` (edit mode) and `DeleteLogDialog`. All three surfaces
+  (`/diary`, `/title/[slug]`, the owner's `/profile/[username]`) revalidate
+  after every create/edit/delete.
 - **Real reads.** The title page shows the viewer's personal state
   (`getMyLatestLogForSlug`), `/diary` renders the authenticated user's real
   diary (`getMyDiary`) while signed-out/no-env visitors see a clearly labelled
-  **example diary**, and a real `/profile/[username]` shows derived stats /
-  recently watched-read / real reviews (`getRealProfileActivity`). A
-  diary-linked review's displayed rating resolves from its diary entry.
+  **example diary** (no edit/delete controls), and a real `/profile/[username]`
+  shows derived stats / recently watched-read / real reviews
+  (`getRealProfileActivity`). A diary-linked review's displayed rating resolves
+  from its diary entry.
 
 Everything else is still mock-data. Do **not** introduce any of the following
 without an explicit task: migrating the remaining product pages off mock data,
-**edit/delete of logs**, Add-to-list / list persistence, favorites, a follows
+Add-to-list / list persistence, favorites, a follows
 UI, likes, external catalog APIs (TMDB, Open Library, Google Books), AI
 functionality, real notifications, real social relationships, real
 recommendation algorithms, additional OAuth providers, MFA/passkeys, or full

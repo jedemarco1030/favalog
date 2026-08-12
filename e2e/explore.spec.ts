@@ -37,6 +37,11 @@ test.describe("Explore discovery", () => {
       .getByRole("searchbox", { name: "Search Favalog" })
       .fill("afterglow");
 
+    // Explore debounces a `router.replace(?q=…)` after each keystroke. Wait
+    // for that URL sync to settle before clicking so the in-flight replace
+    // cannot race with (and cancel) the navigation to the title page.
+    await expect(page).toHaveURL(/[?&]q=afterglow/);
+
     await page.getByRole("link", { name: /Afterglow \(Film, 2023\)/ }).click();
 
     await expect(page).toHaveURL(/\/title\/afterglow$/);

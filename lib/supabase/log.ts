@@ -6,10 +6,23 @@ import { getCurrentProfile, getCurrentUser } from "@/lib/auth/data";
 import { createClient } from "./server";
 import { isSupabaseConfigured } from "./env";
 import {
+  isUuid,
+  validateEditInput,
   validateLogInput,
+  type EditDiaryInput,
   type LogMediaInput,
   type LogFieldErrors,
 } from "./log-input";
+import {
+  GENERIC_DELETE_ERROR,
+  GENERIC_EDIT_ERROR,
+  GENERIC_LOG_ERROR,
+  mapDeleteError,
+  mapEditError,
+  mapLogError,
+} from "./log-errors";
+
+export { mapLogError, mapEditError, mapDeleteError } from "./log-errors";
 
 /**
  * Server-side write path for logging a title.
@@ -36,31 +49,23 @@ export type LogMediaResult =
   | { status: "invalid"; errors: LogFieldErrors }
   | { status: "error"; message: string };
 
-const GENERIC_LOG_ERROR =
-  "We couldn't save your log just now. Please try again in a moment.";
-
-/** Map a Supabase RPC error to a safe, user-facing message. */
-export function mapLogError(error: {
-  code?: string;
-  message?: string;
-}): string {
-  const code = error.code ?? "";
-  const haystack = `${code} ${error.message ?? ""}`.toLowerCase();
-
-  if (code === "28000" || haystack.includes("authentication required")) {
-    return "Please sign in to log a title.";
+/**
+ * Revalidate every surface that reflects a diary write: the diary, the title
+ * page (by trusted slug), and the author's own real public profile. The
+ * username is resolved from the server-side auth DAL — never from a
+ * client-supplied value — so a caller can't trigger revalidation of another
+ * user's route. `slug` originates server-side (the title route param for a
+ * create, or the RPC's own resolved slug for an edit/delete).
+ */
+async function revalidateDiaryWrite(slug: string | null): Promise<void> {
+  revalidatePath("/diary");
+  if (slug) {
+    revalidatePath(`/title/${slug}`);
   }
-  if (code === "P0002" || haystack.includes("unknown media")) {
-    return "We couldn't find that title. Please refresh and try again.";
+  const profile = await getCurrentProfile();
+  if (profile) {
+    revalidatePath(`/profile/${profile.username}`);
   }
-  if (code === "22023" || haystack.includes("invalid rating")) {
-    return "That rating isn't valid. Choose a half-star value from 0.5 to 5.";
-  }
-  if (code === "42501") {
-    // RLS / privilege denial — never expose the raw detail.
-    return "You don't have permission to do that.";
-  }
-  return GENERIC_LOG_ERROR;
 }
 
 interface LogMediaRpcResult {
@@ -126,16 +131,159 @@ export async function logMedia(input: LogMediaInput): Promise<LogMediaResult> {
       ? result.review_id.trim()
       : null;
 
-  // Refresh every surface that now reflects the new entry: the diary, the
-  // title page, and the author's own real public profile. The username is
-  // resolved from the server-side auth DAL — never from a client-supplied
-  // value — so a caller can't trigger revalidation of another user's route.
-  revalidatePath("/diary");
-  revalidatePath(`/title/${value.mediaSlug}`);
-  const profile = await getCurrentProfile();
-  if (profile) {
-    revalidatePath(`/profile/${profile.username}`);
-  }
+  // Refresh every surface that now reflects the new entry.
+  await revalidateDiaryWrite(value.mediaSlug);
 
   return { status: "success", diaryEntryId, reviewId };
+}
+
+export type UpdateDiaryResult =
+  | { status: "success"; diaryEntryId: string; reviewId: string | null }
+  | { status: "unauthenticated" }
+  | { status: "unavailable" }
+  | { status: "invalid"; errors: LogFieldErrors }
+  | { status: "error"; message: string };
+
+interface UpdateDiaryRpcResult {
+  diary_entry_id?: string;
+  review_id?: string | null;
+  media_slug?: string | null;
+}
+
+/**
+ * Edit an existing diary entry (and its optional linked review) for the current
+ * user. Mirrors {@link logMedia}: refuses to run unconfigured, re-validates the
+ * authenticated user and the input, and delegates the atomic write to the
+ * `update_diary_entry` RPC — which derives ownership from `auth.uid()`, requires
+ * the entry to belong to the caller, and runs under RLS. The client only
+ * supplies the diary-entry id and the new field values; it never asserts
+ * ownership. The title slug used for revalidation comes back from the RPC (the
+ * trusted server-resolved catalog identity), not from the browser.
+ */
+export async function updateDiaryEntry(
+  input: EditDiaryInput,
+): Promise<UpdateDiaryResult> {
+  if (!isSupabaseConfigured()) {
+    return { status: "unavailable" };
+  }
+
+  const user = await getCurrentUser();
+  if (!user) {
+    return { status: "unauthenticated" };
+  }
+
+  const validation = validateEditInput(input);
+  if (!validation.ok || !validation.value) {
+    return { status: "invalid", errors: validation.errors };
+  }
+  const value = validation.value;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("update_diary_entry", {
+    p_diary_entry_id: value.diaryEntryId,
+    p_logged_at: value.loggedAt ?? undefined,
+    p_rating: value.rating ?? undefined,
+    p_is_revisit: value.isRevisit,
+    p_review_title: value.reviewTitle ?? undefined,
+    p_review_body: value.reviewBody ?? undefined,
+    p_contains_spoilers: value.containsSpoilers,
+  });
+
+  if (error) {
+    return { status: "error", message: mapEditError(error) };
+  }
+
+  const result = (data ?? {}) as UpdateDiaryRpcResult;
+  const diaryEntryId =
+    typeof result.diary_entry_id === "string"
+      ? result.diary_entry_id.trim()
+      : "";
+
+  // Same defensive success contract as logMedia: a missing/malformed id means
+  // an unexpected response shape, which we treat as an error rather than a
+  // false success.
+  if (diaryEntryId === "") {
+    return { status: "error", message: GENERIC_EDIT_ERROR };
+  }
+
+  const reviewId =
+    typeof result.review_id === "string" && result.review_id.trim() !== ""
+      ? result.review_id.trim()
+      : null;
+  const slug =
+    typeof result.media_slug === "string" && result.media_slug.trim() !== ""
+      ? result.media_slug.trim()
+      : null;
+
+  await revalidateDiaryWrite(slug);
+
+  return { status: "success", diaryEntryId, reviewId };
+}
+
+export type DeleteDiaryResult =
+  | { status: "success"; diaryEntryId: string }
+  | { status: "unauthenticated" }
+  | { status: "unavailable" }
+  | { status: "invalid"; message: string }
+  | { status: "error"; message: string };
+
+interface DeleteDiaryRpcResult {
+  diary_entry_id?: string;
+  media_slug?: string | null;
+}
+
+/**
+ * Delete an existing diary entry (and its linked review) for the current user.
+ * Mirrors {@link updateDiaryEntry}: unconfigured → unavailable; signed-out →
+ * unauthenticated; a non-UUID id is rejected client-side before any round-trip;
+ * the atomic delete is delegated to the `delete_diary_entry` RPC, which requires
+ * ownership via `auth.uid()` and removes the linked review so no orphan remains.
+ */
+export async function deleteDiaryEntry(
+  diaryEntryId: string,
+): Promise<DeleteDiaryResult> {
+  if (!isSupabaseConfigured()) {
+    return { status: "unavailable" };
+  }
+
+  const user = await getCurrentUser();
+  if (!user) {
+    return { status: "unauthenticated" };
+  }
+
+  const id = typeof diaryEntryId === "string" ? diaryEntryId.trim() : "";
+  if (!isUuid(id)) {
+    return {
+      status: "invalid",
+      message: "We couldn't tell which entry to delete. Please try again.",
+    };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("delete_diary_entry", {
+    p_diary_entry_id: id,
+  });
+
+  if (error) {
+    return { status: "error", message: mapDeleteError(error) };
+  }
+
+  const result = (data ?? {}) as DeleteDiaryRpcResult;
+  const deletedId =
+    typeof result.diary_entry_id === "string"
+      ? result.diary_entry_id.trim()
+      : "";
+
+  if (deletedId === "") {
+    return { status: "error", message: GENERIC_DELETE_ERROR };
+  }
+
+  const slug =
+    typeof result.media_slug === "string" && result.media_slug.trim() !== ""
+      ? result.media_slug.trim()
+      : null;
+
+  await revalidateDiaryWrite(slug);
+
+  return { status: "success", diaryEntryId: deletedId };
 }

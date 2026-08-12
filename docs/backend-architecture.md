@@ -1,18 +1,23 @@
 # Backend architecture
 
-> **Status:** infrastructure established, authentication wired, and the first
-> persistent product loop live. Authentication + onboarding and **title
-> logging** (Log / Rate / Review → the atomic `public.log_media(...)` RPC) are
-> wired to Supabase. An authenticated user's `/title/[slug]` personal state,
-> real `/diary`, and real `/profile/[username]` (derived statistics, recent
-> titles, and reviews) read from Supabase; signed-out / no-env visitors keep a
-> clearly labelled mock **example** diary and mock demo profiles. The remaining
-> product surfaces (catalog browsing, community reviews, lists, favorites,
-> follows) still run on the typed mock-data layer (`@/lib/data`), and
-> **edit/delete, Add-to-list, favorites, follows, and likes are deferred**. The
-> generated types (`lib/database.types.ts`) are real and drift-checked; the
-> catalog migration owns all **28** curated titles; `seed.sql` references that
-> catalog and is **local-only**. The app still builds with no Supabase env set.
+> **Status:** infrastructure established, authentication wired, and the full
+> persistent diary-entry lifecycle live. Authentication + onboarding and
+> **title logging** — create (Log / Rate / Review → the atomic
+> `public.log_media(...)` RPC), **edit** (`public.update_diary_entry(...)`), and
+> **delete** (`public.delete_diary_entry(...)`) — are wired to Supabase. An
+> authenticated user's `/title/[slug]` personal state, real `/diary`, and real
+> `/profile/[username]` (derived statistics, recent titles, and reviews) read
+> from Supabase, and the owner gets edit/delete controls on the title's personal
+> state and each real diary row; signed-out / no-env visitors keep a clearly
+> labelled mock **example** diary (no edit/delete) and mock demo profiles, and
+> the title's primary action is a neutral **Log** (never a personalized
+> "Watched"/"Read"). The remaining product surfaces (catalog browsing, community
+> reviews, lists, favorites, follows) still run on the typed mock-data layer
+> (`@/lib/data`), and **Add-to-list, favorites, follows, and likes are
+> deferred**. The generated types (`lib/database.types.ts`) are real and
+> drift-checked; the catalog migration owns all **28** curated titles; `seed.sql`
+> references that catalog and is **local-only**. The app still builds with no
+> Supabase env set.
 
 This document describes the Supabase/PostgreSQL foundation added in Phase 2:
 why it exists, the schema, the security model, and the boundaries that keep the
@@ -203,33 +208,72 @@ to any provider now.
 Postgres row  ──(lib/database.types.ts)──▶  mapper  ──▶  domain model (lib/types.ts)  ──▶  UI
 ```
 
-## Persistent logging (`log_media`) and reads
+## Persistent diary-entry lifecycle (create / edit / delete) and reads
 
-The first persistent product loop is the title **log**:
+The persistent product loop is the full title **log lifecycle**. All three
+write paths are narrowly-scoped RPCs that share one security model:
+`SECURITY INVOKER` (so RLS is a second, independent boundary), a pinned
+`search_path = ''` with fully-qualified objects, ownership derived from
+`auth.uid()` (never a client `user_id`), EXECUTE granted to `authenticated`
+only (revoked from `public`/`anon`), and a return payload limited to the
+identifiers the app needs (no privileged/unrelated row data). A diary-linked
+review always stores `rating = null`; the diary entry owns the rating
+(half-step 0.5–5.0, validated in the RPC and by the table CHECK).
 
-- **Write.** `public.log_media(...)` (migration `20260806160200`) atomically
+- **Create.** `public.log_media(...)` (migration `20260806160200`) atomically
   creates a `diary_entries` row and, when a non-empty review body is supplied,
-  a linked `reviews` row in one transaction. It is `SECURITY INVOKER`, derives
-  ownership from `auth.uid()` (no `user_id` argument), resolves the title from a
-  trusted **slug** server-side, and is EXECUTE-granted to `authenticated` only
-  (revoked from `public`/`anon`). A diary-linked review always stores
-  `rating = null`; the diary entry owns the rating.
-- **Application boundary.** `lib/supabase/log.ts` (`logMedia`) is the server
-  entry point: it refuses to run without Supabase configured, re-validates the
-  user via the auth DAL, re-validates input (`lib/supabase/log-input.ts`), calls
-  the RPC, and maps any error to a safe message. A success **must** carry a
-  non-empty `diary_entry_id`; a malformed RPC response becomes a generic error
-  rather than a false success. It then revalidates `/diary`, the title route,
-  and the author's `/profile/[username]` (username from the DAL, never the
-  client).
-- **Server Action.** `app/title/[slug]/actions.ts` (`logTitleAction`) is the
-  only Client-callable boundary. It reads only `LogMediaInput` fields, requires
-  an authenticated user with a complete profile, routes signed-out / incomplete
-  cases through the safe `returnTo` flow, and returns a serializable state for
-  `useActionState`. It does not duplicate the RPC call.
+  a linked `reviews` row in one transaction. It resolves the title from a
+  trusted **slug** server-side (the browser never supplies media metadata).
+- **Edit.** `public.update_diary_entry(p_diary_entry_id, …)` (migration
+  `20260812164500`) updates the caller's **own** entry and its optional linked
+  review in one transaction: it changes the logged date, rating (passing `null`
+  **removes** an existing rating), and revisit flag, and **upserts** the linked
+  review — creating one when the entry had none, updating it in place
+  otherwise, or **removing** it when the review body is cleared (the diary entry
+  is retained). A missing or cross-user id resolves to no row and fails safely
+  (`P0002`). Returns `{ diary_entry_id, review_id, media_slug }`.
+- **Delete.** `public.delete_diary_entry(p_diary_entry_id)` (migration
+  `20260812164500`) deletes the caller's **own** entry. Because
+  `reviews.diary_entry_id` is `ON DELETE SET NULL` (which would _detach_ rather
+  than remove a linked review), the function deletes the caller's linked
+  review(s) **explicitly first**, then the entry — atomically, leaving **no
+  orphan**. Deleting the newest log lets the previous log (if any) become the
+  title's latest personal state, because reads resolve the newest remaining
+  entry. Returns `{ diary_entry_id, media_slug }`.
+- **Application boundary.** `lib/supabase/log.ts` hosts all three server entry
+  points — `logMedia`, `updateDiaryEntry`, and `deleteDiaryEntry`. Each refuses
+  to run without Supabase configured, re-validates the user via the auth DAL,
+  re-validates/normalizes input (`lib/supabase/log-input.ts`:
+  `validateLogInput` / `validateEditInput`, plus a UUID check for delete), calls
+  the RPC, and maps any error to a safe message via the pure
+  `lib/supabase/log-errors.ts` (`mapLogError` / `mapEditError` /
+  `mapDeleteError` — raw DB detail is never surfaced). A success **must** carry
+  a non-empty `diary_entry_id`; a malformed/absent RPC identifier becomes a
+  generic error rather than a false success. Each then revalidates `/diary`, the
+  title route, and the author's `/profile/[username]` (slug from the RPC's
+  server-resolved catalog identity, username from the DAL — never the client)
+  via the shared `revalidateDiaryWrite` helper.
+- **Server Actions.** `app/title/[slug]/actions.ts` (`logTitleAction`) is the
+  create boundary; `app/diary/actions.ts` (`editDiaryEntryAction` /
+  `deleteDiaryEntryAction`) are the edit/delete boundaries shared by the diary
+  and title UIs. Each reads only allow-listed fields (never a user id, media
+  UUID, username, or ownership field — see `app/title/[slug]/log-form.ts` and
+  `app/diary/diary-form.ts`), independently re-checks authentication and profile
+  completeness, routes signed-out / incomplete cases through the safe `returnTo`
+  flow, and returns a serializable state for `useActionState`. They do not
+  duplicate the RPC call.
+- **UI.** The shared, presentational `LogDialog` (create or edit mode, its
+  action injected as a prop so it never imports a server module) and
+  `DeleteLogDialog` back the owner controls on the title's personal-state area
+  (`MediaActions`) and each real diary row (`DiaryEntryActions`). Edit opens
+  pre-filled from the stored entry; delete requires an explicit second-step
+  confirmation. These controls render only for the authenticated owner — never
+  signed-out or on the example diary.
 - **Reads.** `lib/supabase/diary.ts` provides `getMyLatestLogForSlug` (the
-  title's per-viewer personal state) and `getMyDiary` (the authenticated user's
-  diary as `DiaryEntryView[]`). `lib/supabase/profile-activity.ts`
+  title's per-viewer personal state, now including the linked review's
+  title/body/spoiler flag so an edit can pre-fill) and `getMyDiary` (the
+  authenticated user's diary as `DiaryEntryView[]`, each real row carrying an
+  owner-only `edit` payload). `lib/supabase/profile-activity.ts`
   (`getRealProfileActivity`) derives a real profile's statistics, recent
   titles, and reviews. All embed related rows (no N+1), map through the
   mapper/view-model boundary, and resolve a linked review's effective rating
@@ -340,6 +384,73 @@ the service-role key. Clean up disposable test data afterward.
 > Apply and verify them with the procedure above before relying on the hosted
 > logging loop.
 
+### Deploying the edit/delete migration (`20260812164500`)
+
+The edit/delete lifecycle adds **one** new forward-only migration —
+`20260812164500_edit_delete_diary_entry_rpcs.sql` (the
+`update_diary_entry` / `delete_diary_entry` RPCs and their grants). Existing
+migrations are immutable; this migration only `create or replace`s two new
+functions and re-grants EXECUTE, so it is additive and safe to push. Apply it to
+the hosted project the same way (never `db reset --linked`, never remote seed):
+
+```bash
+supabase link --project-ref <hosted-dev-ref>   # confirm the exact project
+supabase migration list --linked               # inspect the remote ledger
+supabase db push --dry-run                      # expect ONLY 20260812164500
+supabase db push                                # apply after review
+```
+
+**Post-deployment SQL checks** (run read-only against the hosted DB, e.g. in the
+SQL editor):
+
+```sql
+-- 1) The migration is recorded in the remote ledger.
+select version from supabase_migrations.schema_migrations
+where version = '20260812164500';
+
+-- 2) Both functions exist as SECURITY INVOKER with a pinned search_path.
+select p.proname, p.prosecdef as security_definer, p.proconfig
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public'
+  and p.proname in ('update_diary_entry', 'delete_diary_entry');
+--   expect security_definer = false and proconfig = {search_path=""}
+
+-- 3) EXECUTE is granted to authenticated only (not anon/public).
+select has_function_privilege('authenticated',
+  'public.update_diary_entry(uuid, timestamptz, numeric, boolean, text, text, boolean)', 'execute') as authed_update,
+  has_function_privilege('anon',
+  'public.update_diary_entry(uuid, timestamptz, numeric, boolean, text, text, boolean)', 'execute') as anon_update,
+  has_function_privilege('authenticated', 'public.delete_diary_entry(uuid)', 'execute') as authed_delete,
+  has_function_privilege('anon', 'public.delete_diary_entry(uuid)', 'execute') as anon_delete;
+--   expect authed_* = true, anon_* = false
+```
+
+**Manual production verification checklist** (after deploy, with a disposable
+account; clean up test rows afterward):
+
+1. Sign in, open a title you have logged, and **edit** the entry — change the
+   date and rating, and confirm the title personal state, `/diary`, and your
+   `/profile/[username]` all reflect the change after it saves.
+2. **Remove** the rating on an entry (clear it) and confirm the rating
+   disappears everywhere.
+3. **Add** a review to an entry that had none, **update** it, then **clear** its
+   body — confirm the linked review is created, updated, and then removed while
+   the diary entry itself remains.
+4. Log a title **twice**, **delete** the newer entry, and confirm the older log
+   becomes the title's latest personal state (not "unlogged").
+5. **Delete** an entry that has a review and confirm no orphaned review remains
+   on your profile/diary.
+6. Confirm a signed-out visitor sees a neutral **Log** action (no
+   "Watched"/"Read", no edit/delete controls) and that Log/Rate/Review route to
+   the safe sign-in `returnTo`.
+7. Confirm the browser never receives the service-role key.
+
+> **Hosted status for edit/delete:** this migration has **not** been applied to,
+> or verified against, the hosted project from this environment. It was
+> developed and verified **locally only** (local reset + full pgTAP suite +
+> byte-identical type regeneration). Apply and verify it with the procedure and
+> checklist above before relying on the hosted edit/delete lifecycle.
+
 ## Seed assumptions
 
 `supabase/seed.sql` loads a **small, representative** dataset (not a migration
@@ -361,9 +472,6 @@ of the full mock catalog):
 
 ## Deferred decisions
 
-- **Edit / delete of diary entries and reviews** (the backend currently
-  guarantees only the atomic create path). This is the next focused persistence
-  task.
 - Add-to-list persistence, list creation/editing, favorites, follows UI, and
   real likes persistence (and any dedicated activity/event table).
 - Migrating the remaining product surfaces (catalog browsing, community

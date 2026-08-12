@@ -29,6 +29,36 @@ test.describe("Signed-out logging affordances", () => {
     await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 
+  test("shows a neutral 'Log' primary action, never personalized state", async ({
+    page,
+  }) => {
+    await page.goto("/title/dune-part-two");
+    const actions = page.getByRole("group", { name: /Actions for/ });
+
+    // The primary affordance is the honest "Log" — never a "Watched"/"Read"
+    // that would imply the app knows a signed-out visitor's viewing state.
+    await expect(actions.getByRole("link", { name: "Log" })).toBeVisible();
+    await expect(actions.getByRole("link", { name: "Watched" })).toHaveCount(0);
+    await expect(actions.getByRole("link", { name: "Log again" })).toHaveCount(
+      0,
+    );
+    await expect(page.getByText(/Watched on/)).toHaveCount(0);
+  });
+
+  test("the primary Log action navigates to the safe sign-in returnTo", async ({
+    page,
+  }) => {
+    await page.goto("/title/dune-part-two");
+    await page
+      .getByRole("group", { name: /Actions for/ })
+      .getByRole("link", { name: "Log" })
+      .click();
+
+    await expect(page).toHaveURL(
+      /\/auth\/sign-in\?returnTo=%2Ftitle%2Fdune-part-two$/,
+    );
+  });
+
   test("Add to list stays honestly unavailable", async ({ page }) => {
     await page.goto("/title/dune-part-two");
     const addToList = page

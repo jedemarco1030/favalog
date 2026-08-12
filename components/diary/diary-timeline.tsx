@@ -21,6 +21,11 @@ interface DiaryTimelineProps {
   entries: DiaryEntryView[];
   /** Initial filter, sourced from the `type` URL parameter. */
   initialFilter: DiaryFilter;
+  /**
+   * When true, each row shows owner-only edit/delete controls. Set only for
+   * the authenticated owner's real diary — never the signed-out example diary.
+   */
+  editable?: boolean;
 }
 
 const monthFormatter = new Intl.DateTimeFormat("en", {
@@ -64,7 +69,11 @@ function groupByMonth(entries: DiaryEntryView[]): MonthGroup[] {
  * (`?type=…`) via `router.replace` so a filtered diary is shareable and back
  * / forward behaves naturally; `type=all` is omitted to keep the URL clean.
  */
-export function DiaryTimeline({ entries, initialFilter }: DiaryTimelineProps) {
+export function DiaryTimeline({
+  entries,
+  initialFilter,
+  editable = false,
+}: DiaryTimelineProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [filter, setFilter] = useState<DiaryFilter>(initialFilter);
@@ -141,7 +150,7 @@ export function DiaryTimeline({ entries, initialFilter }: DiaryTimelineProps) {
                     key={entry.id}
                     className="border-t border-border/40 py-5 first:border-t-0 first:pt-0"
                   >
-                    <DiaryEntry entry={entry} />
+                    <DiaryEntry entry={entry} editable={editable} />
                   </li>
                 ))}
               </ul>

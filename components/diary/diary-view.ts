@@ -43,6 +43,17 @@ export interface DiaryEntryView {
     title?: string;
     excerpt: string;
   };
+  /**
+   * Full, raw values needed to pre-fill an edit dialog. Present ONLY for the
+   * authenticated owner's real diary (never for the signed-out example diary),
+   * so owner-only edit controls can open with the exact stored values.
+   */
+  edit?: {
+    isRevisit: boolean;
+    reviewTitle: string | null;
+    reviewBody: string | null;
+    containsSpoilers: boolean;
+  };
 }
 
 const ACTION_LABEL: Record<DiaryAction, string> = {

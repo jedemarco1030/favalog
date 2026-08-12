@@ -5,8 +5,15 @@ import { DiaryTimeline } from "@/components/diary/diary-timeline";
 import type { DiaryEntryView } from "@/components/diary/diary-view";
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace: vi.fn() }),
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn(), refresh: vi.fn() }),
   usePathname: () => "/diary",
+}));
+
+// Owner controls transitively import the server-only edit/delete actions;
+// mock them so this UI test never loads a `"use server"` module.
+vi.mock("@/app/diary/actions", () => ({
+  editDiaryEntryAction: vi.fn(),
+  deleteDiaryEntryAction: vi.fn(),
 }));
 
 const entries: DiaryEntryView[] = [

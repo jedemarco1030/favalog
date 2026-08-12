@@ -75,6 +75,15 @@ export type LogFieldErrors = Partial<
   Record<"loggedAt" | "rating" | "reviewTitle" | "reviewBody" | "form", string>
 >;
 
+/** A canonical UUID (any version), used to validate a diary-entry identifier. */
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** True when `value` is a syntactically valid UUID string. */
+export function isUuid(value: string | null | undefined): boolean {
+  return typeof value === "string" && UUID_RE.test(value.trim());
+}
+
 /** A normalized, server-ready payload derived from valid input. */
 export interface NormalizedLogInput {
   mediaSlug: string;
@@ -120,29 +129,34 @@ export function datetimeLocalToISO(
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
 
+/** The fields shared by create and edit, after validation + normalization. */
+interface NormalizedLoggable {
+  loggedAt: string | null;
+  rating: number | null;
+  isRevisit: boolean;
+  reviewTitle: string | null;
+  reviewBody: string | null;
+  containsSpoilers: boolean;
+}
+
 /**
- * Validate and normalize log input.
+ * Validate + normalize the fields common to logging and editing (rating,
+ * logged date, and the optional review). Shared so the create and edit paths
+ * enforce identical rules. Mutates `errors` and returns the normalized fields.
  *
  * Rules mirror the database:
- *  - a media slug is required (the trusted catalog identity);
  *  - a rating, when present, must be a half-star value in [0.5, 5.0];
  *  - a logged date, when present, must parse and must not be in the future;
  *  - a review body, when present, must be within length limits; an empty body
  *    means "no review" and clears the title/spoiler flag so the linked review
- *    is not created;
+ *    is not created/updated;
  *  - a review title (with a body) must be within its length limit.
  */
-export function validateLogInput(
-  input: LogMediaInput,
-  now: Date = new Date(),
-): LogValidationResult {
-  const errors: LogFieldErrors = {};
-
-  const mediaSlug = trimOrNull(input.mediaSlug);
-  if (!mediaSlug) {
-    errors.form = "We couldn't tell which title to log. Please try again.";
-  }
-
+function validateLoggableFields(
+  input: Omit<LogMediaInput, "mediaSlug">,
+  errors: LogFieldErrors,
+  now: Date,
+): NormalizedLoggable {
   // Rating.
   const rating =
     input.rating === undefined || input.rating === null ? null : input.rating;
@@ -175,24 +189,100 @@ export function validateLogInput(
     errors.reviewTitle = `Keep the review title under ${MAX_REVIEW_TITLE} characters.`;
   }
 
+  // A review title / spoiler flag are only meaningful with a body.
+  const hasReview = reviewBody !== null;
+  return {
+    loggedAt,
+    rating,
+    isRevisit: Boolean(input.isRevisit),
+    reviewTitle: hasReview ? reviewTitle : null,
+    reviewBody: hasReview ? reviewBody : null,
+    containsSpoilers: hasReview ? Boolean(input.containsSpoilers) : false,
+  };
+}
+
+/**
+ * Validate and normalize log input. A media slug is required (the trusted
+ * catalog identity); the remaining fields are validated by the shared
+ * {@link validateLoggableFields} helper.
+ */
+export function validateLogInput(
+  input: LogMediaInput,
+  now: Date = new Date(),
+): LogValidationResult {
+  const errors: LogFieldErrors = {};
+
+  const mediaSlug = trimOrNull(input.mediaSlug);
+  if (!mediaSlug) {
+    errors.form = "We couldn't tell which title to log. Please try again.";
+  }
+
+  const fields = validateLoggableFields(input, errors, now);
+
   const ok = Object.keys(errors).length === 0;
   if (!ok || !mediaSlug) {
     return { ok: false, errors };
   }
 
-  // A review title / spoiler flag are only meaningful with a body.
-  const hasReview = reviewBody !== null;
   return {
     ok: true,
     errors: {},
-    value: {
-      mediaSlug,
-      loggedAt,
-      rating,
-      isRevisit: Boolean(input.isRevisit),
-      reviewTitle: hasReview ? reviewTitle : null,
-      reviewBody: hasReview ? reviewBody : null,
-      containsSpoilers: hasReview ? Boolean(input.containsSpoilers) : false,
-    },
+    value: { mediaSlug, ...fields },
+  };
+}
+
+/** Raw, untrusted input as it arrives from the edit form. */
+export interface EditDiaryInput {
+  /** The diary entry being edited; ownership is re-checked server-side. */
+  diaryEntryId: string;
+  loggedAt?: string | null;
+  rating?: number | null;
+  isRevisit?: boolean;
+  reviewTitle?: string | null;
+  reviewBody?: string | null;
+  containsSpoilers?: boolean;
+}
+
+/** A normalized, server-ready edit payload derived from valid input. */
+export interface NormalizedEditInput extends NormalizedLoggable {
+  diaryEntryId: string;
+}
+
+export interface EditValidationResult {
+  ok: boolean;
+  errors: LogFieldErrors;
+  /** Present only when `ok` is true. */
+  value?: NormalizedEditInput;
+}
+
+/**
+ * Validate and normalize edit input. Identical field rules to logging, plus a
+ * required, syntactically valid diary-entry UUID. The identifier is only a
+ * lookup key — ownership is re-derived from `auth.uid()` in the database, never
+ * trusted from the client.
+ */
+export function validateEditInput(
+  input: EditDiaryInput,
+  now: Date = new Date(),
+): EditValidationResult {
+  const errors: LogFieldErrors = {};
+
+  const diaryEntryId = trimOrNull(input.diaryEntryId);
+  if (!diaryEntryId || !isUuid(diaryEntryId)) {
+    errors.form =
+      "We couldn't tell which entry to edit. Please refresh and try again.";
+  }
+
+  const fields = validateLoggableFields(input, errors, now);
+
+  const ok = Object.keys(errors).length === 0;
+  if (!ok || !diaryEntryId) {
+    return { ok: false, errors };
+  }
+
+  return {
+    ok: true,
+    errors: {},
+    value: { diaryEntryId, ...fields },
   };
 }

@@ -8,10 +8,13 @@ import {
 import { StarRating } from "@/components/ui/star-rating";
 import type { DiaryEntryView } from "@/components/diary/diary-view";
 import { diaryActionLabel } from "@/components/diary/diary-view";
+import { DiaryEntryActions } from "@/components/diary/diary-entry-actions";
 import { cn } from "@/lib/cn";
 
 interface DiaryEntryProps {
   entry: DiaryEntryView;
+  /** When true, render owner-only edit/delete controls for this row. */
+  editable?: boolean;
   className?: string;
 }
 
@@ -35,7 +38,11 @@ const fullDateFormatter = new Intl.DateTimeFormat("en", {
  *
  * Both the artwork and the title link to the unified `/title/[slug]` page.
  */
-export function DiaryEntry({ entry, className }: DiaryEntryProps) {
+export function DiaryEntry({
+  entry,
+  editable = false,
+  className,
+}: DiaryEntryProps) {
   const date = new Date(entry.loggedAt);
   const action = diaryActionLabel(entry.action);
   const kindLabel = mediaKindLabel(entry.kind);
@@ -75,15 +82,18 @@ export function DiaryEntry({ entry, className }: DiaryEntryProps) {
           <span className="tabular-nums">{entry.year}</span>
         </div>
 
-        <h3 className="font-display text-base leading-snug text-foreground sm:text-lg">
-          <Link
-            href={`/title/${entry.slug}`}
-            aria-label={`${entry.title} (${kindLabel}, ${entry.year})`}
-            className="rounded outline-none transition-colors hover:text-accent focus-visible:ring-2 focus-visible:ring-accent"
-          >
-            {entry.title}
-          </Link>
-        </h3>
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="font-display text-base leading-snug text-foreground sm:text-lg">
+            <Link
+              href={`/title/${entry.slug}`}
+              aria-label={`${entry.title} (${kindLabel}, ${entry.year})`}
+              className="rounded outline-none transition-colors hover:text-accent focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              {entry.title}
+            </Link>
+          </h3>
+          {editable && <DiaryEntryActions entry={entry} />}
+        </div>
 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="text-sm text-foreground/60">{action}</span>

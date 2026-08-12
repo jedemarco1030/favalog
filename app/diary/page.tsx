@@ -146,7 +146,11 @@ function RealDiary({
             }
           />
         ) : (
-          <DiaryTimeline entries={entries} initialFilter={initialFilter} />
+          <DiaryTimeline
+            entries={entries}
+            initialFilter={initialFilter}
+            editable
+          />
         )}
       </div>
     </Container>

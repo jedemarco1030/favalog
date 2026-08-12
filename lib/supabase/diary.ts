@@ -33,6 +33,12 @@ export interface PersonalTitleView {
   isRevisit: boolean;
   /** True when the most recent log carries a linked review. */
   hasReview: boolean;
+  /** The linked review's title, when one exists (for prefilling an edit). */
+  reviewTitle: string | null;
+  /** The linked review's body, when one exists (for prefilling an edit). */
+  reviewBody: string | null;
+  /** The linked review's spoiler flag (false when there is no review). */
+  containsSpoilers: boolean;
 }
 
 export type PersonalTitleResult =
@@ -41,13 +47,20 @@ export type PersonalTitleResult =
   | { status: "none" }
   | { status: "logged"; entry: PersonalTitleView };
 
+interface PersonalReviewRow {
+  id: string;
+  title: string | null;
+  body: string;
+  contains_spoilers: boolean;
+}
+
 interface PersonalRow {
   id: string;
   logged_at: string;
   rating: number | null;
   is_revisit: boolean;
   media_items: { kind: MediaKind; slug: string };
-  reviews: { id: string }[] | { id: string } | null;
+  reviews: PersonalReviewRow[] | PersonalReviewRow | null;
 }
 
 /**
@@ -70,7 +83,7 @@ export async function getMyLatestLogForSlug(
   const { data, error } = await supabase
     .from("diary_entries")
     .select(
-      "id, logged_at, rating, is_revisit, media_items!inner (kind, slug), reviews (id)",
+      "id, logged_at, rating, is_revisit, media_items!inner (kind, slug), reviews (id, title, body, contains_spoilers)",
     )
     .eq("media_items.slug", slug)
     .eq("user_id", user.id)
@@ -88,6 +101,7 @@ export async function getMyLatestLogForSlug(
     : row.reviews
       ? [row.reviews]
       : [];
+  const review = reviews[0];
 
   return {
     status: "logged",
@@ -98,6 +112,9 @@ export async function getMyLatestLogForSlug(
       rating: toRatingValue(row.rating),
       isRevisit: row.is_revisit,
       hasReview: reviews.length > 0,
+      reviewTitle: review?.title ?? null,
+      reviewBody: review?.body ?? null,
+      containsSpoilers: review?.contains_spoilers ?? false,
     },
   };
 }
@@ -121,8 +138,8 @@ interface DiaryRow {
     kind: MediaKind;
   };
   reviews:
-    | { title: string | null; body: string }[]
-    | { title: string | null; body: string }
+    | { title: string | null; body: string; contains_spoilers: boolean }[]
+    | { title: string | null; body: string; contains_spoilers: boolean }
     | null;
 }
 
@@ -150,6 +167,13 @@ function rowToDiaryView(row: DiaryRow): DiaryEntryView {
       review && review.body
         ? { title: review.title ?? undefined, excerpt: excerptOf(review.body) }
         : undefined,
+    // Owner-only prefill values (this query is always owner-scoped).
+    edit: {
+      isRevisit: row.is_revisit,
+      reviewTitle: review?.title ?? null,
+      reviewBody: review?.body ?? null,
+      containsSpoilers: review?.contains_spoilers ?? false,
+    },
   };
 }
 
@@ -170,7 +194,7 @@ export async function getMyDiary(): Promise<MyDiaryResult> {
   const { data, error } = await supabase
     .from("diary_entries")
     .select(
-      "id, logged_at, rating, is_revisit, media_items!inner (slug, title, year, poster_url, kind), reviews (title, body)",
+      "id, logged_at, rating, is_revisit, media_items!inner (slug, title, year, poster_url, kind), reviews (title, body, contains_spoilers)",
     )
     .eq("user_id", user.id)
     .order("logged_at", { ascending: false });

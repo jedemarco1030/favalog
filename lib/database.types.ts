@@ -371,12 +371,25 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      delete_diary_entry: { Args: { p_diary_entry_id: string }; Returns: Json }
       log_media: {
         Args: {
           p_contains_spoilers?: boolean
           p_is_revisit?: boolean
           p_logged_at?: string
           p_media_slug: string
+          p_rating?: number
+          p_review_body?: string
+          p_review_title?: string
+        }
+        Returns: Json
+      }
+      update_diary_entry: {
+        Args: {
+          p_contains_spoilers?: boolean
+          p_diary_entry_id: string
+          p_is_revisit?: boolean
+          p_logged_at?: string
           p_rating?: number
           p_review_body?: string
           p_review_title?: string

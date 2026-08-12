@@ -9,6 +9,16 @@ vi.mock("@/app/title/[slug]/actions", () => ({
   logTitleAction: (...args: unknown[]) => logTitleAction(...args),
 }));
 
+// The edit/delete Server Actions are also server-only; mock them too so this
+// UI test never imports a `"use server"` module.
+const editDiaryEntryAction = vi.fn();
+const deleteDiaryEntryAction = vi.fn();
+vi.mock("@/app/diary/actions", () => ({
+  editDiaryEntryAction: (...args: unknown[]) => editDiaryEntryAction(...args),
+  deleteDiaryEntryAction: (...args: unknown[]) =>
+    deleteDiaryEntryAction(...args),
+}));
+
 const push = vi.fn();
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -54,15 +64,42 @@ describe("MediaActions", () => {
       />,
     );
 
-    for (const name of ["Watched", "Rate", "Review"]) {
+    for (const name of ["Log", "Rate", "Review"]) {
       const link = screen.getByRole("link", { name });
       expect(link).toHaveAttribute("href", signInHref);
     }
+    // The primary action is the neutral "Log", never a personalized
+    // "Watched"/"Read" that would imply the app knows a signed-out visitor's
+    // viewing state.
+    expect(
+      screen.queryByRole("link", { name: "Watched" }),
+    ).not.toBeInTheDocument();
     // No dialog is rendered for a signed-out visitor.
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(
       screen.getByText(/free account to log, rate, and review/i),
     ).toBeInTheDocument();
+  });
+
+  it("never renders personalized viewing state for a signed-out visitor", () => {
+    render(
+      <MediaActions
+        item={movie}
+        isAuthenticated={false}
+        returnTo={returnTo}
+        signInHref={signInHref}
+        personal={null}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "Log" })).toBeInTheDocument();
+    expect(screen.queryByText(/Watched on/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Edit log/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Delete log/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("keeps Add to list honestly unavailable", () => {
@@ -92,7 +129,7 @@ describe("MediaActions", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Watched" }));
+    await user.click(screen.getByRole("button", { name: "Log" }));
     expect(
       await screen.findByRole("dialog", { name: /Log .Dune: Part Two./ }),
     ).toBeInTheDocument();
@@ -106,6 +143,9 @@ describe("MediaActions", () => {
       rating: 4.5,
       isRevisit: false,
       hasReview: false,
+      reviewTitle: null,
+      reviewBody: null,
+      containsSpoilers: false,
     };
     render(
       <MediaActions
@@ -121,5 +161,12 @@ describe("MediaActions", () => {
       screen.getByRole("button", { name: "Log again" }),
     ).toBeInTheDocument();
     expect(screen.getByText(/Watched on/)).toBeInTheDocument();
+    // Owner-only edit/delete controls are present for the entry's owner.
+    expect(
+      screen.getByRole("button", { name: "Edit log" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Delete log" }),
+    ).toBeInTheDocument();
   });
 });

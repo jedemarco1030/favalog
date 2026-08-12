@@ -106,23 +106,30 @@ once and reused.
 
 ## Backend (Supabase) — foundation + authentication
 
-> **Current status: authentication + onboarding AND the first persistent
-> logging loop are implemented on top of the Supabase foundation; the rest of
-> the product still uses mock data.** Sign up, sign in, email confirmation,
-> password reset, Google OAuth (optional), session-aware navigation, and
-> first-time profile onboarding are wired to Supabase Auth. On a title page a
-> signed-in, onboarded user can **Log / Rate / Review** — each creates a diary
-> entry (Review adds a linked review) through the atomic `public.log_media(...)`
-> RPC. That entry then appears as the title's **personal state**, in the user's
-> real **`/diary`**, and on their real **`/profile/[username]`** (derived stats,
-> recently watched/read, and reviews). A diary-linked review stores its rating
-> as `null` by design; its displayed rating resolves from the diary entry.
+> **Current status: authentication + onboarding AND the full persistent
+> diary-entry lifecycle (create + edit + delete) are implemented on top of the
+> Supabase foundation; the rest of the product still uses mock data.** Sign up,
+> sign in, email confirmation, password reset, Google OAuth (optional),
+> session-aware navigation, and first-time profile onboarding are wired to
+> Supabase Auth. On a title page a signed-in, onboarded user can **Log / Rate /
+> Review** — each creates a diary entry (Review adds a linked review) through the
+> atomic `public.log_media(...)` RPC. The owner can then **edit** that entry
+> (via `public.update_diary_entry(...)` — including adding, updating, or removing
+> its linked review, and clearing its rating) or **delete** it (via
+> `public.delete_diary_entry(...)`, which also removes the linked review so no
+> orphan remains) from both the title's personal-state area and each row of
+> their real diary. That entry appears as the title's **personal state**, in the
+> user's real **`/diary`**, and on their real **`/profile/[username]`** (derived
+> stats, recently watched/read, and reviews); all three revalidate after every
+> create/edit/delete. A diary-linked review stores its rating as `null` by
+> design; its displayed rating resolves from the diary entry.
 >
-> Signed-out visitors see Log/Rate/Review as real affordances that route
-> through the safe sign-in `returnTo` flow, and `/diary` shows a clearly
-> labelled **example diary** (never presented as their own). **Add to list,
-> edit/delete, lists, favorites, follows, and likes remain deferred**, and the
-> catalog / community reviews still render from the `@/lib/data` mock layer.
+> Signed-out visitors see a neutral **Log** primary action (never a personalized
+> "Watched"/"Read"), with Log/Rate/Review routing through the safe sign-in
+> `returnTo` flow, and `/diary` shows a clearly labelled **example diary** (never
+> presented as their own) with no edit/delete controls. **Add to list, lists,
+> favorites, follows, and likes remain deferred**, and the catalog / community
+> reviews still render from the `@/lib/data` mock layer.
 > The generated database types (`lib/database.types.ts`) are real and
 > drift-checked, the catalog migration owns all **28** curated titles, and
 > `seed.sql` references that catalog and remains **local only**. The app still
@@ -195,10 +202,10 @@ npm run db:test            # run pgTAP schema + RLS tests
 npm run supabase:stop      # stop the local stack
 ```
 
-> The committed `lib/database.types.ts` is a clearly-labeled hand-authored
-> **placeholder** matching the migrations, because Docker was unavailable when
-> the foundation was created. Run `npm run supabase:types` once a local stack is
-> available to replace it with the CLI-generated file.
+> `lib/database.types.ts` is **genuinely generated** from the local database by
+> `npm run supabase:types` and is guarded by a secret-free drift check
+> (regeneration must produce no diff). Regenerate it only when a migration
+> actually changes the schema; never hand-edit it.
 
 ### Remote linking (later)
 
@@ -632,9 +639,15 @@ titles can change without breaking links. Invalid slugs use Next.js
   catalog. Related items intentionally may span films, series, and
   books, and always link back to `/title/[slug]` through the existing
   `MediaCard`.
-- **Actions.** Log / Rate / Review / Add to list are presentation-only
-  buttons (`aria-disabled`) that communicate the shape of the future
-  product. No persistence, no fake success states.
+- **Actions.** For a signed-in, onboarded viewer, **Log / Rate / Review** open
+  one shared accessible dialog and persist through `logTitleAction` →
+  `public.log_media(...)`. When the viewer has already logged the title, their
+  latest **personal state** (verb, date, rating) is shown with owner-only
+  **Edit** and **Delete** controls (`update_diary_entry` / `delete_diary_entry`).
+  The primary action reads **Log** (or **Log again** once logged) — never a
+  personalized "Watched"/"Read" for a signed-out visitor. Signed-out
+  Log/Rate/Review are real links into the safe sign-in `returnTo` flow.
+  **Add to list** remains honestly disabled (`aria-disabled`).
 
 ### Profile (`/profile/[username]`)
 

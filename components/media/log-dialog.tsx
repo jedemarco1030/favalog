@@ -3,7 +3,6 @@
 import { useActionState, useEffect, useId, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
-import { logTitleAction } from "@/app/title/[slug]/actions";
 import {
   initialLogFormState,
   type LogFormState,
@@ -17,24 +16,71 @@ import { cn } from "@/lib/cn";
 /** Which field the dialog emphasises when opened, per the triggering action. */
 export type LogFocus = "log" | "rate" | "review";
 
+/** The `useActionState`-compatible action the dialog submits to. */
+export type LogDialogAction = (
+  state: LogFormState,
+  formData: FormData,
+) => Promise<LogFormState> | LogFormState;
+
+/** Raw values used to pre-fill the dialog when editing an existing entry. */
+export interface LogDialogInitialValues {
+  /** ISO timestamp of the entry's logged date. */
+  loggedAt?: string;
+  rating?: number | null;
+  isRevisit?: boolean;
+  reviewTitle?: string | null;
+  reviewBody?: string | null;
+  containsSpoilers?: boolean;
+}
+
 interface LogDialogProps {
   open: boolean;
   onClose: () => void;
   focus: LogFocus;
-  item: MediaItem;
+  /** The title being logged/edited. Only kind/slug/title are used here. */
+  item: Pick<MediaItem, "kind" | "slug" | "title">;
   /** Safe, same-origin path back to this title (used as the sign-in returnTo). */
   returnTo: string;
   /** Default revisit selection — true when the title was already logged. */
   defaultRevisit: boolean;
+  /**
+   * `"create"` (default) logs a new entry; `"edit"` updates an existing entry
+   * and pre-fills from {@link initialValues}.
+   */
+  mode?: "create" | "edit";
+  /**
+   * The `useActionState` action to submit to (the create or edit Server
+   * Action). Injected rather than imported so this presentational dialog never
+   * pulls a server-only module — stories/tests can drive it directly.
+   */
+  action: LogDialogAction;
+  /** The diary entry being edited (rendered as a hidden field in edit mode). */
+  diaryEntryId?: string;
+  /** Pre-fill values for edit mode. */
+  initialValues?: LogDialogInitialValues;
 }
+
+const pad = (n: number) => String(n).padStart(2, "0");
 
 /** A local `datetime-local` value string (`YYYY-MM-DDTHH:mm`) for `now`. */
 function nowLocalDateTime(): string {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
-    now.getDate(),
-  )}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  return toLocalDateTime(new Date());
+}
+
+/** Format a Date as a local `datetime-local` value string. */
+function toLocalDateTime(date: Date): string {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+    date.getDate(),
+  )}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+/** Convert a stored ISO timestamp to a local `datetime-local` value. */
+function isoToLocalDateTime(iso: string | undefined): string {
+  if (!iso) return nowLocalDateTime();
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime())
+    ? nowLocalDateTime()
+    : toLocalDateTime(date);
 }
 
 /**
@@ -58,6 +104,10 @@ export function LogDialog({
   item,
   returnTo,
   defaultRevisit,
+  mode = "create",
+  action,
+  diaryEntryId,
+  initialValues,
 }: LogDialogProps) {
   const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -66,7 +116,7 @@ export function LogDialog({
   const dateRef = useRef<HTMLInputElement>(null);
 
   const [state, formAction, isPending] = useActionState<LogFormState, FormData>(
-    logTitleAction,
+    action,
     initialLogFormState,
   );
 
@@ -78,7 +128,17 @@ export function LogDialog({
   const reviewTitleErrId = `${ids}-rtitle-err`;
   const reviewBodyErrId = `${ids}-rbody-err`;
 
-  const verb = deriveDiaryAction(item.kind, defaultRevisit);
+  const isEdit = mode === "edit";
+  // In edit mode the revisit default comes from the stored entry; in create
+  // mode it reflects whether the title was already logged.
+  const revisitDefault = isEdit
+    ? Boolean(initialValues?.isRevisit)
+    : defaultRevisit;
+  const dateDefault = isEdit
+    ? isoToLocalDateTime(initialValues?.loggedAt)
+    : nowLocalDateTime();
+
+  const verb = deriveDiaryAction(item.kind, revisitDefault);
   const revisitLabel = item.kind === "book" ? "Reread" : "Rewatch";
   const revisitDescription =
     item.kind === "book" ? "I've read this before" : "I've seen this before";
@@ -150,7 +210,11 @@ export function LogDialog({
       )}
     >
       <form action={formAction} className="flex flex-col gap-5 p-5 sm:p-6">
-        <input type="hidden" name="mediaSlug" value={item.slug} />
+        {isEdit ? (
+          <input type="hidden" name="diaryEntryId" value={diaryEntryId ?? ""} />
+        ) : (
+          <input type="hidden" name="mediaSlug" value={item.slug} />
+        )}
         <input type="hidden" name="returnTo" value={returnTo} />
 
         <header className="flex items-start justify-between gap-4">
@@ -159,16 +223,18 @@ export function LogDialog({
               id={titleId}
               className="font-display text-xl leading-tight text-foreground"
             >
-              Log &ldquo;{item.title}&rdquo;
+              {isEdit ? "Edit log" : "Log"} &ldquo;{item.title}&rdquo;
             </h2>
             <p id={descId} className="mt-1 text-sm text-foreground/60">
-              Saving adds a diary entry
-              {focus === "review"
-                ? " with your review"
-                : focus === "rate"
-                  ? " with your rating"
-                  : ""}
-              . Ratings and reviews live on the entry.
+              {isEdit
+                ? "Update this diary entry. Ratings and reviews live on the entry."
+                : "Saving adds a diary entry" +
+                  (focus === "review"
+                    ? " with your review"
+                    : focus === "rate"
+                      ? " with your rating"
+                      : "") +
+                  ". Ratings and reviews live on the entry."}
             </p>
           </div>
           <button
@@ -203,7 +269,7 @@ export function LogDialog({
             id={`${ids}-date`}
             type="datetime-local"
             name="loggedAt"
-            defaultValue={nowLocalDateTime()}
+            defaultValue={dateDefault}
             aria-invalid={fieldErrors?.loggedAt ? true : undefined}
             aria-describedby={fieldErrors?.loggedAt ? dateErrId : undefined}
             className={cn(
@@ -222,7 +288,7 @@ export function LogDialog({
           <input
             type="checkbox"
             name="isRevisit"
-            defaultChecked={defaultRevisit}
+            defaultChecked={revisitDefault}
             className="size-4 rounded border-border/70 bg-surface-2 text-accent focus-visible:ring-2 focus-visible:ring-accent"
           />
           {revisitLabel}{" "}
@@ -235,6 +301,7 @@ export function LogDialog({
           </legend>
           <RatingInput
             autoFocusRef={ratingRef}
+            defaultValue={initialValues?.rating ?? null}
             invalid={Boolean(fieldErrors?.rating)}
             describedBy={fieldErrors?.rating ? ratingErrId : undefined}
           />
@@ -256,6 +323,7 @@ export function LogDialog({
             id={`${ids}-rtitle`}
             type="text"
             name="reviewTitle"
+            defaultValue={initialValues?.reviewTitle ?? ""}
             aria-invalid={fieldErrors?.reviewTitle ? true : undefined}
             aria-describedby={
               fieldErrors?.reviewTitle ? reviewTitleErrId : undefined
@@ -286,6 +354,7 @@ export function LogDialog({
             id={`${ids}-rbody`}
             name="reviewBody"
             rows={4}
+            defaultValue={initialValues?.reviewBody ?? ""}
             aria-invalid={fieldErrors?.reviewBody ? true : undefined}
             aria-describedby={
               fieldErrors?.reviewBody ? reviewBodyErrId : undefined
@@ -308,6 +377,7 @@ export function LogDialog({
           <input
             type="checkbox"
             name="containsSpoilers"
+            defaultChecked={Boolean(initialValues?.containsSpoilers)}
             className="size-4 rounded border-border/70 bg-surface-2 text-accent focus-visible:ring-2 focus-visible:ring-accent"
           />
           This review contains spoilers
@@ -322,12 +392,18 @@ export function LogDialog({
           >
             Cancel
           </button>
-          <SubmitButton pendingLabel="Saving…">Save log</SubmitButton>
+          <SubmitButton pendingLabel="Saving…">
+            {isEdit ? "Save changes" : "Save log"}
+          </SubmitButton>
         </div>
 
         {/* Assistive-tech announcement for the saving state. */}
         <p role="status" aria-live="polite" className="sr-only">
-          {isPending ? "Saving your log…" : ""}
+          {isPending
+            ? isEdit
+              ? "Saving your changes…"
+              : "Saving your log…"
+            : ""}
         </p>
       </form>
     </dialog>

@@ -4,10 +4,14 @@ import {
   MAX_REVIEW_BODY,
   MAX_REVIEW_TITLE,
   deriveDiaryAction,
+  isUuid,
   isValidRating,
   logVerbLabel,
+  validateEditInput,
   validateLogInput,
 } from "./log-input";
+
+const UUID = "11111111-1111-1111-1111-111111111111";
 
 describe("isValidRating", () => {
   it("accepts absence (null/undefined)", () => {
@@ -166,5 +170,96 @@ describe("validateLogInput", () => {
     );
     expect(longTitle.ok).toBe(false);
     expect(longTitle.errors.reviewTitle).toBeDefined();
+  });
+});
+
+describe("isUuid", () => {
+  it("accepts a canonical UUID (trimmed, case-insensitive)", () => {
+    expect(isUuid(UUID)).toBe(true);
+    expect(isUuid(`  ${UUID.toUpperCase()}  `)).toBe(true);
+  });
+
+  it("rejects non-UUID strings and non-strings", () => {
+    expect(isUuid("")).toBe(false);
+    expect(isUuid("not-a-uuid")).toBe(false);
+    expect(isUuid("1111")).toBe(false);
+    expect(isUuid(null)).toBe(false);
+    expect(isUuid(undefined)).toBe(false);
+  });
+});
+
+describe("validateEditInput", () => {
+  const now = new Date("2026-08-06T12:00:00Z");
+
+  it("requires a syntactically valid diary-entry id", () => {
+    expect(validateEditInput({ diaryEntryId: "" }, now).ok).toBe(false);
+    const bad = validateEditInput({ diaryEntryId: "nope" }, now);
+    expect(bad.ok).toBe(false);
+    expect(bad.errors.form).toBeDefined();
+  });
+
+  it("normalizes a minimal valid edit (no rating, no review)", () => {
+    const result = validateEditInput({ diaryEntryId: UUID }, now);
+    expect(result.ok).toBe(true);
+    expect(result.value).toEqual({
+      diaryEntryId: UUID,
+      loggedAt: null,
+      rating: null,
+      isRevisit: false,
+      reviewTitle: null,
+      reviewBody: null,
+      containsSpoilers: false,
+    });
+  });
+
+  it("preserves a half-star rating and lets a null rating remove it", () => {
+    const rated = validateEditInput({ diaryEntryId: UUID, rating: 3.5 }, now);
+    expect(rated.value?.rating).toBe(3.5);
+
+    const cleared = validateEditInput(
+      { diaryEntryId: UUID, rating: null },
+      now,
+    );
+    expect(cleared.ok).toBe(true);
+    expect(cleared.value?.rating).toBeNull();
+  });
+
+  it("rejects an invalid rating on edit", () => {
+    const result = validateEditInput({ diaryEntryId: UUID, rating: 4.3 }, now);
+    expect(result.ok).toBe(false);
+    expect(result.errors.rating).toBeDefined();
+  });
+
+  it("keeps a non-empty review and drops an emptied one", () => {
+    const added = validateEditInput(
+      {
+        diaryEntryId: UUID,
+        reviewTitle: " Nice ",
+        reviewBody: " Loved it. ",
+        containsSpoilers: true,
+      },
+      now,
+    );
+    expect(added.value?.reviewTitle).toBe("Nice");
+    expect(added.value?.reviewBody).toBe("Loved it.");
+    expect(added.value?.containsSpoilers).toBe(true);
+
+    const removed = validateEditInput(
+      { diaryEntryId: UUID, reviewTitle: "orphan", reviewBody: "   " },
+      now,
+    );
+    expect(removed.ok).toBe(true);
+    expect(removed.value?.reviewBody).toBeNull();
+    expect(removed.value?.reviewTitle).toBeNull();
+    expect(removed.value?.containsSpoilers).toBe(false);
+  });
+
+  it("rejects a future logged date on edit", () => {
+    const result = validateEditInput(
+      { diaryEntryId: UUID, loggedAt: "2030-01-01T00:00:00Z" },
+      now,
+    );
+    expect(result.ok).toBe(false);
+    expect(result.errors.loggedAt).toBeDefined();
   });
 });
