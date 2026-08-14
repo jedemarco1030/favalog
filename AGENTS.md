@@ -271,16 +271,33 @@ exists (schema, RLS, clients) and the following are wired to it:
   shows derived stats / recently watched-read / real reviews
   (`getRealProfileActivity`). A diary-linked review's displayed rating resolves
   from its diary entry.
+- **Persistent list loop (create / add-title / remove-title) — backend +
+  server layer.** `public.create_list` / `add_list_item` / `remove_list_item`
+  (migrations `20260814160000` global-unique slug index + `20260814160100`
+  RPCs) follow the same security model as the diary RPCs (`SECURITY INVOKER`,
+  pinned `search_path`, ownership from `auth.uid()`, `authenticated`-only
+  EXECUTE, identifier-only returns). Slugs are generated server-side and are
+  globally unique + immutable; only `public`/`private` visibility is accepted
+  (`ListVisibility` is reconciled to the enum `public | followers | private`,
+  with `ListCreateVisibility = public | private`). The server layer
+  (`lib/supabase/lists.ts` writes + reads, `lib/supabase/list-input.ts`,
+  `list-errors.ts`, `list-view-model.ts`) and Server Actions
+  (`app/lists/actions.ts`, `app/lists/list-form.ts`) exist and are verified
+  **locally** (pgTAP + unit tests). Wiring the Add-to-list dialog on
+  `/title/[slug]`, real `/lists` / `/list/[slug]`, and profile list surfaces is
+  the sanctioned **next slice** for this feature — extend this layer, do not
+  build a parallel one.
 
 Everything else is still mock-data. Do **not** introduce any of the following
 without an explicit task: migrating the remaining product pages off mock data,
-Add-to-list / list persistence, favorites, a follows
-UI, likes, external catalog APIs (TMDB, Open Library, Google Books), AI
-functionality, real notifications, real social relationships, real
-recommendation algorithms, additional OAuth providers, MFA/passkeys, or full
-account settings. Mock demo usernames (`jamie`, `mira`, …) still render their
-full mock profiles; other usernames resolve through Supabase; unknown ones
-`notFound()`. A real profile never inherits mock data.
+**list editing / deletion / arbitrary reordering / curator notes**, favorites,
+a follows UI, likes (reviews or lists), follower-aware list visibility,
+external catalog APIs (TMDB, Open Library, Google Books), AI functionality,
+real notifications, real social relationships, real recommendation algorithms,
+additional OAuth providers, MFA/passkeys, or full account settings. Mock demo
+usernames (`jamie`, `mira`, …) still render their full mock profiles; other
+usernames resolve through Supabase; unknown ones `notFound()`. A real profile
+never inherits mock data (including mock lists).
 
 ## Workflow
 

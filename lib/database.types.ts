@@ -371,6 +371,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_list_item: {
+        Args: { p_list_id: string; p_media_slug: string }
+        Returns: Json
+      }
+      create_list: {
+        Args: {
+          p_description?: string
+          p_is_ranked?: boolean
+          p_media_slug?: string
+          p_title: string
+          p_visibility?: string
+        }
+        Returns: Json
+      }
       delete_diary_entry: { Args: { p_diary_entry_id: string }; Returns: Json }
       log_media: {
         Args: {
@@ -382,6 +396,10 @@ export type Database = {
           p_review_body?: string
           p_review_title?: string
         }
+        Returns: Json
+      }
+      remove_list_item: {
+        Args: { p_list_id: string; p_media_slug: string }
         Returns: Json
       }
       update_diary_entry: {

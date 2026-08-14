@@ -169,11 +169,22 @@ export interface Review {
 }
 
 /**
- * Reserved access model for a list. Unused by MVP rendering (every mock list
- * is treated as public) but carried on the type so the storage shape does not
- * have to change when real visibility rules and authentication arrive.
+ * Access model for a list. Reconciled to match the database `list_visibility`
+ * enum (the single source of truth): `public`, `followers`, and `private`.
+ *
+ * `followers` visibility is represented but not yet enforced (it behaves like
+ * `private` until real follower-aware access exists), so persistent list
+ * creation only exposes {@link ListCreateVisibility} (`public` | `private`) for
+ * now. Mock lists are all `public`.
  */
-export type ListVisibility = "public" | "unlisted" | "private";
+export type ListVisibility = "public" | "followers" | "private";
+
+/**
+ * The visibility options a user may choose when creating a real list in the
+ * current phase. `followers` is deliberately withheld until follower-aware
+ * access is implemented.
+ */
+export type ListCreateVisibility = "public" | "private";
 
 /**
  * A user-authored, cross-media collection of titles.

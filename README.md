@@ -127,9 +127,16 @@ once and reused.
 > Signed-out visitors see a neutral **Log** primary action (never a personalized
 > "Watched"/"Read"), with Log/Rate/Review routing through the safe sign-in
 > `returnTo` flow, and `/diary` shows a clearly labelled **example diary** (never
-> presented as their own) with no edit/delete controls. **Add to list, lists,
-> favorites, follows, and likes remain deferred**, and the catalog / community
-> reviews still render from the `@/lib/data` mock layer.
+> presented as their own) with no edit/delete controls. The **persistent list
+> loop** (create a list, add a title, remove a title — via
+> `public.create_list` / `add_list_item` / `remove_list_item` with
+> server-generated globally-unique slugs and `public`/`private` visibility) is
+> **implemented and verified locally** at the database + server layer
+> (`lib/supabase/lists.ts`, `app/lists/actions.ts`); wiring its Add-to-list
+> dialog, real `/lists` / `/list/[slug]`, and profile surfaces is the **next
+> slice**. **List editing/deletion/reordering/notes, favorites, follows, and
+> likes remain deferred**, and the catalog / community reviews still render from
+> the `@/lib/data` mock layer.
 > The generated database types (`lib/database.types.ts`) are real and
 > drift-checked, the catalog migration owns all **28** curated titles, and
 > `seed.sql` references that catalog and remains **local only**. The app still

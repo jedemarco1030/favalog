@@ -11,13 +11,18 @@
 > state and each real diary row; signed-out / no-env visitors keep a clearly
 > labelled mock **example** diary (no edit/delete) and mock demo profiles, and
 > the title's primary action is a neutral **Log** (never a personalized
-> "Watched"/"Read"). The remaining product surfaces (catalog browsing, community
-> reviews, lists, favorites, follows) still run on the typed mock-data layer
-> (`@/lib/data`), and **Add-to-list, favorites, follows, and likes are
-> deferred**. The generated types (`lib/database.types.ts`) are real and
-> drift-checked; the catalog migration owns all **28** curated titles; `seed.sql`
-> references that catalog and is **local-only**. The app still builds with no
-> Supabase env set.
+> "Watched"/"Read"). The **persistent list loop** — create a list, add a title,
+> remove a title (`public.create_list` / `add_list_item` / `remove_list_item`,
+> server-generated globally-unique slugs, `public`/`private` visibility) — is
+> **implemented and verified locally** at the database + server layer
+> (`lib/supabase/lists.ts`, `app/lists/actions.ts`); its title/lists/list-detail/
+> profile **UI wiring is the next slice**. The remaining product surfaces
+> (catalog browsing, community reviews) still run on the typed mock-data layer
+> (`@/lib/data`), and **list editing/deletion/reordering/notes, favorites,
+> follows, and likes are deferred**. The generated types
+> (`lib/database.types.ts`) are real and drift-checked; the catalog migration
+> owns all **28** curated titles; `seed.sql` references that catalog and is
+> **local-only**. The app still builds with no Supabase env set.
 
 This document describes the Supabase/PostgreSQL foundation added in Phase 2:
 why it exists, the schema, the security model, and the boundaries that keep the
@@ -289,6 +294,119 @@ review always stores `rating = null`; the diary entry owns the rating
   `notFound()`. A real profile never inherits mock data, and real reviews show
   no fabricated like counts.
 
+## Persistent list loop (create / add / remove) and reads
+
+The first persistent **list** loop — sign in → create a list → add a title →
+view the real list → see it on the owner's profile → add/remove other titles —
+is backed by three narrowly-scoped RPCs that share the **same** security model
+as the diary RPCs: `SECURITY INVOKER` (RLS is an independent second boundary), a
+pinned `search_path = ''` with fully-qualified objects, ownership derived from
+`auth.uid()` (never a client `user_id`), EXECUTE granted to `authenticated` only
+(revoked from `public`/`anon`), catalog identity resolved server-side from a
+trusted **slug**, and a return payload limited to the identifiers/routing data
+the app needs.
+
+### Route identity: globally-unique server-generated slugs
+
+`/list/[slug]` must resolve to **exactly one** list, but `lists.slug` was
+originally unique only **per owner** (`lists_user_id_slug_key`). Migration
+`20260814160000_list_slug_global_unique.sql` adds a forward-only **global**
+unique index `lists_slug_global_key on lists (slug)` (strictly stricter than the
+per-owner index, which is kept — migrations are immutable). A `DO` guard makes
+the migration **fail loudly** with a descriptive message if unexpected duplicate
+slugs already exist across owners (none are expected, because persistent list
+creation was never previously exposed).
+
+Slugs are generated **server-side** by `create_list` from a readable base
+(`<username>-<title>`, slugified) plus a deterministic numeric suffix on
+collision. Uniqueness is enforced by the **INSERT** (retry-on-`unique_violation`
+with a bumped suffix), which is correct even against other users' private-list
+slugs that RLS would hide from a pre-`SELECT`. A slug is **immutable**: renaming
+a list later never changes its URL, and the browser never supplies a slug.
+
+### The three RPCs (`20260814160100_list_rpcs.sql`)
+
+- **Create.** `public.create_list(p_title, p_description, p_is_ranked,
+p_visibility, p_media_slug)` inserts a list owned by the caller with a
+  generated slug, validates the title (1–150) / description (≤2000) for clean
+  mapped errors, accepts **only** `public` / `private` visibility (the enum's
+  `followers` and the domain-only `unlisted` are rejected), and — when an
+  optional trusted `p_media_slug` is supplied — adds that title at position 0 in
+  the **same transaction** (so "create a list from the title dialog" is atomic).
+  Returns `{ list_id, slug, added_media_slug }`.
+- **Add.** `public.add_list_item(p_list_id, p_media_slug)` appends a trusted
+  catalog title to a list the caller owns. It **locks the parent list row**
+  (`for update`) so concurrent adds cannot collide, appends at the next
+  contiguous zero-based position, is **idempotent** (an already-present title
+  returns `{ already_present: true }` with its existing position — never a
+  duplicate or a raw unique-constraint error), and bumps the list's
+  `updated_at`. Returns `{ list_id, slug, media_id, position, already_present }`.
+- **Remove.** `public.remove_list_item(p_list_id, p_media_slug)` removes a title
+  from a list the caller owns, then **compacts** the remaining positions to a
+  contiguous `0..n-1` range. Compaction parks rows at a temporary **positive**
+  offset above the current max (never negative — the `list_items` non-negative
+  CHECK — and disjoint from both the old and new ranges, so no ordering can
+  cause a transient `(list_id, position)` duplicate). Removing an absent title
+  is idempotent (`{ removed: false }`). Returns
+  `{ list_id, slug, media_id, removed }`.
+
+A missing/cross-user `p_list_id` resolves to no owned row and fails safely
+(`P0002`); an unknown media slug fails safely (`P0002`); an unauthenticated
+caller is rejected both by the grant and by an in-function `auth.uid()` guard
+(`28000`).
+
+### Visibility reconciliation
+
+The DB enum `list_visibility` is `public | followers | private`; the domain
+`ListVisibility` in `lib/types.ts` was `public | unlisted | private`. These are
+reconciled: `ListVisibility` now matches the enum (`public | followers |
+private`), and a new `ListCreateVisibility` (`public | private`) is the only set
+a user may choose this phase. `followers` remains represented but unenforced
+until follower-aware access exists.
+
+### Application boundary
+
+- `lib/supabase/lists.ts` hosts the server entry points. Writes (`createList`,
+  `addListItem`, `removeListItem`) mirror `log.ts`: refuse to run when Supabase
+  is unconfigured (`unavailable`), independently re-check the authenticated user
+  **and a complete onboarded profile** via the auth DAL, re-validate/normalize
+  input (`lib/supabase/list-input.ts`), call the RPC, treat a missing/malformed
+  RPC identifier as a failure (never a false success), map errors to safe
+  messages (`lib/supabase/list-errors.ts` — raw DB detail never surfaced), and
+  revalidate `/lists`, the real `/list/[slug]` (by the RPC's canonical slug),
+  the `/title/[slug]` route, and the author's `/profile/[username]` (username
+  from the DAL — never the client). Reads (`getMyListsWithMembership`,
+  `getMyLists`, `getPublicLists`, `getRealListBySlug`, `getRealListsForUser`)
+  are owner/visibility-scoped by RLS and return serializable view models via the
+  pure `lib/supabase/list-view-model.ts` mappers — never raw rows, and never a
+  fabricated like count or curator note on a real list.
+- **Server Actions.** `app/lists/actions.ts` (`createListAction`,
+  `addListItemAction`, `removeListItemAction`) are the only Client-callable
+  entry points. Each reads only allow-listed fields (never a user id, media
+  UUID, username, position, or ownership field — see `app/lists/list-form.ts`),
+  routes signed-out / incomplete-profile cases through the safe `returnTo` /
+  onboarding flow, and returns a serializable `useActionState` state. They do
+  not duplicate the RPC call.
+
+### Ordering, likes, notes — deferred
+
+This phase supports **append** and **remove** only (new titles append; removal
+compacts). Ranked lists display their stored order as a ranking; unranked lists
+still preserve deterministic order. **Drag-and-drop / arbitrary reordering,
+curator-note creation/editing, list metadata editing, list deletion, list
+likes, and follower-aware visibility are deferred.** Real lists carry no
+persisted like count (honestly absent, never faked).
+
+### Mock vs. real list boundary
+
+The curated mock discovery experience on `/lists` is retained but labelled as
+editorial/example content; a configured environment additionally surfaces the
+signed-in user's **real** lists and a strictly-`public` **community** section.
+Existing mock demonstration lists on `/list/[slug]` and mock demo profiles keep
+using mock list data; a **real** list/profile never inherits mock lists, counts,
+owners, notes, or likes. A read failure shows a controlled error state rather
+than silently substituting mock lists as the user's own.
+
 ## Supabase clients
 
 Per current `@supabase/ssr` guidance (the deprecated `@supabase/auth-helpers-*`
@@ -451,6 +569,90 @@ account; clean up test rows afterward):
 > byte-identical type regeneration). Apply and verify it with the procedure and
 > checklist above before relying on the hosted edit/delete lifecycle.
 
+### Deploying the persistent-list migrations (`20260814160000`, `20260814160100`)
+
+The persistent-list foundation adds **two** new forward-only migrations, taking
+the total to **16**:
+
+- `20260814160000_list_slug_global_unique.sql` — the global-unique slug index
+  (with the fail-loud duplicate guard).
+- `20260814160100_list_rpcs.sql` — the `create_list` / `add_list_item` /
+  `remove_list_item` RPCs and their `authenticated`-only grants.
+
+Existing migrations are immutable; these are additive (a new index + three new
+functions). Apply them the same way (never `db reset --linked`, never remote
+seed):
+
+```bash
+supabase link --project-ref <hosted-dev-ref>   # confirm the exact project
+supabase migration list --linked               # inspect the remote ledger
+supabase db push --dry-run                      # expect ONLY 20260814160000
+                                                # and 20260814160100
+supabase db push                                # apply after review
+```
+
+**Post-deployment SQL checks** (run read-only against the hosted DB):
+
+```sql
+-- 1) Both migrations are recorded in the remote ledger.
+select version from supabase_migrations.schema_migrations
+where version in ('20260814160000', '20260814160100')
+order by version;
+
+-- 2) The global-unique slug index exists.
+select indexname from pg_indexes
+where schemaname = 'public' and tablename = 'lists'
+  and indexname = 'lists_slug_global_key';
+
+-- 3) All three functions are SECURITY INVOKER with a pinned search_path.
+select p.proname, p.prosecdef as security_definer, p.proconfig
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public'
+  and p.proname in ('create_list', 'add_list_item', 'remove_list_item');
+--   expect security_definer = false and proconfig = {search_path=""}
+
+-- 4) EXECUTE is granted to authenticated only (not anon/public).
+select
+  has_function_privilege('authenticated',
+    'public.create_list(text, text, boolean, text, text)', 'execute') as authed_create,
+  has_function_privilege('anon',
+    'public.create_list(text, text, boolean, text, text)', 'execute') as anon_create,
+  has_function_privilege('authenticated',
+    'public.add_list_item(uuid, text)', 'execute') as authed_add,
+  has_function_privilege('anon',
+    'public.add_list_item(uuid, text)', 'execute') as anon_add,
+  has_function_privilege('authenticated',
+    'public.remove_list_item(uuid, text)', 'execute') as authed_remove,
+  has_function_privilege('anon',
+    'public.remove_list_item(uuid, text)', 'execute') as anon_remove;
+--   expect authed_* = true, anon_* = false
+```
+
+**Manual production verification checklist** (with a disposable account; clean up
+test rows afterward):
+
+1. Sign in and **create** a public list from `/lists`; confirm it appears under
+   your real "Your lists" and its `/list/[slug]` renders your identity with an
+   empty owner-aware state.
+2. From a title page, use **Add to list** to add that title, then confirm it
+   appears in the real list and on your `/profile/[username]`.
+3. **Add** a second and third title; confirm they append in order and the
+   positions stay contiguous.
+4. **Remove** the middle title; confirm the remaining titles stay contiguous and
+   the list's updated time changes.
+5. Add the **same** title twice; confirm it is not duplicated.
+6. Create a **private** list; confirm a signed-out visitor and a second account
+   cannot see it or its `/list/[slug]`, while you can.
+7. Confirm a signed-out visitor sees **Add to list** as a sign-in link (no
+   dialog, no membership state) routing through the safe `returnTo`.
+8. Confirm the browser never receives the service-role key.
+
+> **Hosted status for persistent lists:** these two migrations have **not** been
+> applied to, or verified against, the hosted project from this environment.
+> They were developed and verified **locally only** (local reset + full pgTAP
+> suite + byte-identical type regeneration). Apply and verify them with the
+> procedure and checklist above before relying on the hosted list loop.
+
 ## Seed assumptions
 
 `supabase/seed.sql` loads a **small, representative** dataset (not a migration
@@ -472,8 +674,13 @@ of the full mock catalog):
 
 ## Deferred decisions
 
-- Add-to-list persistence, list creation/editing, favorites, follows UI, and
-  real likes persistence (and any dedicated activity/event table).
+- **List management beyond the create / add / remove loop:** editing a list's
+  title, description, ranking mode, or visibility after creation; deleting a
+  whole list; drag-and-drop / arbitrary reordering; and curator-note
+  creation/editing. (Persistent list **create / add-title / remove-title** now
+  exist — see "Persistent list loop" above — and are verified locally.)
+- Favorites, follows UI, and real likes persistence for reviews **and** lists
+  (and any dedicated activity/event table).
 - Migrating the remaining product surfaces (catalog browsing, community
   reviews) off mock data to Supabase-backed fetchers.
 - Real media-catalog provider integration.
