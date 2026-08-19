@@ -9,13 +9,15 @@ watch, read, and love, and eventually the games, music, and other interests
 that make up their taste.
 
 The current MVP scope is **movies, TV, and books**. A Supabase/PostgreSQL
-backend foundation is in place: **authentication + onboarding** and the first
-**persistent product loop — logging a title with an optional rating and
-review** — are wired to it, and an authenticated user's **Diary** and
-**Profile** now render real Supabase data. Everything else (catalog browsing,
-lists, favorites, follows, community reviews) still renders from a typed
-mock-data layer, and there is no external media API or AI yet. The app still
-builds and runs with **no** Supabase environment variables set. The
+backend foundation is in place: **authentication + onboarding**, the
+**persistent title-log lifecycle** (log a title with an optional rating and
+review, then edit or delete it), and the **persistent list loop** (create a
+list, add a title, view the real list, see it on the owner's profile, and
+add/remove titles) are wired to it, and an authenticated user's **Diary**,
+**Lists**, and **Profile** now render real Supabase data. The remaining
+surfaces (catalog browsing, favorites, follows, community reviews) still render
+from a typed mock-data layer, and there is no external media API or AI yet. The
+app still builds and runs with **no** Supabase environment variables set. The
 architecture is designed so the remaining pieces can drop in without
 rewriting the UI.
 
@@ -72,9 +74,12 @@ components/
   activity/              ActivityCard used by the feed
   diary/                 DiaryTimeline, DiaryEntry, DiarySummary, and the
                          shared diary view-model/helpers
-  lists/                 ListCard, ListPreviewCovers, ListItemRow, ListHeader,
-                         ListActions, ListSection, ListsBrowser, and the
-                         shared list view-model/helpers
+  lists/                 Mock list UI (ListCard, ListPreviewCovers, ListItemRow,
+                         ListHeader, ListActions, ListSection, ListsBrowser) plus
+                         the wired real-list UI (RealListCard, RealListDetail,
+                         RealListItems, RealListsSections, CreateListDialog/Form,
+                         CreateListLauncher, AddToListDialog, RemoveListItemDialog,
+                         ShareListButton) and the shared list view-model/helpers
   reviews/               ReviewCard
   user/                  UserAvatar, ProfileStats, ProfileHeader,
                          ProfileSection, FavoriteMediaGrid
@@ -128,15 +133,17 @@ once and reused.
 > "Watched"/"Read"), with Log/Rate/Review routing through the safe sign-in
 > `returnTo` flow, and `/diary` shows a clearly labelled **example diary** (never
 > presented as their own) with no edit/delete controls. The **persistent list
-> loop** (create a list, add a title, remove a title — via
-> `public.create_list` / `add_list_item` / `remove_list_item` with
-> server-generated globally-unique slugs and `public`/`private` visibility) is
-> **implemented and verified locally** at the database + server layer
-> (`lib/supabase/lists.ts`, `app/lists/actions.ts`); wiring its Add-to-list
-> dialog, real `/lists` / `/list/[slug]`, and profile surfaces is the **next
-> slice**. **List editing/deletion/reordering/notes, favorites, follows, and
-> likes remain deferred**, and the catalog / community reviews still render from
-> the `@/lib/data` mock layer.
+> loop** — create a list, add a title, view the real list, see it on the owner's
+> profile, and add/remove titles (via `public.create_list` / `add_list_item` /
+> `remove_list_item` with server-generated globally-unique slugs and
+> `public`/`private` visibility) — is now **wired end-to-end**: a real
+> **Add to list** dialog on `/title/[slug]`, real "Your lists" + "Community
+> lists" sections and a "Create list" launcher on `/lists`, real `/list/[slug]`
+> detail (owner-only per-item removal, no faked likes), and a real **Lists**
+> section on `/profile/[username]`. **List metadata editing, whole-list
+> deletion, drag-and-drop/arbitrary reordering, curator notes, list likes,
+> follower-aware visibility, favorites, and follows remain deferred**, and the
+> catalog / community reviews still render from the `@/lib/data` mock layer.
 > The generated database types (`lib/database.types.ts`) are real and
 > drift-checked, the catalog migration owns all **28** curated titles, and
 > `seed.sql` references that catalog and remains **local only**. The app still
@@ -491,8 +498,8 @@ profile experiences**:
 | `/`                   | Implemented (home)                                                                                                                                                                                                                                |
 | `/explore`            | Implemented — local search, All / Movies / TV / Books filter, editorial shelves                                                                                                                                                                   |
 | `/diary`              | Implemented — unified newest-first diary of movies, TV, and books, grouped by month, with All / Movies / TV / Books local filtering and a derived activity summary                                                                                |
-| `/lists`              | Implemented — cross-media collection discovery with curated sections (Popular, From your circle, Recently updated, Staff picks) and lightweight local search                                                                                      |
-| `/list/[slug]`        | Implemented — individual collection page keyed by the stable `List.slug`, with mixed-media contents, ranks/notes, presentation-only Like/Share, and related lists                                                                                 |
+| `/lists`              | Implemented — server-first index with a "Create list" launcher, real "Your lists" + strictly-`public` "Community lists" sections, and clearly-labelled curated example sections with lightweight local search                                     |
+| `/list/[slug]`        | Implemented — resolves a real list first (`getRealListBySlug`, globally-unique slug) then falls back to mock demonstration lists; real detail renders stored contents by position, owner-only per-item removal, and Share (no faked likes)        |
 | `/title/[slug]`       | Implemented — unified detail page for movies, TV, and books with adaptive credits, community rating breakdown, popular reviews, and cross-media "More like this"                                                                                  |
 | `/profile/[username]` | Implemented — a person's Favalog profile keyed by the stable `User.username`: identity header, derived taste statistics, favorites, currently enjoying, recently watched/read, recent reviews, lists, and recent activity (e.g. `/profile/jamie`) |
 
@@ -576,7 +583,10 @@ there are no per-kind diary routes.
 
 Lists let people organize and share **cross-media** collections of movies, TV,
 and books. A single list may freely mix all three kinds — there is deliberately
-no per-kind list system.
+no per-kind list system. The **persistent list loop** (create → add title →
+view → see on the owner's profile → add/remove) is now wired to Supabase; the
+curated mock sections remain as clearly-labelled editorial examples alongside
+the real content.
 
 - **Typed list model.** A `List` (`lib/types.ts`) has stable identity and a
   stable `slug` (distinct from the display `title`, so renaming never breaks a
@@ -593,24 +603,37 @@ no per-kind list system.
   renderer and **one** `ListCard`. There is no `MovieListCard` / `BookListCard`
   fork; the shared `MediaItem` union drives everything, and every list item and
   card links to the existing `/title/[slug]` and `/list/[slug]` routes.
-- **Discovery index (`/lists`).** A concise header ("Collections made by people
-  who love what you love.") over curated sections — Popular, From your circle,
-  Recently updated, and Staff picks — each rendered with `ListCard`. Cards are
-  editorial rather than dashboard-like: an overlapping fan of cover art
-  (`ListPreviewCovers`, fully decorative), the title, creator, description, item
-  count, like count, and mixed-media / ranked hints.
-- **Lightweight local search.** The only Client Component on the index
-  (`ListsBrowser`) filters lists by title, description, or creator against a
-  server-built haystack. It is intentionally discovery-first — no tags, no
-  advanced filtering, no search library, no URL state.
-- **List detail (`/list/[slug]`).** `ListHeader` shows the single `h1`, the
-  creator, description, item/updated metadata, and presentation-only Like /
-  Share actions (`ListActions` — the like toggle is optimistic/in-memory and
-  Share copies the URL to the clipboard; nothing is persisted). The ordered
-  contents render as `ListItemRow`s with a rank (for ranked lists), artwork,
-  title, year, media type, community rating, and an optional curator note. A
-  restrained "More lists from this creator" (or "More collections") section
-  closes the page. Unknown slugs call `notFound()` and render the site-wide 404.
+- **Real list surfaces (`/lists`).** The index is server-first. Its header
+  carries a **Create list** launcher (`create-list-launcher.tsx`): signed-in →
+  a `CreateListDialog`; signed-out → a sign-in link with `returnTo=/lists`;
+  no-env → a controlled unavailable state. Real sections (`real-lists-sections.tsx`)
+  render the signed-in user's **Your lists** (`getMyLists`, public + private,
+  with private status shown and an honest empty / read-error state — never a
+  mock fallback) and a strictly-`public` **Community lists** section
+  (`getPublicLists`, real owner / title / description / item count / ranked /
+  updated date, never private, never a fabricated cover or like count). Real
+  lists use `real-list-card.tsx`.
+- **Curated example sections.** The former Popular, From your circle, Recently
+  updated, and Staff picks sections remain but are relabelled as **curated
+  examples**, so mock likes / owners / follows are never presented as live
+  activity. The only Client Component on the index (`ListsBrowser`) still filters
+  **only** the curated mock content by title, description, or creator against a
+  server-built haystack (real and curated content are kept separate) — no tags,
+  advanced filtering, search library, or URL state.
+- **List detail (`/list/[slug]`).** The route resolves a **real** list first via
+  `getRealListBySlug` (globally-unique slug, deterministic), falling back to mock
+  demonstration lists. Private / unauthorized / unknown real lists resolve to
+  not-found through RLS and fall through **without disclosing existence**. Real
+  detail (`real-list-detail.tsx`) renders the stored title, description, owner,
+  visibility, ranked flag, and updated date over the items ordered by stored
+  `position` (1-based ranks when ranked, poster fallback when `posterUrl` is
+  empty), each linking to `/title/[slug]`. The owner sees a per-item **Remove
+  from list** control with an explicit confirmation naming both the title and the
+  list (`remove-list-item-dialog.tsx`); non-owners see no mutation controls.
+  Share is preserved; there is **no** mock Like toggle and **no** fake zero-like
+  counter on a real list. Mock demonstration lists keep the legacy `ListHeader` /
+  `ListItemRow` presentation (ranks, curator notes, presentation-only Like /
+  Share). Unknown slugs call `notFound()` and render the site-wide 404.
 
 ### Title detail (`/title/[slug]`)
 
@@ -654,7 +677,15 @@ titles can change without breaking links. Invalid slugs use Next.js
   The primary action reads **Log** (or **Log again** once logged) — never a
   personalized "Watched"/"Read" for a signed-out visitor. Signed-out
   Log/Rate/Review are real links into the safe sign-in `returnTo` flow.
-  **Add to list** remains honestly disabled (`aria-disabled`).
+- **Add to list.** The control is now real. A signed-out visitor gets a sign-in
+  link through the safe `returnTo` flow (copy mentions adding titles to lists).
+  A signed-in, onboarded viewer opens an `AddToListDialog` loaded via
+  `getMyListsWithMembership(slug)` that lists each owned list (title, item count,
+  public/private, ranked, and whether the title is already included) with
+  idempotent add/remove toggles, an inline create-list that creates the list and
+  adds the title atomically (via `mediaSlug`), and a link to the affected list
+  after success. When the catalog slug is unknown (`mediaKnown: false`) or a read
+  error occurs it shows a controlled unavailable state.
 
 ### Profile (`/profile/[username]`)
 
@@ -688,12 +719,17 @@ from the mutable `displayName`), so `/profile/jamie` is the primary demo
   activity** feed (`ActivityCard`). Sections are composed with focused
   `ProfileHeader`, `ProfileSection`, and `FavoriteMediaGrid` components rather
   than one enormous page.
+- **Real lists on real profiles.** A **real** Supabase profile now shows a real
+  **Lists** section and list count from `getRealListsForUser` (public-only for
+  visitors, all for the owner via RLS, with private lists visually identified
+  for the owner). A real profile never inherits mock lists; **mock demo
+  profiles** keep their mock list data.
 - **Dynamic metadata.** `generateMetadata` derives the title
   (`Display Name (@username)`), description (the bio), and Open Graph / Twitter
   tags from the user, with the canonical URL built from `lib/site-config.ts`.
-- **Editing is out of scope.** No authentication, editing, avatar uploads,
-  following/unfollowing, or persistence — the profile is read-only against the
-  mock data layer.
+- **Editing is out of scope.** Beyond the wired list surfaces, profile editing,
+  avatar uploads, and following/unfollowing remain out of scope — the mock
+  profile experience is read-only against the mock data layer.
 
 ---
 

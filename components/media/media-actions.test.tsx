@@ -19,6 +19,17 @@ vi.mock("@/app/diary/actions", () => ({
     deleteDiaryEntryAction(...args),
 }));
 
+// The list Server Actions are also server-only (they import the server-only
+// data layer); mock them so this UI test never imports a `"use server"` module.
+const addListItemAction = vi.fn();
+const removeListItemAction = vi.fn();
+const createListAction = vi.fn();
+vi.mock("@/app/lists/actions", () => ({
+  addListItemAction: (...args: unknown[]) => addListItemAction(...args),
+  removeListItemAction: (...args: unknown[]) => removeListItemAction(...args),
+  createListAction: (...args: unknown[]) => createListAction(...args),
+}));
+
 const push = vi.fn();
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -64,7 +75,7 @@ describe("MediaActions", () => {
       />,
     );
 
-    for (const name of ["Log", "Rate", "Review"]) {
+    for (const name of ["Log", "Rate", "Review", "Add to list"]) {
       const link = screen.getByRole("link", { name });
       expect(link).toHaveAttribute("href", signInHref);
     }
@@ -77,7 +88,9 @@ describe("MediaActions", () => {
     // No dialog is rendered for a signed-out visitor.
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(
-      screen.getByText(/free account to log, rate, and review/i),
+      screen.getByText(
+        /free account to log, rate, review, and add titles to lists/i,
+      ),
     ).toBeInTheDocument();
   });
 
@@ -102,7 +115,8 @@ describe("MediaActions", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("keeps Add to list honestly unavailable", () => {
+  it("opens the Add-to-list dialog for a signed-in viewer", async () => {
+    const user = userEvent.setup();
     render(
       <MediaActions
         item={movie}
@@ -110,11 +124,19 @@ describe("MediaActions", () => {
         returnTo={returnTo}
         signInHref={signInHref}
         personal={null}
+        addToList={{ mediaKnown: true, lists: [] }}
       />,
     );
+
     const addToList = screen.getByRole("button", { name: "Add to list" });
-    expect(addToList).toBeDisabled();
-    expect(addToList).toHaveAttribute("aria-disabled", "true");
+    expect(addToList).toBeEnabled();
+
+    await user.click(addToList);
+    expect(
+      await screen.findByRole("dialog", {
+        name: /Add .Dune: Part Two. to a list/,
+      }),
+    ).toBeInTheDocument();
   });
 
   it("opens the logging dialog for a signed-in viewer", async () => {

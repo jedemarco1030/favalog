@@ -68,4 +68,48 @@ test.describe("Lists", () => {
       page.getByRole("link", { name: "Go to Explore" }),
     ).toBeVisible();
   });
+
+  test("persistent sections don't break the curated mock browsing", async ({
+    page,
+  }) => {
+    // `/lists` is now server-first: the real (persistent) "Your lists" /
+    // "Community lists" sections render only when Supabase is configured, but
+    // the curated MOCK examples must always render and stay searchable. This
+    // guards the contract that the persistent wiring never regresses public,
+    // secret-free browsing.
+    await page.goto("/lists");
+
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Lists" }),
+    ).toBeVisible();
+
+    // The "Create list" launcher is always present as a controlled affordance
+    // (a disabled button with no env, a link when signed out, a dialog trigger
+    // when signed in) — its exact state depends on configuration, so we only
+    // assert the accessible control exists and doesn't crash the page.
+    await expect(
+      page
+        .getByRole("button", { name: "Create list" })
+        .or(page.getByRole("link", { name: "Create list" })),
+    ).toBeVisible();
+
+    // The curated region and a known curated card render regardless of whether
+    // the persistent sections are available.
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Curated examples" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /Favorite Sci-Fi — a list by/ }).first(),
+    ).toBeVisible();
+
+    // Curated search still narrows the mock content.
+    await page.getByRole("searchbox", { name: "Search lists" }).fill("comfort");
+    await expect(page.getByText(/Results for/)).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /Comfort Watches — a list by/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /Favorite Sci-Fi — a list by/ }),
+    ).toHaveCount(0);
+  });
 });

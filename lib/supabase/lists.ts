@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { getCurrentProfile, getCurrentUser } from "@/lib/auth/data";
 import { isProfileComplete } from "@/lib/auth/profile";
-import type { MediaKind } from "@/lib/types";
+import type { ListCreateVisibility, MediaKind } from "@/lib/types";
 import { createClient } from "./server";
 import { isSupabaseConfigured } from "./env";
 import {
@@ -102,6 +102,15 @@ export type CreateListResult =
       listId: string;
       slug: string;
       addedMediaSlug: string | null;
+      /**
+       * The list's own submitted, validated summary, echoed back so the
+       * add-to-list dialog can fold the new list into its membership view
+       * without a round-trip. These are the caller's OWN inputs — not privileged
+       * data — and the RPC itself still returns identifiers only.
+       */
+      title: string;
+      visibility: ListCreateVisibility;
+      isRanked: boolean;
     }
   | { status: "unauthenticated" }
   | { status: "incomplete-profile" }
@@ -158,7 +167,15 @@ export async function createList(
 
   await revalidateListWrite({ slug, mediaSlug: addedMediaSlug });
 
-  return { status: "success", listId, slug, addedMediaSlug };
+  return {
+    status: "success",
+    listId,
+    slug,
+    addedMediaSlug,
+    title: value.title,
+    visibility: value.visibility,
+    isRanked: value.isRanked,
+  };
 }
 
 // ---------------------------------------------------------------------------

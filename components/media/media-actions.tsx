@@ -6,16 +6,32 @@ import { useState, type ComponentType, type ReactNode } from "react";
 import type { LucideProps } from "lucide-react";
 import type { MediaItem } from "@/lib/types";
 import type { PersonalTitleView } from "@/lib/supabase/diary";
+import type { ListMembershipView } from "@/lib/supabase/list-view-model";
 import { logTitleAction } from "@/app/title/[slug]/actions";
 import {
   deleteDiaryEntryAction,
   editDiaryEntryAction,
 } from "@/app/diary/actions";
+import {
+  addListItemAction,
+  createListAction,
+  removeListItemAction,
+} from "@/app/lists/actions";
 import { diaryActionLabel } from "@/components/diary/diary-view";
 import { StarRating } from "@/components/ui/star-rating";
+import { AddToListDialog } from "@/components/lists/add-to-list-dialog";
 import { LogDialog, type LogFocus } from "./log-dialog";
 import { DeleteLogDialog } from "./delete-log-dialog";
 import { cn } from "@/lib/cn";
+
+/** The viewer's own lists + this-title membership, resolved on the server. */
+export interface AddToListState {
+  /** False when the catalog slug is unknown to the persistent store. */
+  mediaKnown: boolean;
+  lists: ListMembershipView[];
+  /** Safe message when the lists read failed; drives a controlled error state. */
+  error?: string | null;
+}
 
 interface MediaActionsProps {
   item: MediaItem;
@@ -27,6 +43,11 @@ interface MediaActionsProps {
   signInHref: string;
   /** The viewer's most recent log for this title, when they've logged it. */
   personal: PersonalTitleView | null;
+  /**
+   * The viewer's lists + this-title membership for the Add-to-list dialog.
+   * Only meaningful when authenticated; null for signed-out visitors.
+   */
+  addToList?: AddToListState | null;
   className?: string;
 }
 
@@ -37,17 +58,18 @@ const dateFormatter = new Intl.DateTimeFormat("en", {
 });
 
 /**
- * The title action row: Log / Rate / Review are real, accessible affordances,
- * while "Add to list" remains honestly unavailable (list persistence is out of
- * scope this phase).
+ * The title action row: Log / Rate / Review / Add to list are all real,
+ * accessible affordances now that list persistence is wired.
  *
- * For a signed-out visitor the three actions are links into the safe sign-in
+ * For a signed-out visitor every action is a link into the safe sign-in
  * `returnTo` flow, with a short line making clear an account is required — no
  * dialog, no `localStorage`, no auth flash. For a signed-in, onboarded viewer
- * they open one shared {@link LogDialog}: Log at the general state, Rate with
- * the rating emphasised, Review with the review emphasised. When the viewer has
- * already logged the title we surface their latest date/rating and switch the
- * primary affordance to "Log again", defaulting the dialog to a revisit.
+ * Log / Rate / Review open one shared {@link LogDialog} (Log at the general
+ * state, Rate with the rating emphasised, Review with the review emphasised),
+ * and Add to list opens the {@link AddToListDialog} pre-loaded with the
+ * viewer's own lists and this title's membership. When the viewer has already
+ * logged the title we surface their latest date/rating and switch the primary
+ * affordance to "Log again", defaulting the dialog to a revisit.
  */
 export function MediaActions({
   item,
@@ -55,6 +77,7 @@ export function MediaActions({
   returnTo,
   signInHref,
   personal,
+  addToList,
   className,
 }: MediaActionsProps) {
   const [dialog, setDialog] = useState<{ open: boolean; focus: LogFocus }>({
@@ -63,6 +86,10 @@ export function MediaActions({
   });
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [addToListOpen, setAddToListOpen] = useState(false);
+  // Bumped on each open so the Add-to-list dialog remounts fresh from the
+  // latest server-provided lists (see AddToListDialog).
+  const [addToListKey, setAddToListKey] = useState(0);
 
   const hasLogged = personal !== null;
   // The primary affordance is always "Log" (a new entry). Existing personal
@@ -143,17 +170,28 @@ export function MediaActions({
           </>
         )}
 
-        <ActionButton
-          icon={BookmarkPlus}
-          label="Add to list"
-          disabled
-          title="Add to list (coming soon)"
-        />
+        {isAuthenticated ? (
+          <ActionButton
+            icon={BookmarkPlus}
+            label="Add to list"
+            onClick={() => {
+              setAddToListKey((key) => key + 1);
+              setAddToListOpen(true);
+            }}
+          />
+        ) : (
+          <ActionLink
+            icon={BookmarkPlus}
+            label="Add to list"
+            href={signInHref}
+          />
+        )}
       </div>
 
       {!isAuthenticated && (
         <p className="text-sm text-foreground/50">
-          You&rsquo;ll need a free account to log, rate, and review titles.
+          You&rsquo;ll need a free account to log, rate, review, and add titles
+          to lists.
         </p>
       )}
 
@@ -166,6 +204,22 @@ export function MediaActions({
           item={item}
           returnTo={returnTo}
           defaultRevisit={hasLogged}
+        />
+      )}
+
+      {isAuthenticated && (
+        <AddToListDialog
+          key={addToListKey}
+          open={addToListOpen}
+          onClose={() => setAddToListOpen(false)}
+          media={{ slug: item.slug, title: item.title }}
+          returnTo={returnTo}
+          lists={addToList?.lists ?? []}
+          mediaKnown={addToList?.mediaKnown ?? false}
+          error={addToList?.error ?? null}
+          addAction={addListItemAction}
+          removeAction={removeListItemAction}
+          createAction={createListAction}
         />
       )}
 

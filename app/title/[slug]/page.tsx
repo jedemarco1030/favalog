@@ -6,7 +6,10 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { MediaCard } from "@/components/media/media-card";
 import { MediaHero } from "@/components/media/media-hero";
-import { MediaActions } from "@/components/media/media-actions";
+import {
+  MediaActions,
+  type AddToListState,
+} from "@/components/media/media-actions";
 import { MediaDetails } from "@/components/media/media-details";
 import { RatingBreakdown } from "@/components/media/rating-breakdown";
 import { ReviewCard } from "@/components/reviews/review-card";
@@ -21,6 +24,7 @@ import { mediaKindLabel } from "@/components/media/media-type-badge";
 import { isAuthAvailable } from "@/lib/auth/capability";
 import { getCurrentUser } from "@/lib/auth/data";
 import { getMyLatestLogForSlug } from "@/lib/supabase/diary";
+import { getMyListsWithMembership } from "@/lib/supabase/lists";
 import { siteConfig } from "@/lib/site-config";
 
 interface TitlePageProps {
@@ -95,6 +99,30 @@ export default async function TitlePage({ params }: TitlePageProps) {
   const returnTo = `/title/${item.slug}`;
   const signInHref = `/auth/sign-in?returnTo=${encodeURIComponent(returnTo)}`;
 
+  // The viewer's own lists + this-title membership for the Add-to-list dialog.
+  // Only fetched for an authenticated viewer; the read is owner-scoped by RLS
+  // and returns serializable view models, never raw rows. A read error becomes
+  // a controlled in-dialog error state rather than a crash or fake success.
+  let addToList: AddToListState | null = null;
+  if (viewer !== null) {
+    const membership = await getMyListsWithMembership(item.slug);
+    if (membership.status === "ok") {
+      addToList = {
+        mediaKnown: membership.mediaKnown,
+        lists: membership.lists,
+      };
+    } else if (membership.status === "error") {
+      addToList = {
+        mediaKnown: false,
+        lists: [],
+        error:
+          "We couldn't load your lists just now. Please try again in a moment.",
+      };
+    } else {
+      addToList = { mediaKnown: false, lists: [] };
+    }
+  }
+
   return (
     <article>
       <Container>
@@ -111,6 +139,7 @@ export default async function TitlePage({ params }: TitlePageProps) {
                 returnTo={returnTo}
                 signInHref={signInHref}
                 personal={personal}
+                addToList={addToList}
               />
             </section>
 

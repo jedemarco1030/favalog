@@ -11,15 +11,21 @@
 > state and each real diary row; signed-out / no-env visitors keep a clearly
 > labelled mock **example** diary (no edit/delete) and mock demo profiles, and
 > the title's primary action is a neutral **Log** (never a personalized
-> "Watched"/"Read"). The **persistent list loop** — create a list, add a title,
-> remove a title (`public.create_list` / `add_list_item` / `remove_list_item`,
-> server-generated globally-unique slugs, `public`/`private` visibility) — is
-> **implemented and verified locally** at the database + server layer
-> (`lib/supabase/lists.ts`, `app/lists/actions.ts`); its title/lists/list-detail/
-> profile **UI wiring is the next slice**. The remaining product surfaces
-> (catalog browsing, community reviews) still run on the typed mock-data layer
-> (`@/lib/data`), and **list editing/deletion/reordering/notes, favorites,
-> follows, and likes are deferred**. The generated types
+> "Watched"/"Read"). The **persistent list loop** — sign in → create a list →
+> add a title → view the real list → see it on the owner's profile → add/remove
+> titles (`public.create_list` / `add_list_item` / `remove_list_item`,
+> server-generated globally-unique slugs, `public`/`private` visibility) — is now
+> **wired end-to-end** through the database + server layer
+> (`lib/supabase/lists.ts`, `app/lists/actions.ts`) and new UI under
+> `components/lists/` (real **Add to list** dialog on `/title/[slug]`, real
+> "Your lists" + "Community lists" and a "Create list" launcher on `/lists`, real
+> `/list/[slug]` detail with owner-only removal, and a real **Lists** section on
+> `/profile/[username]`); it is verified **locally** (pgTAP + unit/RTL tests),
+> and its two migrations are **not yet applied to hosted Supabase**. The
+> remaining product surfaces (catalog browsing, community reviews) still run on
+> the typed mock-data layer (`@/lib/data`), and **list metadata editing,
+> whole-list deletion, reordering, curator notes, list likes, follower-aware
+> visibility, favorites, and follows are deferred**. The generated types
 > (`lib/database.types.ts`) are real and drift-checked; the catalog migration
 > owns all **28** curated titles; `seed.sql` references that catalog and is
 > **local-only**. The app still builds with no Supabase env set.
@@ -387,6 +393,45 @@ until follower-aware access exists.
   routes signed-out / incomplete-profile cases through the safe `returnTo` /
   onboarding flow, and returns a serializable `useActionState` state. They do
   not duplicate the RPC call.
+- **Create-result echo.** So the Add-to-list dialog can fold a newly created
+  list straight into its membership view without a round-trip, `createList`
+  success additionally echoes the caller's **own submitted summary**
+  (title / visibility / `isRanked`) through the action layer
+  (`CreateListResult` in `lib/supabase/lists.ts`, `CreateListFormState` in
+  `app/lists/list-form.ts`, `app/lists/actions.ts`). The RPC itself still
+  returns identifiers only — the echoed summary is the request's own input,
+  never additional privileged row data.
+
+### UI layering
+
+All Supabase reads stay in server-only modules and Server Components; the
+interactive pieces are presentational Client Components that receive a Server
+Action as a prop (so Storybook never imports a `"use server"` module), and there
+is no client-side Supabase, `localStorage` membership, or `getSession`-based
+rendering. New UI lives under `components/lists/`:
+
+- **Pure helpers.** `real-list-format.ts` (visibility / count / date formatting)
+  and `real-list-poster.tsx` (poster with a deterministic fallback when
+  `posterUrl` is empty) carry no data-layer knowledge.
+- **Cards & sections.** `real-list-card.tsx` renders a real list; the
+  server-rendered `real-lists-sections.tsx` composes the signed-in **Your lists**
+  (`getMyLists`) and strictly-`public` **Community lists** (`getPublicLists`)
+  sections on `/lists`, kept separate from the curated mock sections.
+- **Create.** `create-list-form.ts` + `create-list-form.tsx` drive the create
+  form; `create-list-dialog.tsx` and `create-list-launcher.tsx` present it in the
+  `/lists` header (signed-out → sign-in link with `returnTo=/lists`; no-env →
+  controlled unavailable).
+- **Add to list.** `add-to-list-dialog.tsx` (loaded from
+  `getMyListsWithMembership(slug)` in `app/title/[slug]/page.tsx` via
+  `components/media/media-actions.tsx`) toggles idempotent add/remove per owned
+  list, offers an inline create-list that creates + adds atomically
+  (`mediaSlug`), links to the affected list on success, and shows a controlled
+  unavailable state when the catalog slug is unknown (`mediaKnown: false`) or a
+  read fails.
+- **Detail & removal.** `real-list-detail.tsx` + `real-list-items.tsx` render a
+  real `/list/[slug]`; `remove-list-item-dialog.tsx` is the owner-only per-item
+  removal confirmation (naming both title and list); `share-list-button.tsx`
+  preserves Share without any Like control.
 
 ### Ordering, likes, notes — deferred
 
@@ -626,6 +671,12 @@ select
   has_function_privilege('anon',
     'public.remove_list_item(uuid, text)', 'execute') as anon_remove;
 --   expect authed_* = true, anon_* = false
+
+-- 5) RLS is enabled on the list tables (defence-in-depth behind the RPCs).
+select c.relname, c.relrowsecurity as rls_enabled
+from pg_class c join pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public' and c.relname in ('lists', 'list_items');
+--   expect rls_enabled = true for both
 ```
 
 **Manual production verification checklist** (with a disposable account; clean up
@@ -641,8 +692,12 @@ test rows afterward):
 4. **Remove** the middle title; confirm the remaining titles stay contiguous and
    the list's updated time changes.
 5. Add the **same** title twice; confirm it is not duplicated.
-6. Create a **private** list; confirm a signed-out visitor and a second account
-   cannot see it or its `/list/[slug]`, while you can.
+6. Create a **private** list, then confirm **non-disclosure**: while signed in
+   you can open its `/list/[slug]`, but a signed-out visitor and a _second_
+   account both get the ordinary not-found response for that same URL — the
+   page must never reveal that a private list exists (no distinct "forbidden"
+   state), and it must not appear in the Community section or on your public
+   profile to other viewers.
 7. Confirm a signed-out visitor sees **Add to list** as a sign-in link (no
    dialog, no membership state) routing through the safe `returnTo`.
 8. Confirm the browser never receives the service-role key.

@@ -17,6 +17,7 @@ import type {
   CreateListInput,
   ListFieldErrors,
 } from "@/lib/supabase/list-input";
+import type { ListCreateVisibility } from "@/lib/types";
 
 /** A submitted checkbox arrives as its `value` (default "on") when checked. */
 function checkboxOn(value: FormDataEntryValue | null): boolean {
@@ -83,6 +84,13 @@ export interface CreateListFormState {
   slug?: string;
   /** The slug that was added atomically on creation, when applicable. */
   addedMediaSlug?: string | null;
+  /**
+   * The created list's own submitted summary, echoed on success so the
+   * add-to-list dialog can fold the new list into its membership view.
+   */
+  title?: string;
+  visibility?: ListCreateVisibility;
+  isRanked?: boolean;
 }
 
 export const initialCreateListFormState: CreateListFormState = {

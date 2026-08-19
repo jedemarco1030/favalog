@@ -11,8 +11,10 @@ import {
 import { HorizontalMediaRow } from "@/components/media/horizontal-media-row";
 import { MediaTypeBadge } from "@/components/media/media-type-badge";
 import { StarRating } from "@/components/ui/star-rating";
+import { RealListCard } from "@/components/lists/real-list-card";
 import type { Profile } from "@/lib/types";
 import type { RealProfileActivity } from "@/lib/supabase/profile-activity";
+import type { ProfileListsResult } from "@/lib/supabase/lists";
 
 const joinedFormatter = new Intl.DateTimeFormat("en", {
   month: "long",
@@ -27,6 +29,11 @@ const reviewDateFormatter = new Intl.DateTimeFormat("en", {
 interface RealProfileProps {
   profile: Profile;
   activity: RealProfileActivity;
+  /**
+   * The profile owner's real lists, visibility-scoped by RLS (a non-owner sees
+   * only public lists; the owner sees all of theirs). Never mock data.
+   */
+  lists: ProfileListsResult;
   /** True when this is the signed-in viewer's own profile. */
   isCurrentUser?: boolean;
 }
@@ -38,23 +45,31 @@ interface RealProfileProps {
  * review rows (via `getRealProfileActivity`) — never from the mock layer, so a
  * real user is never attributed mock data. Statistics are derived, not stored;
  * a linked review's rating is its diary entry's rating (already resolved in the
- * read layer); and no fabricated like counts are shown for real reviews. Not
- * yet migrated surfaces (favorites, currently-enjoying, lists, follows) are
- * shown as an honest single unavailable note rather than faked.
+ * read layer); and no fabricated like counts are shown for real reviews. Real
+ * lists are now wired (visibility-scoped by RLS); the remaining not-yet-migrated
+ * surfaces (favorites, currently-enjoying, follows) are shown as an honest
+ * single unavailable note rather than faked.
  */
 export function RealProfile({
   profile,
   activity,
+  lists,
   isCurrentUser = false,
 }: RealProfileProps) {
   const { stats, recentlyWatched, recentlyRead, reviews } = activity;
   const firstName = profile.displayName.split(" ")[0] || profile.displayName;
+
+  // The list count derives only from permitted real rows (RLS-scoped).
+  const listCount = lists.status === "ok" ? lists.lists.length : null;
 
   const statItems: ProfileStat[] = [
     { label: "Movies watched", value: stats.moviesWatched },
     { label: "Shows watched", value: stats.tvWatched },
     { label: "Books read", value: stats.booksRead },
     { label: "Reviews", value: stats.reviews },
+    ...(listCount != null
+      ? [{ label: "Lists", value: listCount } satisfies ProfileStat]
+      : []),
     {
       label: "Average rating",
       value: stats.averageRating != null ? stats.averageRating.toFixed(1) : "—",
@@ -187,9 +202,41 @@ export function RealProfile({
         )}
       </ProfileSection>
 
+      <ProfileSection
+        title="Lists"
+        description="Collections they've put together."
+      >
+        {lists.status === "ok" ? (
+          lists.lists.length > 0 ? (
+            <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {lists.lists.map((list) => (
+                <li key={list.id}>
+                  {/* Owner sees public/private status; visitors see only
+                      public lists (RLS-scoped) so no badge is needed. */}
+                  <RealListCard list={list} showVisibility={isCurrentUser} />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyState
+              title={
+                isCurrentUser
+                  ? "You haven't created any lists yet."
+                  : `${firstName} hasn't created any lists yet.`
+              }
+            />
+          )
+        ) : (
+          <EmptyState
+            title="Lists couldn't be loaded right now."
+            description="Please try again in a moment."
+          />
+        )}
+      </ProfileSection>
+
       <ProfileSection title="More on their Favalog">
         <EmptyState
-          title="Favorites, lists, and follows are coming soon."
+          title="Favorites and follows are coming soon."
           description="These parts of the profile aren't wired up to accounts yet."
         />
       </ProfileSection>

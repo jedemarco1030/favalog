@@ -6,6 +6,7 @@ import { ListItemRow } from "@/components/lists/list-item-row";
 import { ListSection } from "@/components/lists/list-section";
 import { toListCardView } from "@/components/lists/to-list-card-view";
 import type { ListCardView } from "@/components/lists/list-view";
+import { RealListDetail } from "@/components/lists/real-list-detail";
 import {
   getListBySlug,
   getListItemNote,
@@ -14,6 +15,7 @@ import {
   getPopularLists,
   getUserById,
 } from "@/lib/data";
+import { getRealListBySlug } from "@/lib/supabase/lists";
 import { siteConfig } from "@/lib/site-config";
 
 interface ListPageProps {
@@ -31,6 +33,29 @@ export async function generateMetadata({
   params,
 }: ListPageProps): Promise<Metadata> {
   const { slug } = await params;
+
+  // Real (persistent) lists take precedence. A private/unauthorized/unknown
+  // real list resolves to `not-found` via RLS, so metadata never reveals a
+  // private list's existence to an unauthorized viewer.
+  const real = await getRealListBySlug(slug);
+  if (real.status === "ok") {
+    const { list: realList } = real;
+    const realDescription =
+      realList.description ??
+      `A cross-media collection by ${realList.owner.displayName} on ${siteConfig.name}.`;
+    return {
+      title: realList.title,
+      description: realDescription,
+      openGraph: {
+        type: "article",
+        title: `${realList.title} — a list by ${realList.owner.displayName}`,
+        description: realDescription,
+        url: `/list/${realList.slug}`,
+        siteName: siteConfig.name,
+      },
+    };
+  }
+
   const list = getListBySlug(slug);
   if (!list) {
     return { title: "List not found" };
@@ -70,6 +95,16 @@ export async function generateMetadata({
  */
 export default async function ListPage({ params }: ListPageProps) {
   const { slug } = await params;
+
+  // Deterministic resolution: a real (persistent) list wins on its globally
+  // unique slug. Private/unauthorized/unknown real lists resolve to not-found
+  // (RLS), so we fall through to the mock demonstration lists without ever
+  // disclosing whether a private list exists. Unknown everywhere => notFound().
+  const real = await getRealListBySlug(slug);
+  if (real.status === "ok") {
+    return <RealListDetail list={real.list} />;
+  }
+
   const list = getListBySlug(slug);
   if (!list) notFound();
 

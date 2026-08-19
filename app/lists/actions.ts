@@ -58,6 +58,9 @@ export async function createListAction(
         listId: result.listId,
         slug: result.slug,
         addedMediaSlug: result.addedMediaSlug,
+        title: result.title,
+        visibility: result.visibility,
+        isRanked: result.isRanked,
       };
     case "invalid":
       return {

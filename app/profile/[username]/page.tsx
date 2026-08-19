@@ -34,6 +34,7 @@ import { isAuthAvailable } from "@/lib/auth/capability";
 import { getCurrentUser } from "@/lib/auth/data";
 import { getPublicProfileByUsername } from "@/lib/supabase/profiles";
 import { getRealProfileActivity } from "@/lib/supabase/profile-activity";
+import { getRealListsForUser } from "@/lib/supabase/lists";
 import { siteConfig } from "@/lib/site-config";
 
 interface ProfilePageProps {
@@ -133,10 +134,14 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
         // identity view with honest empty states rather than faking activity.
         const activityResult = await getRealProfileActivity(profile.id);
         if (activityResult.status === "ok") {
+          // The owner's real lists, visibility-scoped by RLS (public-only for
+          // visitors; all for the owner). Never inherits mock lists.
+          const listsResult = await getRealListsForUser(profile.id);
           return (
             <RealProfile
               profile={profile}
               activity={activityResult.activity}
+              lists={listsResult}
               isCurrentUser={isCurrentUser}
             />
           );

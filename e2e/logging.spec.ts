@@ -14,15 +14,17 @@ test.describe("Signed-out logging affordances", () => {
     await page.goto("/title/dune-part-two");
 
     const actions = page.getByRole("group", { name: /Actions for/ });
-    // All three primary actions are real links into the sign-in returnTo flow.
+    // All four actions (Log / Rate / Review / Add to list) are real links into
+    // the sign-in returnTo flow now that list persistence is wired — the
+    // signed-out "Add to list" is a link, never a fake local experience.
     const signInLinks = actions.locator(
       'a[href*="/auth/sign-in?returnTo=%2Ftitle%2Fdune-part-two"]',
     );
-    await expect(signInLinks).toHaveCount(3);
+    await expect(signInLinks).toHaveCount(4);
 
     // A signed-out visitor is told an account is required before redirecting.
     await expect(
-      page.getByText(/free account to log, rate, and review/i),
+      page.getByText(/free account to log, rate, review/i),
     ).toBeVisible();
 
     // No dialog is mounted for a signed-out visitor.
@@ -59,12 +61,18 @@ test.describe("Signed-out logging affordances", () => {
     );
   });
 
-  test("Add to list stays honestly unavailable", async ({ page }) => {
+  test("Add to list routes to the safe sign-in flow", async ({ page }) => {
+    // List persistence is now wired: for a signed-out visitor "Add to list" is
+    // a real link into the same safe sign-in returnTo flow as the other
+    // actions (it used to be a disabled "coming soon" button).
     await page.goto("/title/dune-part-two");
     const addToList = page
       .getByRole("group", { name: /Actions for/ })
-      .getByRole("button", { name: "Add to list" });
-    await expect(addToList).toBeDisabled();
+      .getByRole("link", { name: "Add to list" });
+    await expect(addToList).toHaveAttribute(
+      "href",
+      "/auth/sign-in?returnTo=%2Ftitle%2Fdune-part-two",
+    );
   });
 });
 
