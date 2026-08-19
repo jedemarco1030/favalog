@@ -30,7 +30,8 @@ interface RealListOwnerActionsProps {
  * signed-out visitors, non-owners, and mock-list viewers never see it. The two
  * dialogs stay mounted (open toggles) so closing restores focus to the
  * triggering control. The edit dialog keeps the person on the immutable
- * canonical URL; the delete dialog navigates to `/lists` on success.
+ * canonical URL; a successful delete redirects to `/lists` authoritatively from
+ * the delete Server Action (after revalidation), never via a client effect.
  */
 export function RealListOwnerActions({
   listId,

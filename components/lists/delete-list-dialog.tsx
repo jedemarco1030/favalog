@@ -36,8 +36,15 @@ interface DeleteListDialogProps {
  * the clearly-named destructive action. The dialog explains that every title in
  * the list will be removed, cannot be dismissed while the deletion is
  * committing, disables the button to prevent a repeat submission, and announces
- * progress/failure via live regions. On success it navigates to `/lists` so the
- * person is never left on the now-deleted list page.
+ * progress/failure via live regions.
+ *
+ * Successful-deletion navigation is authoritative on the server: the delete
+ * Server Action redirects to `/lists` only after the delete has committed and
+ * all revalidation (including the now-deleted list route) has completed, so the
+ * person is never left on the now-deleted list page. This dialog therefore does
+ * NOT navigate on success; it only forwards the unauthenticated / onboarding
+ * cases through the safe `returnTo` flow and surfaces error / unavailable
+ * states.
  */
 export function DeleteListDialog({
   open,
@@ -73,12 +80,9 @@ export function DeleteListDialog({
   }, [open]);
 
   useEffect(() => {
-    if (state.status === "success") {
-      // Never leave the person on the now-deleted list page.
-      router.push("/lists");
-      router.refresh();
-      onClose();
-    } else if (
+    // Success navigation is handled authoritatively by the Server Action's
+    // `redirect("/lists")`; only the auth / onboarding cases are client-driven.
+    if (
       (state.status === "unauthenticated" || state.status === "onboarding") &&
       state.redirectTo
     ) {

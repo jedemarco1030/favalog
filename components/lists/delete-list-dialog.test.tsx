@@ -8,6 +8,13 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push, refresh }),
 }));
 
+// NOTE: successful-deletion navigation is NOT a client concern. The real
+// delete Server Action calls `redirect("/lists")` after revalidation (proven
+// in `app/lists/actions.test.ts`). This suite must therefore never assert that
+// a mocked `router.push` stands in for that real success flow; it only covers
+// what the dialog genuinely owns: the auth / onboarding client redirects, the
+// deliberate confirmation, and the pending lock.
+
 import { DeleteListDialog } from "@/components/lists/delete-list-dialog";
 import type { DeleteListFormState } from "@/app/lists/list-form";
 
@@ -58,16 +65,38 @@ describe("DeleteListDialog", () => {
     expect(screen.getByRole("button", { name: "Delete list" })).toBeEnabled();
   });
 
-  it("navigates to /lists on a successful deletion", async () => {
+  it("leaves successful-deletion navigation to the Server Action (no client push)", async () => {
     const user = userEvent.setup();
-    const { onClose, action } = renderOpen();
+    const { action } = renderOpen();
+    // The real Server Action redirects to `/lists` itself and never resolves a
+    // success state back to the client. Even if a success state were returned,
+    // the dialog must NOT re-navigate on the client — that fragile effect is
+    // exactly what this fix removed.
     action.mockResolvedValue({ status: "success" });
 
     await user.click(screen.getByRole("checkbox"));
     await user.click(screen.getByRole("button", { name: "Delete list" }));
 
-    await waitFor(() => expect(push).toHaveBeenCalledWith("/lists"));
-    expect(onClose).toHaveBeenCalled();
+    await waitFor(() => expect(action).toHaveBeenCalled());
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("routes an unauthenticated result through the safe sign-in redirect", async () => {
+    const user = userEvent.setup();
+    const { action } = renderOpen();
+    action.mockResolvedValue({
+      status: "unauthenticated",
+      redirectTo: "/auth/sign-in?returnTo=%2Flist%2Ffavorite-sci-fi",
+    });
+
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: "Delete list" }));
+
+    await waitFor(() =>
+      expect(push).toHaveBeenCalledWith(
+        "/auth/sign-in?returnTo=%2Flist%2Ffavorite-sci-fi",
+      ),
+    );
   });
 
   // Kept last: a never-resolving action leaves the form pending.

@@ -98,16 +98,20 @@ test.describe("Persistent lists — graceful degradation (secret-free)", () => {
 });
 
 test.describe("Persistent lists — authenticated flows (require Supabase)", () => {
-  // BLOCKER (all tests below): these exercise real, owner-scoped writes/reads
-  // through Supabase RPCs (`create_list` / `add_list_item` / `remove_list_item`
-  // / `update_list` / `delete_list`) and RLS-scoped reads. They need a running
-  // Supabase instance plus an
-  // authenticated session created from disposable local test credentials. This
-  // environment has no such credentials, and secrets must never be committed or
-  // invented, so each scenario is marked `fixme` to record the intended
-  // coverage without producing a false failure. Un-skip once a disposable local
-  // Supabase auth fixture (e.g. a seeded confirmed test user + programmatic
-  // sign-in helper) is wired into the e2e setup.
+  // These exercise real, owner-scoped writes/reads through Supabase RPCs
+  // (`create_list` / `add_list_item` / `remove_list_item` / `update_list` /
+  // `delete_list`) and RLS-scoped reads. They need a running Supabase instance
+  // plus an authenticated session from disposable test credentials.
+  //
+  // The list-deletion navigation regression at the bottom is ACTIVATED: it is a
+  // real test gated on `E2E_SUPABASE_TEST_EMAIL` / `E2E_SUPABASE_TEST_PASSWORD`
+  // and runs a genuine sign-in + create + delete when those are set, skipping
+  // cleanly otherwise (never substituting mocked navigation). The remaining
+  // scenarios stay `fixme` placeholders that record the intended coverage
+  // without producing a false failure until a disposable Supabase auth fixture
+  // (a seeded, confirmed, onboarded test user) is wired into the e2e setup.
+  // This environment supplies no such credentials, and secrets are never
+  // committed or invented.
 
   test.fixme("create → add title → view list → see it on profile → remove title", async ({
     page,
@@ -157,16 +161,71 @@ test.describe("Persistent lists — authenticated flows (require Supabase)", () 
     expect(page).toBeTruthy();
   });
 
-  test.fixme("owner deletes a whole list and returns safely to /lists", async ({
+  // ACTIVATED (env-gated) regression for the production list-deletion
+  // navigation bug: after a successful delete the browser must finish on
+  // `/lists`, not stranded on the now-deleted list's 404. This performs a REAL
+  // sign-in + create + delete against Supabase (never mocked navigation) and
+  // runs only when disposable test credentials are supplied via
+  // `E2E_SUPABASE_TEST_EMAIL` / `E2E_SUPABASE_TEST_PASSWORD` (the test account
+  // must already be confirmed and onboarded). Without them it skips cleanly —
+  // this environment provides no such account and secrets are never committed.
+  const testEmail = process.env.E2E_SUPABASE_TEST_EMAIL;
+  const testPassword = process.env.E2E_SUPABASE_TEST_PASSWORD;
+
+  test("owner deletes a whole list and returns safely to /lists", async ({
     page,
   }) => {
-    // Intended steps (owner session required end-to-end):
-    // 1. Sign in as the list owner and open their real `/list/[slug]`.
-    // 2. Use owner-only "Delete list", tick the deliberate naming checkbox,
-    //    and confirm.
-    // 3. Assert navigation to `/lists`; the old `/list/[slug]` now returns the
-    //    ordinary not-found response and the list is gone from the profile,
-    //    with no orphaned items.
-    expect(page).toBeTruthy();
+    test.skip(
+      !testEmail || !testPassword,
+      "Set E2E_SUPABASE_TEST_EMAIL and E2E_SUPABASE_TEST_PASSWORD (a confirmed, onboarded disposable Supabase test account) to run the authenticated list-deletion regression.",
+    );
+
+    // 1. Sign in as the disposable owner via the real SSR-cookie auth flow.
+    await page.goto("/auth/sign-in");
+    await page.getByLabel("Email").fill(testEmail!);
+    await page.getByLabel("Password").fill(testPassword!);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    // The account must be confirmed + onboarded, so sign-in leaves the auth
+    // routes (it never lands back on sign-in or on onboarding).
+    await expect(page).not.toHaveURL(/\/auth\/sign-in/);
+    await expect(page).not.toHaveURL(/\/onboarding/);
+
+    // 2. Create a uniquely-named real list and follow the server redirect to
+    //    its canonical `/list/[slug]`.
+    const listTitle = `E2E delete regression ${Date.now()}`;
+    await page.goto("/lists");
+    await page.getByRole("button", { name: "Create list" }).click();
+    const createDialog = page.getByRole("dialog");
+    await createDialog.getByLabel("List title").fill(listTitle);
+    await createDialog.getByRole("button", { name: "Create list" }).click();
+
+    await expect(page).toHaveURL(/\/list\/[^/]+$/);
+    const listUrl = new URL(page.url()).pathname;
+    await expect(
+      page.getByRole("heading", { level: 1, name: listTitle }),
+    ).toBeVisible();
+
+    // 3. Delete the whole list through the deliberate owner-only confirmation.
+    await page.getByRole("button", { name: "Delete list" }).click();
+    const deleteDialog = page.getByRole("alertdialog", {
+      name: /Delete this list/i,
+    });
+    await deleteDialog.getByRole("checkbox").check();
+    await deleteDialog.getByRole("button", { name: "Delete list" }).click();
+
+    // 3a. The browser finishes authoritatively on `/lists` (the fix): it is
+    //     never left stranded on the deleted list's not-found page.
+    await expect(page).toHaveURL(/\/lists$/);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Lists" }),
+    ).toBeVisible();
+
+    // 3b. The deleted list is gone from the index.
+    await expect(page.getByText(listTitle)).toHaveCount(0);
+
+    // 3c. Reopening its former URL returns the ordinary not-found page — the
+    //     deleted-route revalidation is intact.
+    const response = await page.goto(listUrl);
+    expect(response?.status()).toBe(404);
   });
 });

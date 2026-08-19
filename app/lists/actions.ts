@@ -1,5 +1,7 @@
 "use server";
 
+import { redirect } from "next/navigation";
+
 import { getSafeRedirectPath } from "@/lib/auth/safe-redirect";
 import {
   addListItem,
@@ -191,7 +193,13 @@ export async function deleteListAction(
   const result = await deleteList(input);
   switch (result.status) {
     case "success":
-      return { status: "success" };
+      // `deleteList` has already committed the delete and awaited every
+      // required revalidation (including the now-deleted `/list/[slug]`, so it
+      // becomes not-found). Navigate authoritatively from the server here so
+      // success navigation never depends on a client effect that revalidation
+      // could unmount before it runs.
+      redirect("/lists");
+    // `redirect` throws (returns `never`), so control never falls through.
     case "invalid":
       return { status: "error", message: result.message };
     case "unauthenticated":
