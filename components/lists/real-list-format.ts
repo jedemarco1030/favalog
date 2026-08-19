@@ -1,4 +1,4 @@
-import type { ListVisibility } from "@/lib/types";
+import type { ListCreateVisibility, ListVisibility } from "@/lib/types";
 
 /**
  * Pure formatting helpers for real (persistent) list surfaces.
@@ -28,6 +28,18 @@ export function visibilityLabel(visibility: ListVisibility): string {
  */
 export function isPrivateVisibility(visibility: ListVisibility): boolean {
   return visibility !== "public";
+}
+
+/**
+ * Reconcile a stored {@link ListVisibility} to a creatable/editable value. Only
+ * `public` maps to `public`; everything else (including the reserved
+ * `followers`) reconciles to `private`, so the edit form never offers an
+ * unsupported choice and a `followers` list pre-fills safely as private.
+ */
+export function toCreateVisibility(
+  visibility: ListVisibility,
+): ListCreateVisibility {
+  return visibility === "public" ? "public" : "private";
 }
 
 const updatedFormatter = new Intl.DateTimeFormat("en", {

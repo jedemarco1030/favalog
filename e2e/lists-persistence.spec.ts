@@ -76,12 +76,32 @@ test.describe("Persistent lists — graceful degradation (secret-free)", () => {
       page.getByRole("button", { name: "Share this list" }),
     ).toBeVisible();
   });
+
+  test("a mock demonstration list never shows owner edit/delete controls", async ({
+    page,
+  }) => {
+    // Owner-only "Edit list" / "Delete list" belong exclusively to real
+    // Supabase-backed lists. A curated mock list must never expose them, no
+    // matter the environment, so this holds with or without Supabase.
+    await page.goto("/list/favorite-sci-fi");
+
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Favorite Sci-Fi" }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Edit list" })).toHaveCount(
+      0,
+    );
+    await expect(page.getByRole("button", { name: "Delete list" })).toHaveCount(
+      0,
+    );
+  });
 });
 
 test.describe("Persistent lists — authenticated flows (require Supabase)", () => {
   // BLOCKER (all tests below): these exercise real, owner-scoped writes/reads
-  // through Supabase RPCs (`create_list` / `add_list_item` / `remove_list_item`)
-  // and RLS-scoped reads. They need a running Supabase instance plus an
+  // through Supabase RPCs (`create_list` / `add_list_item` / `remove_list_item`
+  // / `update_list` / `delete_list`) and RLS-scoped reads. They need a running
+  // Supabase instance plus an
   // authenticated session created from disposable local test credentials. This
   // environment has no such credentials, and secrets must never be committed or
   // invented, so each scenario is marked `fixme` to record the intended
@@ -122,6 +142,31 @@ test.describe("Persistent lists — authenticated flows (require Supabase)", () 
     // Intended: a `private` list's slug resolves to the custom not-found
     // (404) experience for a non-owner / signed-out visitor — never leaking
     // its existence, name, or contents — while the owner can view it.
+    expect(page).toBeTruthy();
+  });
+
+  test.fixme("owner edits a list's metadata and stays on the immutable URL", async ({
+    page,
+  }) => {
+    // Intended steps (owner session required end-to-end):
+    // 1. Sign in as the list owner and open their real `/list/[slug]`.
+    // 2. Use owner-only "Edit list" to change the title, edit/clear the
+    //    description, flip public/private, and toggle ranked/unranked; save.
+    // 3. Assert the URL is unchanged (slug is immutable) and the updated
+    //    metadata renders, with item order/positions preserved.
+    expect(page).toBeTruthy();
+  });
+
+  test.fixme("owner deletes a whole list and returns safely to /lists", async ({
+    page,
+  }) => {
+    // Intended steps (owner session required end-to-end):
+    // 1. Sign in as the list owner and open their real `/list/[slug]`.
+    // 2. Use owner-only "Delete list", tick the deliberate naming checkbox,
+    //    and confirm.
+    // 3. Assert navigation to `/lists`; the old `/list/[slug]` now returns the
+    //    ordinary not-found response and the list is gone from the profile,
+    //    with no orphaned items.
     expect(page).toBeTruthy();
   });
 });

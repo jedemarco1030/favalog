@@ -386,6 +386,7 @@ export type Database = {
         Returns: Json
       }
       delete_diary_entry: { Args: { p_diary_entry_id: string }; Returns: Json }
+      delete_list: { Args: { p_list_id: string }; Returns: Json }
       log_media: {
         Args: {
           p_contains_spoilers?: boolean
@@ -411,6 +412,16 @@ export type Database = {
           p_rating?: number
           p_review_body?: string
           p_review_title?: string
+        }
+        Returns: Json
+      }
+      update_list: {
+        Args: {
+          p_description?: string
+          p_is_ranked?: boolean
+          p_list_id: string
+          p_title: string
+          p_visibility?: string
         }
         Returns: Json
       }

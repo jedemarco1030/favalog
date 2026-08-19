@@ -6,7 +6,9 @@ import {
   isUuid,
   normalizeVisibility,
   validateCreateListInput,
+  validateDeleteListInput,
   validateListItemInput,
+  validateUpdateListInput,
 } from "./list-input";
 
 const UUID = "11111111-1111-1111-1111-111111111111";
@@ -112,6 +114,94 @@ describe("validateListItemInput", () => {
     const result = validateListItemInput({ listId: UUID, mediaSlug: "   " });
     expect(result.ok).toBe(false);
     expect(result.message).toMatch(/which title/i);
+  });
+});
+
+describe("validateUpdateListInput", () => {
+  it("normalizes a valid edit (trimming, clearing, defaults)", () => {
+    const result = validateUpdateListInput({
+      listId: `  ${UUID}  `,
+      title: "  Best Films  ",
+      description: "   ",
+      isRanked: true,
+      visibility: "private",
+    });
+    expect(result.ok).toBe(true);
+    expect(result.value).toEqual({
+      listId: UUID,
+      title: "Best Films",
+      description: null,
+      isRanked: true,
+      visibility: "private",
+    });
+  });
+
+  it("defaults visibility to public and description to null when omitted", () => {
+    const result = validateUpdateListInput({ listId: UUID, title: "A title" });
+    expect(result.ok).toBe(true);
+    expect(result.value).toMatchObject({
+      visibility: "public",
+      description: null,
+      isRanked: false,
+    });
+  });
+
+  it("requires a syntactically valid list id", () => {
+    const result = validateUpdateListInput({
+      listId: "not-a-uuid",
+      title: "ok",
+    });
+    expect(result.ok).toBe(false);
+    expect(result.errors.form).toMatch(/which list/i);
+    expect(result.value).toBeUndefined();
+  });
+
+  it("requires a non-empty title", () => {
+    const result = validateUpdateListInput({ listId: UUID, title: "   " });
+    expect(result.ok).toBe(false);
+    expect(result.errors.title).toBeTruthy();
+  });
+
+  it("rejects an over-long title and description", () => {
+    const longTitle = validateUpdateListInput({
+      listId: UUID,
+      title: "x".repeat(MAX_LIST_TITLE + 1),
+    });
+    expect(longTitle.ok).toBe(false);
+    expect(longTitle.errors.title).toBeTruthy();
+
+    const longDesc = validateUpdateListInput({
+      listId: UUID,
+      title: "ok",
+      description: "y".repeat(MAX_LIST_DESCRIPTION + 1),
+    });
+    expect(longDesc.ok).toBe(false);
+    expect(longDesc.errors.description).toBeTruthy();
+  });
+
+  it("rejects an explicit unknown visibility rather than coercing it", () => {
+    const result = validateUpdateListInput({
+      listId: UUID,
+      title: "ok",
+      visibility: "followers",
+    });
+    expect(result.ok).toBe(false);
+    expect(result.errors.visibility).toBeTruthy();
+  });
+});
+
+describe("validateDeleteListInput", () => {
+  it("accepts a valid uuid and trims", () => {
+    const result = validateDeleteListInput({ listId: `  ${UUID}  ` });
+    expect(result.ok).toBe(true);
+    expect(result.value).toEqual({ listId: UUID });
+  });
+
+  it("rejects a non-uuid list id with a safe message", () => {
+    const result = validateDeleteListInput({ listId: "not-a-uuid" });
+    expect(result.ok).toBe(false);
+    expect(result.message).toMatch(/which list/i);
+    expect(result.value).toBeUndefined();
   });
 });
 

@@ -6,11 +6,17 @@ import { itemCountLabel } from "@/components/lists/list-view";
 import {
   formatUpdatedAt,
   isPrivateVisibility,
+  toCreateVisibility,
   visibilityLabel,
 } from "@/components/lists/real-list-format";
 import { RealListItems } from "@/components/lists/real-list-items";
+import { RealListOwnerActions } from "@/components/lists/real-list-owner-actions";
 import { ShareListButton } from "@/components/lists/share-list-button";
-import { removeListItemAction } from "@/app/lists/actions";
+import {
+  deleteListAction,
+  editListAction,
+  removeListItemAction,
+} from "@/app/lists/actions";
 import type { ListDetailView } from "@/lib/supabase/list-view-model";
 import type { MediaKind } from "@/lib/types";
 
@@ -123,7 +129,21 @@ export function RealListDetail({ list }: RealListDetailProps) {
             )}
           </p>
 
-          <ShareListButton />
+          <div className="flex flex-wrap items-center gap-3">
+            <ShareListButton />
+            {list.isOwner && (
+              <RealListOwnerActions
+                listId={list.id}
+                title={list.title}
+                description={list.description}
+                isRanked={list.isRanked}
+                visibility={toCreateVisibility(list.visibility)}
+                returnTo={returnTo}
+                editAction={editListAction}
+                deleteAction={deleteListAction}
+              />
+            )}
+          </div>
         </header>
 
         <section aria-label="List contents" className="mt-10">

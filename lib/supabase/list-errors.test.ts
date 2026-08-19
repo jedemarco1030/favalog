@@ -3,10 +3,14 @@ import { describe, expect, it } from "vitest";
 import {
   GENERIC_ADD_ITEM_ERROR,
   GENERIC_CREATE_LIST_ERROR,
+  GENERIC_DELETE_LIST_ERROR,
   GENERIC_REMOVE_ITEM_ERROR,
+  GENERIC_UPDATE_LIST_ERROR,
   mapAddItemError,
   mapCreateListError,
+  mapDeleteListError,
   mapRemoveItemError,
+  mapUpdateListError,
 } from "./list-errors";
 
 describe("safe list-error mapping", () => {
@@ -53,6 +57,26 @@ describe("safe list-error mapping", () => {
     );
     expect(mapAddItemError({})).toBe(GENERIC_ADD_ITEM_ERROR);
     expect(mapRemoveItemError({})).toBe(GENERIC_REMOVE_ITEM_ERROR);
+    expect(mapUpdateListError({})).toBe(GENERIC_UPDATE_LIST_ERROR);
+    expect(mapDeleteListError({})).toBe(GENERIC_DELETE_LIST_ERROR);
+  });
+
+  it("maps edit/delete auth, not-found, and invalid cases safely", () => {
+    expect(mapUpdateListError({ code: "28000" })).toBe(
+      "Please sign in to continue.",
+    );
+    expect(mapUpdateListError({ message: "unknown list: x" })).toMatch(
+      /find that list/i,
+    );
+    expect(mapUpdateListError({ code: "22023" })).toBe(
+      "Please check the list details and try again.",
+    );
+    expect(mapDeleteListError({ message: "unknown list: x" })).toMatch(
+      /find that list/i,
+    );
+    expect(
+      mapDeleteListError({ code: "42501", message: "permission denied" }),
+    ).toBe("You don't have permission to do that.");
   });
 
   it("never returns raw database detail", () => {

@@ -137,6 +137,126 @@ export function validateCreateListInput(
   };
 }
 
+/** Raw, untrusted input as it arrives from the edit-list form. */
+export interface UpdateListInput {
+  /** The target list; ownership is re-checked server-side. */
+  listId: string;
+  title: string;
+  description?: string | null;
+  isRanked?: boolean;
+  /** One of {@link LIST_CREATE_VISIBILITIES}; anything else is rejected. */
+  visibility?: string | null;
+}
+
+/** A normalized, server-ready update-list payload derived from valid input. */
+export interface NormalizedUpdateListInput {
+  listId: string;
+  title: string;
+  description: string | null;
+  isRanked: boolean;
+  visibility: ListCreateVisibility;
+}
+
+export interface UpdateListValidationResult {
+  ok: boolean;
+  errors: ListFieldErrors;
+  /** Present only when `ok` is true. */
+  value?: NormalizedUpdateListInput;
+}
+
+/**
+ * Validate and normalize edit-list input. The field rules mirror
+ * {@link validateCreateListInput} exactly (title 1..150, optional description
+ * <= 2000 chars normalized to null, only `public`/`private` visibility). It
+ * additionally requires a syntactically valid list UUID — a lookup key only;
+ * ownership is re-derived from `auth.uid()` in the database, never trusted from
+ * the client. An unknown visibility value is an error (never silently coerced).
+ */
+export function validateUpdateListInput(
+  input: UpdateListInput,
+): UpdateListValidationResult {
+  const errors: ListFieldErrors = {};
+
+  const listId = trimOrNull(input.listId);
+  if (!listId || !isUuid(listId)) {
+    errors.form = "We couldn't tell which list to update. Please try again.";
+  }
+
+  const title = trimOrNull(input.title);
+  if (!title) {
+    errors.title = "Give your list a title.";
+  } else if (title.length > MAX_LIST_TITLE) {
+    errors.title = `Keep the title under ${MAX_LIST_TITLE} characters.`;
+  }
+
+  const description = trimOrNull(input.description);
+  if (description && description.length > MAX_LIST_DESCRIPTION) {
+    errors.description = `Keep the description under ${MAX_LIST_DESCRIPTION.toLocaleString()} characters.`;
+  }
+
+  // A missing/blank visibility defaults to public; an explicit unknown value is
+  // an error (we never silently coerce an unrecognized choice).
+  let visibility: ListCreateVisibility = "public";
+  const rawVisibility = trimOrNull(input.visibility);
+  if (rawVisibility !== null) {
+    const normalized = normalizeVisibility(rawVisibility);
+    if (normalized === null) {
+      errors.visibility = "Choose either public or private.";
+    } else {
+      visibility = normalized;
+    }
+  }
+
+  const ok = Object.keys(errors).length === 0;
+  if (!ok || !listId || !title) {
+    return { ok: false, errors };
+  }
+
+  return {
+    ok: true,
+    errors: {},
+    value: {
+      listId,
+      title,
+      description,
+      isRanked: Boolean(input.isRanked),
+      visibility,
+    },
+  };
+}
+
+/** Raw, untrusted input for deleting an entire list. */
+export interface DeleteListInput {
+  /** The target list; ownership is re-checked server-side. */
+  listId: string;
+}
+
+export interface DeleteListValidationResult {
+  ok: boolean;
+  /** A single safe form-level message when invalid. */
+  message?: string;
+  /** Present only when `ok` is true. */
+  value?: { listId: string };
+}
+
+/**
+ * Validate delete-list input: a syntactically valid list UUID. The id is only a
+ * lookup key — ownership is re-derived from `auth.uid()` in the database, never
+ * trusted from the client.
+ */
+export function validateDeleteListInput(
+  input: DeleteListInput,
+): DeleteListValidationResult {
+  const listId = trimOrNull(input.listId);
+  if (!listId || !isUuid(listId)) {
+    return {
+      ok: false,
+      message: "We couldn't tell which list to delete. Please try again.",
+    };
+  }
+  return { ok: true, value: { listId } };
+}
+
 /** Raw, untrusted input for adding/removing a title in a list. */
 export interface ListItemInput {
   /** The target list; ownership is re-checked server-side. */

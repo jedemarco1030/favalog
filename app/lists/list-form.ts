@@ -1,6 +1,7 @@
 /**
- * Shared, pure state + parsing contracts for the list CREATE, ADD-ITEM, and
- * REMOVE-ITEM Server Actions, used with React's `useActionState`.
+ * Shared, pure state + parsing contracts for the list CREATE, ADD-ITEM,
+ * REMOVE-ITEM, EDIT, and DELETE Server Actions, used with React's
+ * `useActionState`.
  *
  * Kept out of the `"use server"` actions module (which may only export async
  * functions) so both the client dialogs and the actions can import these types,
@@ -16,6 +17,7 @@
 import type {
   CreateListInput,
   ListFieldErrors,
+  UpdateListInput,
 } from "@/lib/supabase/list-input";
 import type { ListCreateVisibility } from "@/lib/types";
 
@@ -53,6 +55,29 @@ export function parseListItemFormData(formData: FormData): {
     listId: stringOrNull(formData.get("listId")) ?? "",
     mediaSlug: stringOrNull(formData.get("mediaSlug")) ?? "",
   };
+}
+
+/**
+ * Build an {@link UpdateListInput} from submitted edit-list form data. Pure and
+ * defensive: reads only the allowed fields (the list id lookup key plus the
+ * editable metadata), never an owner id, username, slug, or timestamp. The slug
+ * is immutable server-side, so it is deliberately not read here.
+ */
+export function parseUpdateListFormData(formData: FormData): UpdateListInput {
+  return {
+    listId: stringOrNull(formData.get("listId")) ?? "",
+    title: stringOrNull(formData.get("title")) ?? "",
+    description: stringOrNull(formData.get("description")),
+    isRanked: checkboxOn(formData.get("isRanked")),
+    visibility: stringOrNull(formData.get("visibility")),
+  };
+}
+
+/** Read just the list id from a delete-list submission. */
+export function parseDeleteListFormData(formData: FormData): {
+  listId: string;
+} {
+  return { listId: stringOrNull(formData.get("listId")) ?? "" };
 }
 
 // ---------------------------------------------------------------------------
@@ -127,3 +152,55 @@ export interface ListItemFormState {
 }
 
 export const initialListItemFormState: ListItemFormState = { status: "idle" };
+
+// ---------------------------------------------------------------------------
+// Edit-list form state
+// ---------------------------------------------------------------------------
+
+export type EditListFormStatus =
+  | "idle"
+  | "success"
+  | "invalid"
+  | "error"
+  | "unavailable"
+  | "unauthenticated"
+  | "onboarding";
+
+export interface EditListFormState {
+  status: EditListFormStatus;
+  /** Form-level, human-readable message (never a raw database error). */
+  message?: string;
+  /** Field-keyed validation errors for the `invalid` case. */
+  fieldErrors?: ListFieldErrors;
+  /** Safe, same-origin path for the auth / onboarding cases. */
+  redirectTo?: string;
+  /** The edited list's canonical (immutable) identifiers on success. */
+  listId?: string;
+  slug?: string;
+}
+
+export const initialEditListFormState: EditListFormState = { status: "idle" };
+
+// ---------------------------------------------------------------------------
+// Delete-list form state
+// ---------------------------------------------------------------------------
+
+export type DeleteListFormStatus =
+  | "idle"
+  | "success"
+  | "error"
+  | "unavailable"
+  | "unauthenticated"
+  | "onboarding";
+
+export interface DeleteListFormState {
+  status: DeleteListFormStatus;
+  /** Form-level, human-readable message (never a raw database error). */
+  message?: string;
+  /** Safe, same-origin path for the auth / onboarding cases. */
+  redirectTo?: string;
+}
+
+export const initialDeleteListFormState: DeleteListFormState = {
+  status: "idle",
+};

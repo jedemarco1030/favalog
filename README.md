@@ -11,15 +11,15 @@ that make up their taste.
 The current MVP scope is **movies, TV, and books**. A Supabase/PostgreSQL
 backend foundation is in place: **authentication + onboarding**, the
 **persistent title-log lifecycle** (log a title with an optional rating and
-review, then edit or delete it), and the **persistent list loop** (create a
-list, add a title, view the real list, see it on the owner's profile, and
-add/remove titles) are wired to it, and an authenticated user's **Diary**,
-**Lists**, and **Profile** now render real Supabase data. The remaining
-surfaces (catalog browsing, favorites, follows, community reviews) still render
-from a typed mock-data layer, and there is no external media API or AI yet. The
-app still builds and runs with **no** Supabase environment variables set. The
-architecture is designed so the remaining pieces can drop in without
-rewriting the UI.
+review, then edit or delete it), and the **persistent list lifecycle** (create
+a list, add/remove titles, edit list metadata, delete a whole list, view the
+real list, and see it on the owner's profile) are wired to it, and an
+authenticated user's **Diary**, **Lists**, and **Profile** now render real
+Supabase data. The remaining surfaces (catalog browsing, favorites, follows,
+community reviews) still render from a typed mock-data layer, and there is no
+external media API or AI yet. The app still builds and runs with **no**
+Supabase environment variables set. The architecture is designed so the
+remaining pieces can drop in without rewriting the UI.
 
 ---
 
@@ -133,23 +133,23 @@ once and reused.
 > "Watched"/"Read"), with Log/Rate/Review routing through the safe sign-in
 > `returnTo` flow, and `/diary` shows a clearly labelled **example diary** (never
 > presented as their own) with no edit/delete controls. The **persistent list
-> loop** — create a list, add a title, view the real list, see it on the owner's
-> profile, and add/remove titles (via `public.create_list` / `add_list_item` /
-> `remove_list_item` with server-generated globally-unique slugs and
-> `public`/`private` visibility) — is now **wired end-to-end**: a real
-> **Add to list** dialog on `/title/[slug]`, real "Your lists" + "Community
-> lists" sections and a "Create list" launcher on `/lists`, real `/list/[slug]`
-> detail (owner-only per-item removal, no faked likes), and a real **Lists**
-> section on `/profile/[username]`. **List metadata editing, whole-list
-> deletion, drag-and-drop/arbitrary reordering, curator notes, list likes,
-> follower-aware visibility, favorites, and follows remain deferred**, and the
-> catalog / community reviews still render from the `@/lib/data` mock layer.
-> The generated database types (`lib/database.types.ts`) are real and
-> drift-checked, the catalog migration owns all **28** curated titles, and
-> `seed.sql` references that catalog and remains **local only**. The app still
-> builds and runs with **no** Supabase environment variables set — public
-> browsing keeps working and the auth/logging entry points show a controlled
-> unavailable state.
+> lifecycle** — create a list, add/remove titles, **edit list metadata**, and
+> **delete a whole list** (via `public.create_list` / `add_list_item` /
+> `remove_list_item` / `update_list` / `delete_list` with server-generated
+> globally-unique immutable slugs and `public`/`private` visibility) — is now
+> **wired end-to-end**: a real **Add to list** dialog on `/title/[slug]`, real
+> "Your lists" + "Community lists" sections and a "Create list" launcher on
+> `/lists`, real `/list/[slug]` detail (owner-only per-item removal, owner-only
+> edit/delete list controls, no faked likes), and a real **Lists** section on
+> `/profile/[username]`. **Drag-and-drop/arbitrary reordering, curator notes,
+> list likes, follower-aware visibility, favorites, and follows remain
+> deferred**, and the catalog / community reviews still render from the
+> `@/lib/data` mock layer. The generated database types (`lib/database.types.ts`)
+> are real and drift-checked, the catalog migration owns all **28** curated
+> titles, and `seed.sql` references that catalog and remains **local only**.
+> The app still builds and runs with **no** Supabase environment variables set —
+> public browsing keeps working and the auth/logging entry points show a
+> controlled unavailable state.
 > See [Authentication & onboarding](#authentication--onboarding) below.
 
 Full detail lives in [`docs/backend-architecture.md`](docs/backend-architecture.md)
@@ -231,40 +231,62 @@ supabase db push
 
 Remote/PR CI does **not** require Supabase credentials.
 
-### Hosted verification status (2026-08-05)
+### Hosted verification status
 
-The hosted development project was verified directly (read-only schema
-introspection plus disposable-account auth flows over the Supabase client);
-`supabase link`/`db push`/`gen types` could not be run here because the local
-Docker stack was unavailable and no CLI access token was present.
+The hosted development project has been **deployed and verified** for the
+logging foundation, diary edit/delete, and the persistent list create/add/remove
+loop. All **16** migrations through `20260814160100_list_rpcs.sql` are recorded
+in the remote `schema_migrations` ledger — no drift. Generated database types
+(`lib/database.types.ts`, via `npm run supabase:types`) are real and
+drift-checked (a second generation is byte-identical). Hosted RPC
+security/grant checks and production list behavior — including private-list
+non-disclosure — have been confirmed.
 
-- **Schema & migrations**: all 8 committed migrations are recorded in the
-  remote `schema_migrations` ledger — no drift. All expected tables, both enums
-  (`media_kind`, `list_visibility`), the `set_updated_at` + `handle_new_user`
-  functions, the `on_auth_user_created` trigger, constraints (rating half-steps,
-  self-follow prevention, duplicate list-item/username uniqueness), indexes, and
-  **RLS on every table** are present and match the intended owner-write /
-  public-read model.
-- **Fix applied**: `handle_new_user()` cast `::citext` unqualified under a pinned
-  empty `search_path`; because `citext` lives in the `extensions` schema this
-  raised `type "citext" does not exist`, so **every** hosted sign-up failed with
-  "Database error creating new user". Forward-only migration
-  `20260805175500_fix_handle_new_user_citext_qualification.sql` qualifies the
-  cast as `extensions.citext`. This is the exact path the local pgTAP trigger
-  test exercises, so it also unblocks the CI `database` job.
-- **Auth verified end-to-end** against the hosted project (disposable accounts,
-  cleaned up): automatic profile creation via the trigger (id/username/
-  display-name/timestamps), sign-in, wrong-password rejection, owner onboarding
-  update, case-insensitive duplicate-username rejection, RLS cross-user-update
-  block, and sign-out.
-- **Still a placeholder**: `lib/database.types.ts` remains the hand-authored
-  placeholder — genuine `supabase gen types` needs Docker or a CLI access token,
-  neither available here. Regenerate and commit it from a Docker-capable
-  environment or the CI `database` job.
-- **Not exercised here** (require a browser / real email inbox / dashboard):
-  the sign-up UI + email-confirmation link, browser session-restore-on-refresh,
-  the recovery email link, the Google OAuth consent screen, and Vercel
-  environment/deploy verification. Backend equivalents were verified above.
+Historical note (2026-08-05): an earlier pass verified the first 8 migrations
+directly via read-only schema introspection plus disposable-account auth flows
+over the Supabase client, before CLI link/push was available in that
+environment. That pass found and fixed `handle_new_user()` casting `::citext`
+unqualified under a pinned empty `search_path` (citext lives in `extensions`);
+forward-only migration
+`20260805175500_fix_handle_new_user_citext_qualification.sql` qualifies the
+cast as `extensions.citext`. Auth was verified end-to-end against the hosted
+project (disposable accounts, cleaned up): automatic profile creation via the
+trigger, sign-in, wrong-password rejection, owner onboarding update,
+case-insensitive duplicate-username rejection, RLS cross-user-update block, and
+sign-out.
+
+- **Schema & migrations (current)**: all **16** migrations through
+  `20260814160100` are on hosted Supabase — tables, both enums (`media_kind`,
+  `list_visibility`), triggers/functions, constraints, indexes, RLS on every
+  table, diary RPCs, and list create/add/remove RPCs match the intended
+  owner-write / public-read model.
+- **Database types (current)**: `lib/database.types.ts` is **genuinely
+  generated** via `npm run supabase:types` and drift-checked; do not hand-edit
+  it. Regenerate only when a migration changes the schema.
+- **List management edit/delete (local only)**: migration
+  `20260814160200_edit_delete_list_rpcs.sql` (the 17th — `public.update_list` /
+  `public.delete_list`) is **applied and verified locally only** and is
+  **not yet** on hosted Supabase. Deploy later with a forward-only push (never
+  `db reset --linked`, never remote seed):
+
+  ```bash
+  supabase link --project-ref <hosted-dev-ref>   # confirm the exact project
+  supabase migration list --linked               # inspect the remote ledger
+  supabase db push --dry-run                      # expect ONLY 20260814160200
+  supabase db push                                # apply pending migrations
+                                                  # (or: supabase migration up --linked)
+  npm run supabase:types                          # regenerate types; second run
+                                                  # must be byte-identical
+  ```
+
+  Full post-deploy SQL checks and the manual production checklist live in
+  [`docs/backend-architecture.md`](docs/backend-architecture.md#deploying-the-list-management-migration-20260814160200).
+
+- **Not exercised in the earliest hosted pass** (require a browser / real email
+  inbox / dashboard): the sign-up UI + email-confirmation link, browser
+  session-restore-on-refresh, the recovery email link, the Google OAuth consent
+  screen, and Vercel environment/deploy verification. Backend equivalents were
+  verified above.
 
 ---
 

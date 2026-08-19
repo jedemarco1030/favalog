@@ -1,19 +1,30 @@
 "use server";
 
 import { getSafeRedirectPath } from "@/lib/auth/safe-redirect";
-import { addListItem, createList, removeListItem } from "@/lib/supabase/lists";
+import {
+  addListItem,
+  createList,
+  deleteList,
+  removeListItem,
+  updateList,
+} from "@/lib/supabase/lists";
 import {
   parseCreateListFormData,
+  parseDeleteListFormData,
   parseListItemFormData,
+  parseUpdateListFormData,
   type CreateListFormState,
+  type DeleteListFormState,
+  type EditListFormState,
   type ListItemFormState,
 } from "./list-form";
 
 /**
- * `"use server"` boundaries for the persistent list loop: create a list, add a
- * title, and remove a title. These are the only Client-callable entry points
- * and are shared by the lists index, the add-to-list dialog on `/title/[slug]`,
- * and the real `/list/[slug]` owner controls.
+ * `"use server"` boundaries for the persistent list lifecycle: create a list,
+ * add a title, remove a title, edit the list's metadata, and delete the whole
+ * list. These are the only Client-callable entry points and are shared by the
+ * lists index, the add-to-list dialog on `/title/[slug]`, and the real
+ * `/list/[slug]` owner controls.
  *
  * Each is a thin, authoritative gate in front of the corresponding server write
  * path in `lib/supabase/lists.ts` — it does not duplicate the RPC call. Treated
@@ -125,6 +136,80 @@ export async function addListItemAction(
       return {
         status: "unavailable",
         message: "Updating lists isn't available in this environment yet.",
+      };
+    case "error":
+      return { status: "error", message: result.message };
+  }
+}
+
+export async function editListAction(
+  _prevState: EditListFormState,
+  formData: FormData,
+): Promise<EditListFormState> {
+  const input = parseUpdateListFormData(formData);
+  const returnTo = safeReturnTo(formData);
+
+  const result = await updateList(input);
+  switch (result.status) {
+    case "success":
+      return { status: "success", listId: result.listId, slug: result.slug };
+    case "invalid":
+      return {
+        status: "invalid",
+        message: "Please fix the highlighted fields and try again.",
+        fieldErrors: result.errors,
+      };
+    case "unauthenticated":
+      return {
+        status: "unauthenticated",
+        message: "Please sign in to edit your list.",
+        redirectTo: withReturnTo("/auth/sign-in", returnTo),
+      };
+    case "incomplete-profile":
+      return {
+        status: "onboarding",
+        message: "Finish setting up your profile first.",
+        redirectTo: withReturnTo("/onboarding", returnTo),
+      };
+    case "unavailable":
+      return {
+        status: "unavailable",
+        message: "Editing lists isn't available in this environment yet.",
+      };
+    case "error":
+      return { status: "error", message: result.message };
+  }
+}
+
+export async function deleteListAction(
+  _prevState: DeleteListFormState,
+  formData: FormData,
+): Promise<DeleteListFormState> {
+  const input = parseDeleteListFormData(formData);
+  const returnTo = safeReturnTo(formData);
+
+  const result = await deleteList(input);
+  switch (result.status) {
+    case "success":
+      return { status: "success" };
+    case "invalid":
+      return { status: "error", message: result.message };
+    case "unauthenticated":
+      return {
+        status: "unauthenticated",
+        message: "Please sign in to delete your list.",
+        redirectTo: withReturnTo("/auth/sign-in", returnTo),
+      };
+    case "incomplete-profile":
+      return {
+        status: "onboarding",
+        message: "Finish setting up your profile first.",
+        redirectTo: withReturnTo("/onboarding", returnTo),
+      };
+    case "unavailable":
+      return {
+        status: "unavailable",
+        message: "Deleting lists isn't available in this environment yet.",
       };
     case "error":
       return { status: "error", message: result.message };

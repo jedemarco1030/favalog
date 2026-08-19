@@ -9,18 +9,26 @@ import { createClient } from "./server";
 import { isSupabaseConfigured } from "./env";
 import {
   validateCreateListInput,
+  validateDeleteListInput,
   validateListItemInput,
+  validateUpdateListInput,
   type CreateListInput,
+  type DeleteListInput,
   type ListFieldErrors,
   type ListItemInput,
+  type UpdateListInput,
 } from "./list-input";
 import {
   GENERIC_ADD_ITEM_ERROR,
   GENERIC_CREATE_LIST_ERROR,
+  GENERIC_DELETE_LIST_ERROR,
   GENERIC_REMOVE_ITEM_ERROR,
+  GENERIC_UPDATE_LIST_ERROR,
   mapAddItemError,
   mapCreateListError,
+  mapDeleteListError,
   mapRemoveItemError,
+  mapUpdateListError,
 } from "./list-errors";
 import {
   toListDetailView,
@@ -37,6 +45,8 @@ export {
   mapCreateListError,
   mapAddItemError,
   mapRemoveItemError,
+  mapUpdateListError,
+  mapDeleteListError,
 } from "./list-errors";
 
 /**
@@ -67,10 +77,22 @@ export {
 async function revalidateListWrite(opts: {
   slug?: string | null;
   mediaSlug?: string | null;
+  /**
+   * Multiple member title slugs (edit/delete a whole list), so every affected
+   * `/title/[slug]` add-to-list membership UI drops a stale list name or a
+   * deleted membership. Resolved server-side from the RPC result — never a
+   * client value.
+   */
+  mediaSlugs?: readonly string[] | null;
 }): Promise<void> {
   revalidatePath("/lists");
   if (opts.slug) revalidatePath(`/list/${opts.slug}`);
-  if (opts.mediaSlug) revalidatePath(`/title/${opts.mediaSlug}`);
+  const titleSlugs = new Set<string>();
+  if (opts.mediaSlug) titleSlugs.add(opts.mediaSlug);
+  for (const slug of opts.mediaSlugs ?? []) {
+    if (typeof slug === "string" && slug.trim() !== "") titleSlugs.add(slug);
+  }
+  for (const slug of titleSlugs) revalidatePath(`/title/${slug}`);
   const profile = await getCurrentProfile();
   if (profile) revalidatePath(`/profile/${profile.username}`);
 }
@@ -317,6 +339,137 @@ export async function removeListItem(
     mediaId,
     removed: result.removed === true,
   };
+}
+
+// ---------------------------------------------------------------------------
+// update_list
+// ---------------------------------------------------------------------------
+
+export type UpdateListResult =
+  | {
+      status: "success";
+      listId: string;
+      slug: string;
+    }
+  | { status: "unauthenticated" }
+  | { status: "incomplete-profile" }
+  | { status: "unavailable" }
+  | { status: "invalid"; errors: ListFieldErrors }
+  | { status: "error"; message: string };
+
+interface UpdateListRpcResult {
+  list_id?: string;
+  slug?: string;
+  media_slugs?: unknown;
+}
+
+/** Normalize the RPC's member-slug array to a clean string list. */
+function asStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (item): item is string => typeof item === "string" && item.trim() !== "",
+  );
+}
+
+/** Edit the metadata of a list owned by the current user (slug is immutable). */
+export async function updateList(
+  input: UpdateListInput,
+): Promise<UpdateListResult> {
+  if (!isSupabaseConfigured()) return { status: "unavailable" };
+
+  const auth = await requireOnboardedUser();
+  if (!auth.ok) return { status: auth.status };
+
+  const validation = validateUpdateListInput(input);
+  if (!validation.ok || !validation.value) {
+    return { status: "invalid", errors: validation.errors };
+  }
+  const value = validation.value;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("update_list", {
+    p_list_id: value.listId,
+    p_title: value.title,
+    p_description: value.description ?? undefined,
+    p_is_ranked: value.isRanked,
+    p_visibility: value.visibility,
+  });
+
+  if (error) return { status: "error", message: mapUpdateListError(error) };
+
+  const result = (data ?? {}) as UpdateListRpcResult;
+  const listId = asString(result.list_id);
+  const slug = asString(result.slug);
+  // Defensive success contract: without a real id AND canonical slug the write
+  // may not have completed as expected; never report a false success.
+  if (listId === "" || slug === "") {
+    return { status: "error", message: GENERIC_UPDATE_LIST_ERROR };
+  }
+
+  await revalidateListWrite({
+    slug,
+    mediaSlugs: asStringArray(result.media_slugs),
+  });
+
+  return { status: "success", listId, slug };
+}
+
+// ---------------------------------------------------------------------------
+// delete_list
+// ---------------------------------------------------------------------------
+
+export type DeleteListResult =
+  | { status: "success"; listId: string; slug: string }
+  | { status: "unauthenticated" }
+  | { status: "incomplete-profile" }
+  | { status: "unavailable" }
+  | { status: "invalid"; message: string }
+  | { status: "error"; message: string };
+
+interface DeleteListRpcResult {
+  list_id?: string;
+  slug?: string;
+  media_slugs?: unknown;
+}
+
+/** Delete an entire list owned by the current user (items cascade). */
+export async function deleteList(
+  input: DeleteListInput,
+): Promise<DeleteListResult> {
+  if (!isSupabaseConfigured()) return { status: "unavailable" };
+
+  const auth = await requireOnboardedUser();
+  if (!auth.ok) return { status: auth.status };
+
+  const validation = validateDeleteListInput(input);
+  if (!validation.ok || !validation.value) {
+    return {
+      status: "invalid",
+      message: validation.message ?? GENERIC_DELETE_LIST_ERROR,
+    };
+  }
+  const value = validation.value;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("delete_list", {
+    p_list_id: value.listId,
+  });
+
+  if (error) return { status: "error", message: mapDeleteListError(error) };
+
+  const result = (data ?? {}) as DeleteListRpcResult;
+  const listId = asString(result.list_id);
+  const slug = asString(result.slug);
+  if (listId === "" || slug === "") {
+    return { status: "error", message: GENERIC_DELETE_LIST_ERROR };
+  }
+
+  await revalidateListWrite({
+    slug,
+    mediaSlugs: asStringArray(result.media_slugs),
+  });
+
+  return { status: "success", listId, slug };
 }
 
 // ---------------------------------------------------------------------------

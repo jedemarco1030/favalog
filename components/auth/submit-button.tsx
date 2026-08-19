@@ -10,6 +10,8 @@ interface SubmitButtonProps {
   pendingLabel?: string;
   className?: string;
   variant?: "primary" | "secondary";
+  /** Extra disabled condition, OR-ed with the form's pending state. */
+  disabled?: boolean;
 }
 
 /**
@@ -23,14 +25,16 @@ export function SubmitButton({
   pendingLabel = "Working…",
   className,
   variant = "primary",
+  disabled = false,
 }: SubmitButtonProps) {
   const { pending } = useFormStatus();
+  const isDisabled = pending || disabled;
 
   return (
     <button
       type="submit"
-      disabled={pending}
-      aria-disabled={pending}
+      disabled={isDisabled}
+      aria-disabled={isDisabled}
       className={cn(
         "inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60",
         variant === "primary"

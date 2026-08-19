@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatUpdatedAt,
   isPrivateVisibility,
+  toCreateVisibility,
   visibilityLabel,
 } from "@/components/lists/real-list-format";
 
@@ -24,6 +25,17 @@ describe("isPrivateVisibility", () => {
   it("is true for private and the reserved followers visibility", () => {
     expect(isPrivateVisibility("private")).toBe(true);
     expect(isPrivateVisibility("followers")).toBe(true);
+  });
+});
+
+describe("toCreateVisibility", () => {
+  it("maps public to public", () => {
+    expect(toCreateVisibility("public")).toBe("public");
+  });
+
+  it("reconciles private and the reserved followers to private", () => {
+    expect(toCreateVisibility("private")).toBe("private");
+    expect(toCreateVisibility("followers")).toBe("private");
   });
 });
 

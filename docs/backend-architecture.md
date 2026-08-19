@@ -11,20 +11,25 @@
 > state and each real diary row; signed-out / no-env visitors keep a clearly
 > labelled mock **example** diary (no edit/delete) and mock demo profiles, and
 > the title's primary action is a neutral **Log** (never a personalized
-> "Watched"/"Read"). The **persistent list loop** — sign in → create a list →
-> add a title → view the real list → see it on the owner's profile → add/remove
-> titles (`public.create_list` / `add_list_item` / `remove_list_item`,
-> server-generated globally-unique slugs, `public`/`private` visibility) — is now
-> **wired end-to-end** through the database + server layer
-> (`lib/supabase/lists.ts`, `app/lists/actions.ts`) and new UI under
-> `components/lists/` (real **Add to list** dialog on `/title/[slug]`, real
-> "Your lists" + "Community lists" and a "Create list" launcher on `/lists`, real
-> `/list/[slug]` detail with owner-only removal, and a real **Lists** section on
-> `/profile/[username]`); it is verified **locally** (pgTAP + unit/RTL tests),
-> and its two migrations are **not yet applied to hosted Supabase**. The
-> remaining product surfaces (catalog browsing, community reviews) still run on
-> the typed mock-data layer (`@/lib/data`), and **list metadata editing,
-> whole-list deletion, reordering, curator notes, list likes, follower-aware
+> "Watched"/"Read"). The **persistent list lifecycle** — sign in → create a list
+> → add a title → view the real list → see it on the owner's profile →
+> add/remove titles → **edit list metadata** → **delete a whole list**
+> (`public.create_list` / `add_list_item` / `remove_list_item` /
+> `update_list` / `delete_list`, server-generated globally-unique immutable
+> slugs, `public`/`private` visibility) — is now **wired end-to-end** through
+> the database + server layer (`lib/supabase/lists.ts`, `app/lists/actions.ts`)
+> and UI under `components/lists/` (real **Add to list** dialog on
+> `/title/[slug]`, real "Your lists" + "Community lists" and a "Create list"
+> launcher on `/lists`, real `/list/[slug]` detail with owner-only per-item
+> removal and owner-only edit/delete list controls, and a real **Lists** section
+> on `/profile/[username]`). All **16** migrations through
+> `20260814160100_list_rpcs.sql` are **deployed and verified on hosted
+> Supabase**; the list create/add/remove loop (plus private non-disclosure) is
+> production-verified. Migration `20260814160200_edit_delete_list_rpcs.sql`
+> (the 17th — `update_list` / `delete_list`) is **local-only** / unverified on
+> hosted Supabase until the owner deploys it. The remaining product surfaces
+> (catalog browsing, community reviews) still run on the typed mock-data layer
+> (`@/lib/data`), and **reordering, curator notes, list likes, follower-aware
 > visibility, favorites, and follows are deferred**. The generated types
 > (`lib/database.types.ts`) are real and drift-checked; the catalog migration
 > owns all **28** curated titles; `seed.sql` references that catalog and is
@@ -300,17 +305,17 @@ review always stores `rating = null`; the diary entry owns the rating
   `notFound()`. A real profile never inherits mock data, and real reviews show
   no fabricated like counts.
 
-## Persistent list loop (create / add / remove) and reads
+## Persistent list lifecycle (create / add / remove / edit / delete) and reads
 
-The first persistent **list** loop — sign in → create a list → add a title →
-view the real list → see it on the owner's profile → add/remove other titles —
-is backed by three narrowly-scoped RPCs that share the **same** security model
-as the diary RPCs: `SECURITY INVOKER` (RLS is an independent second boundary), a
-pinned `search_path = ''` with fully-qualified objects, ownership derived from
-`auth.uid()` (never a client `user_id`), EXECUTE granted to `authenticated` only
-(revoked from `public`/`anon`), catalog identity resolved server-side from a
-trusted **slug**, and a return payload limited to the identifiers/routing data
-the app needs.
+The persistent **list** lifecycle — sign in → create a list → add a title →
+view the real list → see it on the owner's profile → add/remove other titles →
+edit list metadata → delete a whole list — is backed by narrowly-scoped RPCs
+that share the **same** security model as the diary RPCs: `SECURITY INVOKER`
+(RLS is an independent second boundary), a pinned `search_path = ''` with
+fully-qualified objects, ownership derived from `auth.uid()` (never a client
+`user_id`), EXECUTE granted to `authenticated` only (revoked from
+`public`/`anon`), catalog identity resolved server-side from a trusted **slug**,
+and a return payload limited to the identifiers/routing data the app needs.
 
 ### Route identity: globally-unique server-generated slugs
 
@@ -361,6 +366,36 @@ A missing/cross-user `p_list_id` resolves to no owned row and fails safely
 caller is rejected both by the grant and by an in-function `auth.uid()` guard
 (`28000`).
 
+### List management (`20260814160200_edit_delete_list_rpcs.sql`)
+
+> **Local-only / unverified on hosted Supabase.** This is the **17th**
+> migration. All 16 migrations through `20260814160100` are deployed and
+> verified on hosted Supabase; apply `20260814160200` with the deploy procedure
+> below before relying on hosted edit/delete list behavior.
+
+Two additional RPCs extend the list lifecycle. They use the **same** security
+model as the create/add/remove RPCs: `SECURITY INVOKER`, `set search_path = ''`
+with fully schema-qualified objects, ownership from `auth.uid()` (no client
+`user_id` / username / slug / owner / timestamp), `raise` on null `auth.uid()`,
+`revoke all ... from public` and `from anon`, `grant execute ... to
+authenticated`. Unknown or cross-owner ids fail safely (`P0002`) without
+disclosing private-list existence. Both return identifiers only:
+`{ list_id, slug, media_slugs }` (`media_slugs` = the list's member catalog
+slugs, captured for revalidation — on delete, captured **before** the row is
+removed).
+
+- **Update.** `public.update_list(p_list_id uuid, p_title text, p_description
+text default null, p_is_ranked boolean default false, p_visibility text
+default 'public')` edits title / description / `is_ranked` / visibility of a
+  list the caller owns. The **slug is never changed** (immutable canonical URL).
+  Only `'public'` / `'private'` visibility is accepted (`'followers'` rejected).
+  A blank description normalizes to `NULL`. Toggling `is_ranked` **preserves**
+  existing item order/positions (the RPC never touches `list_items`);
+  `updated_at` is refreshed by the existing `lists_set_updated_at` trigger.
+- **Delete.** `public.delete_list(p_list_id uuid)` deletes the whole list the
+  caller owns. `list_items.list_id` is `ON DELETE CASCADE`, so items are removed
+  automatically (no orphan, no explicit child delete).
+
 ### Visibility reconciliation
 
 The DB enum `list_visibility` is `public | followers | private`; the domain
@@ -373,26 +408,33 @@ until follower-aware access exists.
 ### Application boundary
 
 - `lib/supabase/lists.ts` hosts the server entry points. Writes (`createList`,
-  `addListItem`, `removeListItem`) mirror `log.ts`: refuse to run when Supabase
-  is unconfigured (`unavailable`), independently re-check the authenticated user
-  **and a complete onboarded profile** via the auth DAL, re-validate/normalize
-  input (`lib/supabase/list-input.ts`), call the RPC, treat a missing/malformed
-  RPC identifier as a failure (never a false success), map errors to safe
-  messages (`lib/supabase/list-errors.ts` — raw DB detail never surfaced), and
-  revalidate `/lists`, the real `/list/[slug]` (by the RPC's canonical slug),
-  the `/title/[slug]` route, and the author's `/profile/[username]` (username
-  from the DAL — never the client). Reads (`getMyListsWithMembership`,
-  `getMyLists`, `getPublicLists`, `getRealListBySlug`, `getRealListsForUser`)
-  are owner/visibility-scoped by RLS and return serializable view models via the
-  pure `lib/supabase/list-view-model.ts` mappers — never raw rows, and never a
+  `addListItem`, `removeListItem`, `updateList`, `deleteList`) mirror `log.ts`:
+  refuse to run when Supabase is unconfigured (`unavailable`), independently
+  re-check the authenticated user **and a complete onboarded profile** via the
+  auth DAL, re-validate/normalize input (`lib/supabase/list-input.ts` —
+  including pure `validateUpdateListInput` / `validateDeleteListInput`), call
+  the RPC, treat a missing/malformed RPC identifier (id or slug) as a failure
+  (never a false success), map errors to safe messages
+  (`lib/supabase/list-errors.ts` — `mapUpdateListError` / `mapDeleteListError`;
+  raw DB detail never surfaced), and revalidate `/lists`, the real
+  `/list/[slug]` (by the RPC's canonical slug), every member `/title/[slug]`
+  (add-to-list membership UI; from returned `media_slugs`), and the author's
+  `/profile/[username]` (username from the DAL — never the client). Reads
+  (`getMyListsWithMembership`, `getMyLists`, `getPublicLists`,
+  `getRealListBySlug`, `getRealListsForUser`) are owner/visibility-scoped by RLS
+  and return serializable view models via the pure
+  `lib/supabase/list-view-model.ts` mappers — never raw rows, and never a
   fabricated like count or curator note on a real list.
 - **Server Actions.** `app/lists/actions.ts` (`createListAction`,
-  `addListItemAction`, `removeListItemAction`) are the only Client-callable
-  entry points. Each reads only allow-listed fields (never a user id, media
-  UUID, username, position, or ownership field — see `app/lists/list-form.ts`),
-  routes signed-out / incomplete-profile cases through the safe `returnTo` /
-  onboarding flow, and returns a serializable `useActionState` state. They do
-  not duplicate the RPC call.
+  `addListItemAction`, `removeListItemAction`, `editListAction`,
+  `deleteListAction`) are the only Client-callable entry points. Each reads only
+  allow-listed fields (never a user id, media UUID, username, position, or
+  ownership field — see `app/lists/list-form.ts`, including serializable
+  `EditListFormState` / `DeleteListFormState`), routes signed-out /
+  incomplete-profile cases through the safe `returnTo` / onboarding flow, and
+  returns a serializable `useActionState` state. They do not duplicate the RPC
+  call. Controlled `unavailable` behavior is preserved when Supabase is not
+  configured.
 - **Create-result echo.** So the Add-to-list dialog can fold a newly created
   list straight into its membership view without a round-trip, `createList`
   success additionally echoes the caller's **own submitted summary**
@@ -410,8 +452,9 @@ Action as a prop (so Storybook never imports a `"use server"` module), and there
 is no client-side Supabase, `localStorage` membership, or `getSession`-based
 rendering. New UI lives under `components/lists/`:
 
-- **Pure helpers.** `real-list-format.ts` (visibility / count / date formatting)
-  and `real-list-poster.tsx` (poster with a deterministic fallback when
+- **Pure helpers.** `real-list-format.ts` (visibility / count / date formatting,
+  plus `toCreateVisibility` reconciling stored `followers` → `private` for the
+  edit form) and `real-list-poster.tsx` (poster with a deterministic fallback when
   `posterUrl` is empty) carry no data-layer knowledge.
 - **Cards & sections.** `real-list-card.tsx` renders a real list; the
   server-rendered `real-lists-sections.tsx` composes the signed-in **Your lists**
@@ -432,15 +475,25 @@ rendering. New UI lives under `components/lists/`:
   real `/list/[slug]`; `remove-list-item-dialog.tsx` is the owner-only per-item
   removal confirmation (naming both title and list); `share-list-button.tsx`
   preserves Share without any Like control.
+- **Edit & delete list.** Owner-only controls on real `/list/[slug]` via
+  `real-list-owner-actions.tsx`: `edit-list-dialog.tsx` + `edit-list-form.tsx`
+  (prefilled, action-injected; successful edit keeps the user on the immutable
+  canonical URL and refreshes) and `delete-list-dialog.tsx` (deliberate
+  confirmation naming the list + a naming checkbox gating the destructive
+  button; on success navigates to `/lists`). `toCreateVisibility` in
+  `real-list-format.ts` reconciles stored `followers` to `private` for the edit
+  form. These controls never show to signed-out visitors, non-owners, or
+  mock-list viewers. Share behavior is unchanged.
 
 ### Ordering, likes, notes — deferred
 
-This phase supports **append** and **remove** only (new titles append; removal
-compacts). Ranked lists display their stored order as a ranking; unranked lists
-still preserve deterministic order. **Drag-and-drop / arbitrary reordering,
-curator-note creation/editing, list metadata editing, list deletion, list
-likes, and follower-aware visibility are deferred.** Real lists carry no
-persisted like count (honestly absent, never faked).
+Title membership still supports **append** and **remove** only (new titles
+append; removal compacts). Ranked lists display their stored order as a ranking;
+unranked lists still preserve deterministic order; toggling ranked/unranked does
+not reorder items. **Drag-and-drop / arbitrary reordering, curator-note
+creation/editing, list likes, and follower-aware visibility remain deferred.**
+List metadata editing and whole-list deletion are implemented (see above). Real
+lists carry no persisted like count (honestly absent, never faked).
 
 ### Mock vs. real list boundary
 
@@ -542,10 +595,10 @@ stays null and whose rating lives on the diary entry); a second user cannot
 mutate the first's rows; unknown media is rejected; and the browser never uses
 the service-role key. Clean up disposable test data afterward.
 
-> **Hosted status at time of writing:** these migrations have **not** yet been
-> confirmed applied to the hosted development project from this environment.
-> Apply and verify them with the procedure above before relying on the hosted
-> logging loop.
+> **Hosted status for logging foundation:** these migrations **have been
+> deployed and verified** on hosted Supabase as part of all **16** migrations
+> through `20260814160100`. The procedure above is retained as the historical
+> apply path.
 
 ### Deploying the edit/delete migration (`20260812164500`)
 
@@ -608,16 +661,19 @@ account; clean up test rows afterward):
    the safe sign-in `returnTo`.
 7. Confirm the browser never receives the service-role key.
 
-> **Hosted status for edit/delete:** this migration has **not** been applied to,
-> or verified against, the hosted project from this environment. It was
-> developed and verified **locally only** (local reset + full pgTAP suite +
-> byte-identical type regeneration). Apply and verify it with the procedure and
-> checklist above before relying on the hosted edit/delete lifecycle.
+> **Hosted status for diary edit/delete:** migration `20260812164500` **has been
+> deployed and verified** on hosted Supabase as part of all **16** migrations
+> through `20260814160100`. The procedure and checklist above are retained as
+> the historical apply path.
 
 ### Deploying the persistent-list migrations (`20260814160000`, `20260814160100`)
 
-The persistent-list foundation adds **two** new forward-only migrations, taking
-the total to **16**:
+> **Hosted status:** these two migrations **have been deployed and verified** on
+> hosted Supabase as part of all **16** migrations through `20260814160100`.
+> The procedure below is retained as the historical apply path.
+
+The persistent-list foundation added **two** forward-only migrations, taking
+the total to **16** (before the later local-only `20260814160200`):
 
 - `20260814160000_list_slug_global_unique.sql` — the global-unique slug index
   (with the fail-loud duplicate guard).
@@ -625,8 +681,8 @@ the total to **16**:
   `remove_list_item` RPCs and their `authenticated`-only grants.
 
 Existing migrations are immutable; these are additive (a new index + three new
-functions). Apply them the same way (never `db reset --linked`, never remote
-seed):
+functions). They were applied the same way (never `db reset --linked`, never
+remote seed):
 
 ```bash
 supabase link --project-ref <hosted-dev-ref>   # confirm the exact project
@@ -702,11 +758,111 @@ test rows afterward):
    dialog, no membership state) routing through the safe `returnTo`.
 8. Confirm the browser never receives the service-role key.
 
-> **Hosted status for persistent lists:** these two migrations have **not** been
-> applied to, or verified against, the hosted project from this environment.
-> They were developed and verified **locally only** (local reset + full pgTAP
-> suite + byte-identical type regeneration). Apply and verify them with the
-> procedure and checklist above before relying on the hosted list loop.
+> **Hosted status for persistent lists (create / add / remove):** the two
+> migrations `20260814160000` and `20260814160100` **have been deployed and
+> verified** on hosted Supabase (part of the full set of **16** migrations
+> through `20260814160100`). Hosted RPC security/grant checks and production
+> list behavior — including private-list non-disclosure — are confirmed.
+> Generated types are drift-checked.
+
+### Deploying the list-management migration (`20260814160200`)
+
+The list edit/delete lifecycle adds **one** new forward-only migration — the
+**17th** overall:
+
+- `20260814160200_edit_delete_list_rpcs.sql` — `public.update_list` /
+  `public.delete_list` and their `authenticated`-only grants.
+
+> **Local-only / UNVERIFIED on hosted Supabase** until the owner performs the
+> deploy + checks below. Existing migrations are immutable; this migration is
+> additive (two new functions + grants). Apply it the same way as prior
+> forward-only pushes — **never** `db reset --linked`, **never** remote seed —
+> so only the not-yet-applied `20260814160200` lands (no wipe of hosted data):
+
+```bash
+supabase link --project-ref <hosted-dev-ref>   # confirm the exact project
+supabase migration list --linked               # inspect the remote ledger
+supabase db push --dry-run                      # expect ONLY 20260814160200
+supabase db push                                # apply pending migrations
+                                                # (or: supabase migration up --linked)
+npm run supabase:types                          # regenerate lib/database.types.ts
+                                                # from the appropriate DB; a second
+                                                # run must be byte-identical
+```
+
+**Post-deployment SQL checks** (run **SELECT-only** against the hosted DB):
+
+```sql
+-- 1) The migration is recorded in the remote ledger.
+select name from supabase_migrations.schema_migrations
+where version = '20260814160200';
+
+-- 2) Both functions are SECURITY INVOKER with a pinned empty search_path.
+select proname, prosecdef, proconfig
+from pg_proc
+where proname in ('update_list', 'delete_list');
+--   expect prosecdef = false (SECURITY INVOKER)
+--   and proconfig containing search_path=""
+
+-- 3) EXECUTE is granted to authenticated only (not anon).
+select
+  has_function_privilege(
+    'authenticated',
+    'public.update_list(uuid, text, text, boolean, text)',
+    'execute'
+  ) as authed_update,
+  has_function_privilege(
+    'anon',
+    'public.update_list(uuid, text, text, boolean, text)',
+    'execute'
+  ) as anon_update,
+  has_function_privilege(
+    'authenticated',
+    'public.delete_list(uuid)',
+    'execute'
+  ) as authed_delete,
+  has_function_privilege(
+    'anon',
+    'public.delete_list(uuid)',
+    'execute'
+  ) as anon_delete;
+--   expect authed_* = true, anon_* = false
+
+-- 4) RLS is still enabled on the list tables.
+select relrowsecurity
+from pg_class
+where oid in ('public.lists'::regclass, 'public.list_items'::regclass);
+--   expect true for both
+```
+
+**Manual production verification checklist** (disposable account; clean up
+afterward):
+
+- **Edit title** on an owned real list; confirm the canonical `/list/[slug]` URL
+  does not change and the new title appears on `/lists` and the owner profile.
+- **Clear description** (blank → stored `NULL`); confirm the detail view shows
+  no description.
+- **Visibility public → private** and **private → public**; confirm Community /
+  visitor profile non-disclosure for private, and public visibility when flipped
+  back.
+- **Ranked ↔ unranked** toggle; confirm item **order/positions are preserved**.
+- **Whole-list deletion** via the confirm flow (name checkbox); confirm navigate
+  to `/lists`, the list is gone from "Your lists" and the owner profile, and
+  member title pages no longer show membership.
+- **Non-owner rejection**: a second account cannot edit or delete the list.
+- **Private non-disclosure**: non-owner / signed-out visitors get ordinary
+  not-found for a private list URL (no distinct forbidden state).
+- **Stale page after delete**: the old `/list/[slug]` resolves to not-found;
+  the deleting user was returned to `/lists`.
+- **No orphaned items**: after delete, no `list_items` rows remain for that
+  `list_id` (cascade).
+
+> **Hosted status for list edit/delete:** migration `20260814160200` has **not**
+> been applied to, or verified against, the hosted project. It was developed and
+> verified **locally only** (local reset + full pgTAP suite including
+> `edit_delete_list_rpcs.test.sql` + unit/RTL/Storybook coverage). Apply and
+> verify it with the procedure and checklist above before relying on the hosted
+> list-management lifecycle.
 
 ## Seed assumptions
 
@@ -729,11 +885,11 @@ of the full mock catalog):
 
 ## Deferred decisions
 
-- **List management beyond the create / add / remove loop:** editing a list's
-  title, description, ranking mode, or visibility after creation; deleting a
-  whole list; drag-and-drop / arbitrary reordering; and curator-note
-  creation/editing. (Persistent list **create / add-title / remove-title** now
-  exist — see "Persistent list loop" above — and are verified locally.)
+- **List features beyond the current lifecycle:** drag-and-drop / arbitrary
+  reordering and curator-note creation/editing. (Persistent list **create /
+  add-title / remove-title / edit metadata / delete whole list** now exist —
+  see "Persistent list lifecycle" above. Create/add/remove are hosted-verified;
+  edit/delete RPCs are local-only until `20260814160200` is deployed.)
 - Favorites, follows UI, and real likes persistence for reviews **and** lists
   (and any dedicated activity/event table).
 - Migrating the remaining product surfaces (catalog browsing, community

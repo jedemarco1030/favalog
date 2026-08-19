@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { parseCreateListFormData, parseListItemFormData } from "./list-form";
+import {
+  parseCreateListFormData,
+  parseDeleteListFormData,
+  parseListItemFormData,
+  parseUpdateListFormData,
+} from "./list-form";
 
 function fd(entries: Record<string, string>): FormData {
   const form = new FormData();
@@ -62,5 +67,59 @@ describe("parseListItemFormData", () => {
       listId: "",
       mediaSlug: "",
     });
+  });
+});
+
+describe("parseUpdateListFormData", () => {
+  it("reads only the allow-listed edit fields (never slug/owner)", () => {
+    const form = fd({
+      listId: "11111111-1111-1111-1111-111111111111",
+      title: "Best Films",
+      description: "Now public.",
+      isRanked: "on",
+      visibility: "private",
+      // Hostile extras that must be ignored (never trusted).
+      slug: "hacked-slug",
+      userId: "hacker",
+      ownerId: "hacker",
+      updatedAt: "2000-01-01",
+    });
+    expect(parseUpdateListFormData(form)).toEqual({
+      listId: "11111111-1111-1111-1111-111111111111",
+      title: "Best Films",
+      description: "Now public.",
+      isRanked: true,
+      visibility: "private",
+    });
+  });
+
+  it("defaults missing optional fields", () => {
+    const parsed = parseUpdateListFormData(
+      fd({ listId: "abc", title: "A title" }),
+    );
+    expect(parsed).toEqual({
+      listId: "abc",
+      title: "A title",
+      description: null,
+      isRanked: false,
+      visibility: null,
+    });
+  });
+});
+
+describe("parseDeleteListFormData", () => {
+  it("reads only the list id", () => {
+    const form = fd({
+      listId: "11111111-1111-1111-1111-111111111111",
+      userId: "hacker",
+      slug: "hacked",
+    });
+    expect(parseDeleteListFormData(form)).toEqual({
+      listId: "11111111-1111-1111-1111-111111111111",
+    });
+  });
+
+  it("defaults a missing list id to an empty string", () => {
+    expect(parseDeleteListFormData(fd({}))).toEqual({ listId: "" });
   });
 });

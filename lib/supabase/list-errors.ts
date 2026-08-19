@@ -1,6 +1,6 @@
 /**
  * Pure, safe mapping of Supabase/Postgres RPC errors to user-facing messages
- * for the list write paths (create / add item / remove item).
+ * for the list write paths (create / add item / remove item / update / delete).
  *
  * Kept free of any server/Supabase import so it can be unit-tested in isolation
  * and reused by the server-only data layer. Raw error detail is NEVER surfaced
@@ -17,6 +17,10 @@ export const GENERIC_ADD_ITEM_ERROR =
   "We couldn't add that title to your list just now. Please try again in a moment.";
 export const GENERIC_REMOVE_ITEM_ERROR =
   "We couldn't remove that title from your list just now. Please try again in a moment.";
+export const GENERIC_UPDATE_LIST_ERROR =
+  "We couldn't save your changes just now. Please try again in a moment.";
+export const GENERIC_DELETE_LIST_ERROR =
+  "We couldn't delete that list just now. Please try again in a moment.";
 
 const NOT_FOUND_LIST_ERROR =
   "We couldn't find that list. Please refresh and try again.";
@@ -82,5 +86,21 @@ export function mapRemoveItemError(error: DbError): string {
   return mapListWriteError(error, {
     notFound: NOT_FOUND_LIST_ERROR,
     generic: GENERIC_REMOVE_ITEM_ERROR,
+  });
+}
+
+/** Map an `update_list` RPC error to a safe, user-facing message. */
+export function mapUpdateListError(error: DbError): string {
+  return mapListWriteError(error, {
+    notFound: NOT_FOUND_LIST_ERROR,
+    generic: GENERIC_UPDATE_LIST_ERROR,
+  });
+}
+
+/** Map a `delete_list` RPC error to a safe, user-facing message. */
+export function mapDeleteListError(error: DbError): string {
+  return mapListWriteError(error, {
+    notFound: NOT_FOUND_LIST_ERROR,
+    generic: GENERIC_DELETE_LIST_ERROR,
   });
 }
