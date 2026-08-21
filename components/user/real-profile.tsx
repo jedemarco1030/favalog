@@ -9,12 +9,14 @@ import {
   type ProfileStat,
 } from "@/components/user/profile-stats";
 import { HorizontalMediaRow } from "@/components/media/horizontal-media-row";
+import { FavoriteMediaGrid } from "@/components/user/favorite-media-grid";
 import { MediaTypeBadge } from "@/components/media/media-type-badge";
 import { StarRating } from "@/components/ui/star-rating";
 import { RealListCard } from "@/components/lists/real-list-card";
 import type { Profile } from "@/lib/types";
 import type { RealProfileActivity } from "@/lib/supabase/profile-activity";
 import type { ProfileListsResult } from "@/lib/supabase/lists";
+import type { ProfileFavoritesResult } from "@/lib/supabase/favorites";
 
 const joinedFormatter = new Intl.DateTimeFormat("en", {
   month: "long",
@@ -34,6 +36,12 @@ interface RealProfileProps {
    * only public lists; the owner sees all of theirs). Never mock data.
    */
   lists: ProfileListsResult;
+  /**
+   * The profile owner's real favorites, ordered by position. Favorites are
+   * publicly readable (the documented RLS model), so a visitor sees them too.
+   * Never mock data.
+   */
+  favorites: ProfileFavoritesResult;
   /** True when this is the signed-in viewer's own profile. */
   isCurrentUser?: boolean;
 }
@@ -46,14 +54,15 @@ interface RealProfileProps {
  * real user is never attributed mock data. Statistics are derived, not stored;
  * a linked review's rating is its diary entry's rating (already resolved in the
  * read layer); and no fabricated like counts are shown for real reviews. Real
- * lists are now wired (visibility-scoped by RLS); the remaining not-yet-migrated
- * surfaces (favorites, currently-enjoying, follows) are shown as an honest
- * single unavailable note rather than faked.
+ * lists and favorites are now wired (favorites are publicly readable; lists are
+ * visibility-scoped by RLS). The remaining not-yet-migrated social surface
+ * (follows) is shown as an honest deferred note rather than faked.
  */
 export function RealProfile({
   profile,
   activity,
   lists,
+  favorites,
   isCurrentUser = false,
 }: RealProfileProps) {
   const { stats, recentlyWatched, recentlyRead, reviews } = activity;
@@ -126,6 +135,37 @@ export function RealProfile({
           className="gap-x-10"
         />
       </section>
+
+      <ProfileSection
+        title="Favorites"
+        description="A few titles that sum up their taste, across every format."
+      >
+        {favorites.status === "ok" ? (
+          favorites.favorites.length > 0 ? (
+            <FavoriteMediaGrid
+              items={favorites.favorites.map((favorite) => favorite.media)}
+            />
+          ) : (
+            <EmptyState
+              title={
+                isCurrentUser
+                  ? "You haven't chosen any favorites yet."
+                  : `${firstName} hasn't chosen any favorites yet.`
+              }
+              description={
+                isCurrentUser
+                  ? "Open a title and tap Favorite to start your shelf."
+                  : undefined
+              }
+            />
+          )
+        ) : (
+          <EmptyState
+            title="Favorites couldn't be loaded right now."
+            description="Please try again in a moment."
+          />
+        )}
+      </ProfileSection>
 
       {recentlyWatched.length > 0 && (
         <HorizontalMediaRow
@@ -236,8 +276,8 @@ export function RealProfile({
 
       <ProfileSection title="More on their Favalog">
         <EmptyState
-          title="Favorites and follows are coming soon."
-          description="These parts of the profile aren't wired up to accounts yet."
+          title="Follows are coming soon."
+          description="Following people isn't wired up to accounts yet."
         />
       </ProfileSection>
     </Container>

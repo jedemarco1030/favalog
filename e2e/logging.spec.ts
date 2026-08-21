@@ -14,13 +14,14 @@ test.describe("Signed-out logging affordances", () => {
     await page.goto("/title/dune-part-two");
 
     const actions = page.getByRole("group", { name: /Actions for/ });
-    // All four actions (Log / Rate / Review / Add to list) are real links into
-    // the sign-in returnTo flow now that list persistence is wired — the
-    // signed-out "Add to list" is a link, never a fake local experience.
+    // All five actions (Log / Rate / Review / Add to list / Favorite) are real
+    // links into the sign-in returnTo flow now that list AND favorite
+    // persistence are wired — the signed-out "Add to list" and "Favorite" are
+    // links, never fake local experiences.
     const signInLinks = actions.locator(
       'a[href*="/auth/sign-in?returnTo=%2Ftitle%2Fdune-part-two"]',
     );
-    await expect(signInLinks).toHaveCount(4);
+    await expect(signInLinks).toHaveCount(5);
 
     // A signed-out visitor is told an account is required before redirecting.
     await expect(

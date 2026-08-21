@@ -278,9 +278,9 @@ exists (schema, RLS, clients) and the following are wired to it:
   a whole list**. `public.create_list` / `add_list_item` / `remove_list_item`
   (migrations `20260814160000` global-unique slug index + `20260814160100`
   RPCs) and `public.update_list` / `public.delete_list` (migration
-  `20260814160200_edit_delete_list_rpcs.sql` — the **17th**, **local-only** /
-  unverified on hosted Supabase until the owner deploys it) follow the same
-  security model as the diary RPCs (`SECURITY INVOKER`, pinned
+  `20260814160200_edit_delete_list_rpcs.sql` — the **17th**, now **hosted and
+  production-verified**) follow the same security model as the diary RPCs
+  (`SECURITY INVOKER`, pinned
   `search_path = ''`, ownership from `auth.uid()`, `authenticated`-only
   EXECUTE, identifier-only returns). Slugs are generated server-side and are
   globally unique + **immutable** (edit never renames the URL); only
@@ -299,9 +299,11 @@ exists (schema, RLS, clients) and the following are wired to it:
   Owner-only **edit** covers title / description / visibility
   (`public`|`private`) / ranked; a successful edit keeps the user on the
   immutable canonical `/list/[slug]` and refreshes. Owner-only **delete** uses
-  a deliberate confirmation naming the list (checkbox-gated) and navigates to
-  `/lists` on success; `list_items` cascade via FK `ON DELETE CASCADE` (no
-  orphan). Both revalidate `/lists`, the affected `/list/[slug]`, the owner's
+  a deliberate confirmation naming the list (checkbox-gated) and
+  authoritatively redirects to `/lists` on success — the former list URL
+  correctly becomes not-found; commit `53eac02` fixed the client-navigation
+  race. `list_items` cascade via FK `ON DELETE CASCADE` (no orphan). Both
+  revalidate `/lists`, the affected `/list/[slug]`, the owner's
   `/profile/[username]`, and every member `/title/[slug]` (add-to-list
   membership UI). On `/title/[slug]`, **Add to list** is real: signed-out → a
   sign-in link through the safe `returnTo` flow; signed-in + onboarded → a
@@ -321,10 +323,63 @@ exists (schema, RLS, clients) and the following are wired to it:
   injected into presentational components (Storybook never imports
   `"use server"`); no client-side Supabase, `localStorage` membership, or
   `getSession`-based rendering.
+- **Persistent favorites lifecycle (favorite / unfavorite a title) — wired
+  end-to-end.** The full loop is now real: sign in → favorite a title → see
+  the ordered shelf on the owner's real profile → unfavorite. The atomic
+  idempotent `public.set_favorite(p_media_slug, p_is_favorite)` RPC (migration
+  `20260814160300_set_favorite_rpc.sql` — the **18th**, **local-only** and
+  unverified on hosted Supabase until the owner deploys it) follows the same
+  security model as the diary and list RPCs (`SECURITY INVOKER`, pinned
+  `search_path = ''`, fully schema-qualified, ownership from `auth.uid()`
+  only — no client `user_id`/`media_id`/`username`/`position`/ownership
+  fields, trusted catalog identity resolved server-side from
+  `media_items.slug`, `authenticated`-only EXECUTE with EXECUTE revoked from
+  `public`/`anon`, identifier-only returns). It rejects unauthenticated
+  callers (28000), a null/invalid desired state (22023), and an unknown media
+  slug (P0002); RLS stays an independent boundary and position changes are
+  serialized by locking the caller's own `profiles` row. Adding an existing
+  favorite and removing an absent one are both idempotent successes; new
+  favorites append at the next contiguous zero-based position, and removal
+  compacts remaining positions to a contiguous `0..n-1` range without
+  transient unique-index collisions. The RPC returns only
+  `{ favorite_id, media_id, slug, position, is_favorite, changed }` (never
+  profile details). Backed by the `public.favorites` table (pre-existing
+  migrations `20260805150600` + `20260805150700`) with unique
+  `(user_id, media_id)` and `(user_id, position)`, RLS is **public-read**
+  (`using (true)`) with owner-only authenticated writes — so favorites appear
+  on real profiles for any visitor. The server layer
+  (`lib/supabase/favorites.ts` reads + write, `lib/supabase/favorite-input.ts`
+  validation, `favorite-errors.ts` safe mapping, `favorite-view-model.ts` pure
+  row→view-model embedding a full `MediaItem` via `mapMediaRowToDomain`,
+  ordered by position) and Server Action (`setFavoriteAction` in
+  `app/title/[slug]/actions.ts` with `app/title/[slug]/favorite-form.ts`) back
+  a presentational, action-injected `components/media/favorite-button.tsx`
+  (Heart icon, `aria-pressed`, pending/disabled state preventing duplicate
+  submissions, controlled error/unavailable state, server-truth state that
+  never contradicts the write). `setFavorite` re-checks auth + onboarding via
+  the auth DAL, treats a missing/malformed success contract as failure, and
+  reports a controlled `unavailable` state when Supabase is not configured; the
+  action routes signed-out/expired sessions through the safe sign-in `returnTo`
+  flow and incomplete profiles to onboarding, returning the actual
+  server-resolved state (never optimistic). It is wired into
+  `components/media/media-actions.tsx`: signed-in users get the real toggle,
+  signed-out visitors get a neutral **Favorite** sign-in link (never a
+  personalized "Favorited"), and the account-required note mentions favoriting.
+  The title page (`app/title/[slug]/page.tsx`) loads favorite state on the
+  server for authenticated viewers (`getMyFavoriteState`), and
+  `components/user/real-profile.tsx` renders a real **Favorites** section
+  (`getRealFavoritesForUser`, ordered by position, cross-media `MediaCard`s
+  linking to `/title/[slug]`, honest owner/visitor empty states, controlled
+  read-error state, real catalog rows only). Every write revalidates the
+  affected `/title/[slug]` and the authenticated owner's `/profile/[username]`
+  (username from the auth DAL, never the client). Mock demo profiles keep their
+  existing mock favorites; a real profile never inherits mock data.
 
 Everything else is still mock-data. Do **not** introduce any of the following
 without an explicit task: migrating the remaining product pages off mock data,
-**drag-and-drop / arbitrary reordering, curator notes**, favorites, a follows
+**drag-and-drop / arbitrary reordering** (including arbitrary favorite
+reordering and direct favorite-removal controls on the profile — favorite
+removal is from the title page only this phase), **curator notes**, a follows
 UI, likes (reviews or lists), follower-aware list visibility, external catalog
 APIs (TMDB, Open Library, Google Books), AI functionality, real notifications,
 real social relationships, real recommendation algorithms, additional OAuth

@@ -35,6 +35,7 @@ import { getCurrentUser } from "@/lib/auth/data";
 import { getPublicProfileByUsername } from "@/lib/supabase/profiles";
 import { getRealProfileActivity } from "@/lib/supabase/profile-activity";
 import { getRealListsForUser } from "@/lib/supabase/lists";
+import { getRealFavoritesForUser } from "@/lib/supabase/favorites";
 import { siteConfig } from "@/lib/site-config";
 
 interface ProfilePageProps {
@@ -137,11 +138,16 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
           // The owner's real lists, visibility-scoped by RLS (public-only for
           // visitors; all for the owner). Never inherits mock lists.
           const listsResult = await getRealListsForUser(profile.id);
+          // The owner's real favorites, ordered by position. Favorites are
+          // publicly readable (the documented RLS model), so a visitor sees
+          // them too. Never inherits mock favorites.
+          const favoritesResult = await getRealFavoritesForUser(profile.id);
           return (
             <RealProfile
               profile={profile}
               activity={activityResult.activity}
               lists={listsResult}
+              favorites={favoritesResult}
               isCurrentUser={isCurrentUser}
             />
           );

@@ -1,13 +1,21 @@
 "use client";
 
-import { BookmarkPlus, Eye, PenLine, Pencil, Star, Trash2 } from "lucide-react";
+import {
+  BookmarkPlus,
+  Eye,
+  Heart,
+  PenLine,
+  Pencil,
+  Star,
+  Trash2,
+} from "lucide-react";
 import Link from "next/link";
 import { useState, type ComponentType, type ReactNode } from "react";
 import type { LucideProps } from "lucide-react";
 import type { MediaItem } from "@/lib/types";
 import type { PersonalTitleView } from "@/lib/supabase/diary";
 import type { ListMembershipView } from "@/lib/supabase/list-view-model";
-import { logTitleAction } from "@/app/title/[slug]/actions";
+import { logTitleAction, setFavoriteAction } from "@/app/title/[slug]/actions";
 import {
   deleteDiaryEntryAction,
   editDiaryEntryAction,
@@ -20,6 +28,7 @@ import {
 import { diaryActionLabel } from "@/components/diary/diary-view";
 import { StarRating } from "@/components/ui/star-rating";
 import { AddToListDialog } from "@/components/lists/add-to-list-dialog";
+import { FavoriteButton } from "./favorite-button";
 import { LogDialog, type LogFocus } from "./log-dialog";
 import { DeleteLogDialog } from "./delete-log-dialog";
 import { cn } from "@/lib/cn";
@@ -31,6 +40,14 @@ export interface AddToListState {
   lists: ListMembershipView[];
   /** Safe message when the lists read failed; drives a controlled error state. */
   error?: string | null;
+}
+
+/** The viewer's persisted favorite state for this title, resolved on the server. */
+export interface FavoriteState {
+  /** The viewer's current persisted favorite state. */
+  isFavorite: boolean;
+  /** False when the catalog slug is unknown to the persistent store. */
+  mediaKnown: boolean;
 }
 
 interface MediaActionsProps {
@@ -48,6 +65,12 @@ interface MediaActionsProps {
    * Only meaningful when authenticated; null for signed-out visitors.
    */
   addToList?: AddToListState | null;
+  /**
+   * The viewer's persisted favorite state for this title. Only meaningful when
+   * authenticated; null for signed-out visitors (who get a neutral sign-in
+   * affordance, never a personalized "Favorited" state).
+   */
+  favorite?: FavoriteState | null;
   className?: string;
 }
 
@@ -78,6 +101,7 @@ export function MediaActions({
   signInHref,
   personal,
   addToList,
+  favorite,
   className,
 }: MediaActionsProps) {
   const [dialog, setDialog] = useState<{ open: boolean; focus: LogFocus }>({
@@ -186,12 +210,25 @@ export function MediaActions({
             href={signInHref}
           />
         )}
+
+        {isAuthenticated ? (
+          <FavoriteButton
+            mediaSlug={item.slug}
+            mediaTitle={item.title}
+            returnTo={returnTo}
+            initialIsFavorite={favorite?.isFavorite ?? false}
+            available={favorite?.mediaKnown ?? false}
+            action={setFavoriteAction}
+          />
+        ) : (
+          <ActionLink icon={Heart} label="Favorite" href={signInHref} />
+        )}
       </div>
 
       {!isAuthenticated && (
         <p className="text-sm text-foreground/50">
-          You&rsquo;ll need a free account to log, rate, review, and add titles
-          to lists.
+          You&rsquo;ll need a free account to log, rate, review, favorite
+          titles, and add them to lists.
         </p>
       )}
 

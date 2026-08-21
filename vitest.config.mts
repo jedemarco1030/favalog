@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import tsconfigPaths from "vite-tsconfig-paths";
 import { defineConfig } from "vitest/config";
@@ -19,6 +20,16 @@ import { defineConfig } from "vitest/config";
  */
 export default defineConfig({
   plugins: [tsconfigPaths(), react()],
+  resolve: {
+    alias: {
+      // `server-only` is a build-time guard with no Vitest-resolvable module;
+      // alias it to an empty stub so the server-only data layer can be
+      // unit-tested with its Supabase/auth dependencies mocked.
+      "server-only": fileURLToPath(
+        new URL("./test/stubs/server-only.ts", import.meta.url),
+      ),
+    },
+  },
   test: {
     globals: true,
     environment: "jsdom",

@@ -9,6 +9,7 @@ import { MediaHero } from "@/components/media/media-hero";
 import {
   MediaActions,
   type AddToListState,
+  type FavoriteState,
 } from "@/components/media/media-actions";
 import { MediaDetails } from "@/components/media/media-details";
 import { RatingBreakdown } from "@/components/media/rating-breakdown";
@@ -25,6 +26,7 @@ import { isAuthAvailable } from "@/lib/auth/capability";
 import { getCurrentUser } from "@/lib/auth/data";
 import { getMyLatestLogForSlug } from "@/lib/supabase/diary";
 import { getMyListsWithMembership } from "@/lib/supabase/lists";
+import { getMyFavoriteState } from "@/lib/supabase/favorites";
 import { siteConfig } from "@/lib/site-config";
 
 interface TitlePageProps {
@@ -123,6 +125,23 @@ export default async function TitlePage({ params }: TitlePageProps) {
     }
   }
 
+  // The viewer's persisted favorite state for this title. Only fetched for an
+  // authenticated viewer; the read is owner-scoped by auth.uid(). A read error,
+  // an unknown catalog slug, or an unavailable environment all collapse to a
+  // controlled unavailable state (mediaKnown: false) rather than a crash or a
+  // fake "Favorited". Signed-out visitors get a neutral sign-in affordance.
+  let favorite: FavoriteState | null = null;
+  if (viewer !== null) {
+    const favoriteState = await getMyFavoriteState(item.slug);
+    favorite =
+      favoriteState.status === "ok"
+        ? {
+            isFavorite: favoriteState.isFavorite,
+            mediaKnown: favoriteState.mediaKnown,
+          }
+        : { isFavorite: false, mediaKnown: false };
+  }
+
   return (
     <article>
       <Container>
@@ -140,6 +159,7 @@ export default async function TitlePage({ params }: TitlePageProps) {
                 signInHref={signInHref}
                 personal={personal}
                 addToList={addToList}
+                favorite={favorite}
               />
             </section>
 

@@ -22,15 +22,25 @@
 > `/title/[slug]`, real "Your lists" + "Community lists" and a "Create list"
 > launcher on `/lists`, real `/list/[slug]` detail with owner-only per-item
 > removal and owner-only edit/delete list controls, and a real **Lists** section
-> on `/profile/[username]`). All **16** migrations through
-> `20260814160100_list_rpcs.sql` are **deployed and verified on hosted
-> Supabase**; the list create/add/remove loop (plus private non-disclosure) is
-> production-verified. Migration `20260814160200_edit_delete_list_rpcs.sql`
-> (the 17th — `update_list` / `delete_list`) is **local-only** / unverified on
-> hosted Supabase until the owner deploys it. The remaining product surfaces
-> (catalog browsing, community reviews) still run on the typed mock-data layer
-> (`@/lib/data`), and **reordering, curator notes, list likes, follower-aware
-> visibility, favorites, and follows are deferred**. The generated types
+> on `/profile/[username]`). All **17** migrations through
+> `20260814160200_edit_delete_list_rpcs.sql` are **deployed and verified on
+> hosted Supabase**; the full list lifecycle — create / add / remove **and**
+> edit / delete (plus private non-disclosure, immutable-slug edits, and the
+> authoritative post-delete redirect to `/lists`, with the former list URL
+> correctly becoming not-found; commit `53eac02` fixed the client-navigation
+> race) — is production-verified. The **persistent favorites loop** — favorite /
+> unfavorite a title on `/title/[slug]` (the atomic idempotent
+> `public.set_favorite(...)` RPC) and see the ordered shelf on the owner's real
+> `/profile/[username]` — is now **wired end-to-end** through the database +
+> server layer (`lib/supabase/favorites.ts`, `app/title/[slug]/actions.ts`) and
+> UI (`components/media/favorite-button.tsx` via
+> `components/media/media-actions.tsx`); its migration
+> `20260814160300_set_favorite_rpc.sql` (the **18th** — `set_favorite`) is
+> **local-only** / unverified on hosted Supabase until the owner deploys it. The
+> remaining product surfaces (catalog browsing, community reviews) still run on
+> the typed mock-data layer (`@/lib/data`), and **reordering, curator notes, list
+> likes, follower-aware visibility, direct favorite-removal from the profile, and
+> follows are deferred**. The generated types
 > (`lib/database.types.ts`) are real and drift-checked; the catalog migration
 > owns all **28** curated titles; `seed.sql` references that catalog and is
 > **local-only**. The app still builds with no Supabase env set.
@@ -368,10 +378,11 @@ caller is rejected both by the grant and by an in-function `auth.uid()` guard
 
 ### List management (`20260814160200_edit_delete_list_rpcs.sql`)
 
-> **Local-only / unverified on hosted Supabase.** This is the **17th**
-> migration. All 16 migrations through `20260814160100` are deployed and
-> verified on hosted Supabase; apply `20260814160200` with the deploy procedure
-> below before relying on hosted edit/delete list behavior.
+> **Hosted and production-verified.** This is the **17th** migration. All 17
+> migrations through `20260814160200` are deployed and verified on hosted
+> Supabase; edit/delete list behavior, immutable-slug edits, and the
+> authoritative post-delete redirect to `/lists` (the former list URL correctly
+> becomes not-found; commit `53eac02` fixed the client-navigation race) are live.
 
 Two additional RPCs extend the list lifecycle. They use the **same** security
 model as the create/add/remove RPCs: `SECURITY INVOKER`, `set search_path = ''`
@@ -504,6 +515,138 @@ Existing mock demonstration lists on `/list/[slug]` and mock demo profiles keep
 using mock list data; a **real** list/profile never inherits mock lists, counts,
 owners, notes, or likes. A read failure shows a controlled error state rather
 than silently substituting mock lists as the user's own.
+
+## Persistent favorites loop (add / remove) and reads
+
+The persistent **favorites** loop — sign in → favorite a title on
+`/title/[slug]` → see the ordered shelf on the owner's real
+`/profile/[username]` → unfavorite it again — is backed by **one** narrowly-scoped
+RPC that shares the **same** security model as the diary and list RPCs:
+`SECURITY INVOKER` (RLS is an independent second boundary), a pinned
+`search_path = ''` with fully-qualified objects, ownership derived from
+`auth.uid()` (never a client `user_id` / `media_id` / username / position /
+ownership field), catalog identity resolved server-side from a trusted **slug**,
+and a return payload limited to the identifiers and resulting state the app
+needs (never profile details).
+
+### Table & RLS (pre-existing)
+
+The favorites shelf table and its policies predate this loop, from
+`20260805150600_favorites_follows.sql` and `20260805150700`:
+
+- `public.favorites (id, user_id, media_id, position >= 0, created_at)` with a
+  unique `(user_id, media_id)` (at most one favorite per title) and a unique
+  `(user_id, position)` (a gap-free per-user ordering).
+- **RLS:** favorites are **publicly readable** (`select using (true)`), with
+  owner-only authenticated insert / update / delete (`auth.uid() = user_id`).
+  This public-read / owner-write privacy model means a user's favorites appear
+  on their real profile for **any** visitor, while only the owner may change
+  them.
+
+### The RPC (`20260814160300_set_favorite_rpc.sql`)
+
+> **Local-only / UNVERIFIED on hosted Supabase.** This is the **18th**
+> migration, added after `20260814160200`. All 17 migrations through
+> `20260814160200` are deployed and verified on hosted Supabase; apply
+> `20260814160300` with the deploy procedure below before relying on hosted
+> favorites behavior.
+
+- **Set.** `public.set_favorite(p_media_slug text, p_is_favorite boolean)
+returns jsonb` idempotently adds or removes the caller's favorite for a
+  trusted catalog title. A null/invalid desired state is rejected (`22023`); an
+  unknown media slug is rejected (`P0002`); an unauthenticated caller is
+  rejected both by the grant and by an in-function `auth.uid()` guard (`28000`).
+  Adding an existing favorite is an idempotent success (no duplicate); removing
+  an absent favorite is an idempotent success. A new favorite **appends** at the
+  next contiguous zero-based position; a removal **compacts** the remaining
+  positions to a contiguous `0..n-1` range. Compaction parks rows at a temporary
+  **positive** offset above the current max (never negative — the
+  `favorites_position_non_negative` CHECK — and disjoint from both the old and
+  new ranges, so no ordering can cause a transient `(user_id, position)`
+  duplicate). Every position-changing branch first **serializes** the caller's
+  own writes by locking their **own** `profiles` row (`select ... for update`),
+  so concurrent appends can't claim the same position and a concurrent
+  add+remove can't corrupt compaction, while never blocking a different user.
+  Returns **only**
+  `{ favorite_id, media_id, slug, position, is_favorite, changed }` —
+  `favorite_id` / `position` are `null` when the title is not a favorite, and
+  `changed` is `true` only when a row was actually inserted/deleted. It never
+  returns profile details.
+
+### Generated types
+
+`lib/database.types.ts` gained the `set_favorite` function entry (`Args:
+{ p_is_favorite: boolean; p_media_slug: string }`, `Returns: Json`). As with
+every schema change the types are regenerated via `npm run supabase:types` and
+verified byte-identical on a second run; they are never hand-edited.
+
+### Application boundary
+
+- `lib/supabase/favorites.ts` hosts the server entry points. The write
+  (`setFavorite`) mirrors `log.ts` / `lists.ts`: it refuses to run when Supabase
+  is unconfigured (`unavailable`), independently re-checks the authenticated
+  user **and** a complete onboarded profile via the auth DAL, re-validates input
+  (`lib/supabase/favorite-input.ts` — `validateSetFavoriteInput` requires a
+  media slug and an explicit boolean desired state), calls the RPC, treats a
+  missing/malformed success contract as a failure (never a false success), maps
+  errors to safe messages (`lib/supabase/favorite-errors.ts` —
+  `mapSetFavoriteError`; raw Supabase/Postgres detail is never surfaced), and
+  revalidates the affected `/title/[slug]` and the authenticated owner's
+  `/profile/[username]` (username from the DAL — never the client). Reads
+  (`getMyFavoriteState(slug)` for the viewer's state on a title,
+  `getRealFavoritesForUser(userId)` for a profile's ordered public favorites)
+  are owner/visibility-scoped by RLS and return serializable view models via the
+  pure `lib/supabase/favorite-view-model.ts` mappers (`toFavoriteView` /
+  `toFavoriteViews`), each embedding a full `MediaItem` mapped through the
+  existing `mapMediaRowToDomain` boundary (no fabricated mock records), ordered
+  by position.
+- **Server Action.** `app/title/[slug]/actions.ts` (`setFavoriteAction`) is the
+  only Client-callable entry point. It reads only allow-listed fields via
+  `app/title/[slug]/favorite-form.ts` (serializable `FavoriteFormState` +
+  `parseFavoriteFormData` — never a user id, media UUID, username, position, or
+  ownership field), independently re-checks authentication and profile
+  completeness, routes signed-out / expired sessions through the safe sign-in
+  `returnTo` flow and incomplete profiles to onboarding, and returns the
+  **actual** server-returned resulting state (never an optimistic value). It
+  does not duplicate the RPC call.
+
+### UI layering
+
+All Supabase reads stay in server-only modules and Server Components; the
+interactive toggle is a presentational Client Component that receives the Server
+Action as a prop (so Storybook never imports a `"use server"` module), and there
+is no client-side Supabase, `localStorage`, `getSession`-based rendering, or
+optimistic state.
+
+- **Title page.** `components/media/favorite-button.tsx` is an action-injected
+  client toggle (Heart icon, `aria-pressed`, a pending/disabled state that
+  prevents duplicate submissions, a controlled error/unavailable state, and a
+  server-truth state that never contradicts the write). It is wired into
+  `components/media/media-actions.tsx`: a signed-in viewer gets the real toggle;
+  a signed-out visitor gets a neutral **Favorite** sign-in link (never a
+  personalized "Favorited"), and the account-required explanatory text now
+  mentions favoriting. `app/title/[slug]/page.tsx` loads the viewer's favorite
+  state on the server for authenticated viewers.
+- **Real profile.** `components/user/real-profile.tsx` renders a real
+  **Favorites** section (ordered by position, cross-media `MediaCard`s linking to
+  `/title/[slug]`, honest owner/visitor empty states, a controlled read-error
+  state, real catalog rows only). The previous combined "Favorites and follows
+  are coming soon" note is replaced: favorites are now real; **follows remain
+  clearly deferred**.
+
+### Removal & reordering — deferred
+
+Favorites support **add** and **remove** (from the title page) only. **Arbitrary
+favorite reordering and a direct favorite-removal control on the profile**
+(removal is from the title page this phase) **remain deferred**, alongside
+follows, followers-only list visibility, likes, and notifications.
+
+### Mock vs. real favorites boundary
+
+Mock demo usernames (`jamie`, `mira`, …) still render their full mock profiles,
+including mock favorites; a **real** Supabase profile renders real favorites and
+never inherits mock data. Without Supabase configured everything stays on the
+mock layer, and favorite writes/reads report a controlled `unavailable` state.
 
 ## Supabase clients
 
@@ -673,7 +816,8 @@ account; clean up test rows afterward):
 > The procedure below is retained as the historical apply path.
 
 The persistent-list foundation added **two** forward-only migrations, taking
-the total to **16** (before the later local-only `20260814160200`):
+the total to **16** (before `20260814160200`, now also hosted, and the later
+local-only favorites migration `20260814160300`):
 
 - `20260814160000_list_slug_global_unique.sql` — the global-unique slug index
   (with the fail-loud duplicate guard).
@@ -773,11 +917,12 @@ The list edit/delete lifecycle adds **one** new forward-only migration — the
 - `20260814160200_edit_delete_list_rpcs.sql` — `public.update_list` /
   `public.delete_list` and their `authenticated`-only grants.
 
-> **Local-only / UNVERIFIED on hosted Supabase** until the owner performs the
-> deploy + checks below. Existing migrations are immutable; this migration is
-> additive (two new functions + grants). Apply it the same way as prior
+> **Hosted and production-verified.** This migration **has been deployed and
+> verified** on hosted Supabase. Existing migrations are immutable; it is
+> additive (two new functions + grants) and was applied the same way as prior
 > forward-only pushes — **never** `db reset --linked`, **never** remote seed —
-> so only the not-yet-applied `20260814160200` lands (no wipe of hosted data):
+> so only the not-yet-applied `20260814160200` landed (no wipe of hosted data).
+> The procedure below is retained as the historical apply path:
 
 ```bash
 supabase link --project-ref <hosted-dev-ref>   # confirm the exact project
@@ -857,12 +1002,100 @@ afterward):
 - **No orphaned items**: after delete, no `list_items` rows remain for that
   `list_id` (cascade).
 
-> **Hosted status for list edit/delete:** migration `20260814160200` has **not**
-> been applied to, or verified against, the hosted project. It was developed and
-> verified **locally only** (local reset + full pgTAP suite including
-> `edit_delete_list_rpcs.test.sql` + unit/RTL/Storybook coverage). Apply and
-> verify it with the procedure and checklist above before relying on the hosted
-> list-management lifecycle.
+> **Hosted status for list edit/delete:** migration `20260814160200` **has been
+> deployed and verified** on hosted Supabase. Edit/delete list behavior,
+> immutable-slug edits, and the authoritative post-delete redirect to `/lists`
+> (the former list URL correctly becomes not-found; commit `53eac02` fixed the
+> client-navigation race) are live. It was also developed and verified locally
+> (local reset + full pgTAP suite including `edit_delete_list_rpcs.test.sql` +
+> unit/RTL/Storybook coverage). The procedure and checklist above are retained
+> as the historical apply path.
+
+### Deploying the favorites migration (`20260814160300`)
+
+The favorites loop adds **one** new forward-only migration — the **18th**
+overall, added after `20260814160200`:
+
+- `20260814160300_set_favorite_rpc.sql` — `public.set_favorite` and its
+  `authenticated`-only grant.
+
+> **Local-only / UNVERIFIED on hosted Supabase** until the owner performs the
+> deploy + checks below. Existing migrations are immutable; this migration is
+> additive (one new function + grants — the `favorites` table and its RLS were
+> laid down earlier in `20260805150600` / `20260805150700`). Apply it the same
+> way as prior forward-only pushes — **never** `db reset --linked`, **never**
+> remote seed — so only the not-yet-applied `20260814160300` lands (no wipe of
+> hosted data):
+
+```bash
+supabase link --project-ref <hosted-dev-ref>   # confirm the exact project
+supabase migration list --linked               # inspect the remote ledger
+supabase db push --dry-run                      # expect ONLY 20260814160300
+supabase db push                                # apply pending migrations
+                                                # (or: supabase migration up --linked)
+npm run supabase:types                          # regenerate lib/database.types.ts
+                                                # from the appropriate DB; a second
+                                                # run must be byte-identical
+```
+
+**Post-deployment SQL checks** (run **SELECT-only** against the hosted DB):
+
+```sql
+-- 1) The migration is recorded in the remote ledger.
+select version from supabase_migrations.schema_migrations
+where version = '20260814160300';
+
+-- 2) The function is SECURITY INVOKER with a pinned empty search_path.
+select p.proname, p.prosecdef as security_definer, p.proconfig
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public' and p.proname = 'set_favorite';
+--   expect security_definer = false (SECURITY INVOKER)
+--   and proconfig containing search_path=""
+
+-- 3) EXECUTE is granted to authenticated only (not anon/public).
+select
+  has_function_privilege('authenticated',
+    'public.set_favorite(text, boolean)', 'execute') as authed_set,
+  has_function_privilege('anon',
+    'public.set_favorite(text, boolean)', 'execute') as anon_set,
+  has_function_privilege('public',
+    'public.set_favorite(text, boolean)', 'execute') as public_set;
+--   expect authed_set = true, anon_set = false, public_set = false
+
+-- 4) EXECUTE grants can also be inspected via the information schema.
+select grantee, privilege_type
+from information_schema.routine_privileges
+where routine_schema = 'public' and routine_name = 'set_favorite';
+--   expect a single EXECUTE grant to authenticated (no anon/public)
+
+-- 5) RLS is still enabled on the favorites table (defence-in-depth).
+select relrowsecurity
+from pg_class
+where oid = 'public.favorites'::regclass;
+--   expect true
+```
+
+**Manual production verification checklist** (disposable account; clean up
+afterward):
+
+1. Sign in and open a title; **favorite** it and confirm the toggle shows the
+   favorited state.
+2. **Refresh** the title page; confirm the favorited state is retained (server
+   truth, not optimistic).
+3. Open your `/profile/[username]`; confirm the title now **appears** in the real
+   Favorites section.
+4. Back on the title page, **unfavorite** it; refresh and confirm the removal is
+   retained.
+5. Return to your profile; confirm the title **no longer** shows in Favorites and
+   the remaining favorites stay contiguous.
+6. Confirm a signed-out visitor sees a neutral **Favorite** sign-in link (no
+   personalized "Favorited", no toggle) routing through the safe `returnTo`.
+7. Confirm the browser never receives the service-role key.
+
+> **Hosted status for favorites:** migration `20260814160300` has **not** been
+> applied to, or verified against, the hosted project. It was developed and
+> verified **locally only**. Apply and verify it with the procedure and checklist
+> above before relying on the hosted favorites loop.
 
 ## Seed assumptions
 
@@ -888,10 +1121,14 @@ of the full mock catalog):
 - **List features beyond the current lifecycle:** drag-and-drop / arbitrary
   reordering and curator-note creation/editing. (Persistent list **create /
   add-title / remove-title / edit metadata / delete whole list** now exist —
-  see "Persistent list lifecycle" above. Create/add/remove are hosted-verified;
-  edit/delete RPCs are local-only until `20260814160200` is deployed.)
-- Favorites, follows UI, and real likes persistence for reviews **and** lists
-  (and any dedicated activity/event table).
+  see "Persistent list lifecycle" above. Create / add / remove **and**
+  edit / delete are all hosted-verified.)
+- **Favorite reordering and a direct favorite-removal control on the profile.**
+  (The persistent favorites **add / remove** loop from the title page now exists
+  — see "Persistent favorites loop" above; its migration `20260814160300` is
+  local-only until deployed.)
+- Follows UI, and real likes persistence for reviews **and** lists (and any
+  dedicated activity/event table).
 - Migrating the remaining product surfaces (catalog browsing, community
   reviews) off mock data to Supabase-backed fetchers.
 - Real media-catalog provider integration.

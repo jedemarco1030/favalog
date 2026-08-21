@@ -403,6 +403,10 @@ export type Database = {
         Args: { p_list_id: string; p_media_slug: string }
         Returns: Json
       }
+      set_favorite: {
+        Args: { p_is_favorite: boolean; p_media_slug: string }
+        Returns: Json
+      }
       update_diary_entry: {
         Args: {
           p_contains_spoilers?: boolean

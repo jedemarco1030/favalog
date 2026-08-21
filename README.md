@@ -11,15 +11,17 @@ that make up their taste.
 The current MVP scope is **movies, TV, and books**. A Supabase/PostgreSQL
 backend foundation is in place: **authentication + onboarding**, the
 **persistent title-log lifecycle** (log a title with an optional rating and
-review, then edit or delete it), and the **persistent list lifecycle** (create
+review, then edit or delete it), the **persistent list lifecycle** (create
 a list, add/remove titles, edit list metadata, delete a whole list, view the
-real list, and see it on the owner's profile) are wired to it, and an
-authenticated user's **Diary**, **Lists**, and **Profile** now render real
-Supabase data. The remaining surfaces (catalog browsing, favorites, follows,
-community reviews) still render from a typed mock-data layer, and there is no
-external media API or AI yet. The app still builds and runs with **no**
-Supabase environment variables set. The architecture is designed so the
-remaining pieces can drop in without rewriting the UI.
+real list, and see it on the owner's profile), and the **persistent favorites
+loop** (favorite/unfavorite a title, and see the ordered shelf on the owner's
+profile) are wired to it, and an authenticated user's **Diary**, **Lists**,
+**Favorites**, and **Profile** now render real Supabase data. The remaining
+surfaces (catalog browsing, follows, community reviews) still render from a
+typed mock-data layer, and there is no external media API or AI yet. The app
+still builds and runs with **no** Supabase environment variables set. The
+architecture is designed so the remaining pieces can drop in without rewriting
+the UI.
 
 ---
 
@@ -70,7 +72,8 @@ components/
                          SectionHeader, EmptyState, Skeleton)
   media/                 MediaCard, MediaPoster, MediaTypeBadge,
                          HorizontalMediaRow, MediaHero, MediaActions,
-                         MediaDetails, RatingBreakdown
+                         MediaDetails, RatingBreakdown, FavoriteButton
+                         (real title-page favorite toggle)
   activity/              ActivityCard used by the feed
   diary/                 DiaryTimeline, DiaryEntry, DiarySummary, and the
                          shared diary view-model/helpers
@@ -82,7 +85,9 @@ components/
                          ShareListButton) and the shared list view-model/helpers
   reviews/               ReviewCard
   user/                  UserAvatar, ProfileStats, ProfileHeader,
-                         ProfileSection, FavoriteMediaGrid
+                         ProfileSection, FavoriteMediaGrid, and the wired
+                         real-profile UI (RealProfile with a real Favorites
+                         section)
   skeletons/             Media, activity/feed, and profile skeletons
 
 lib/
@@ -141,12 +146,20 @@ once and reused.
 > "Your lists" + "Community lists" sections and a "Create list" launcher on
 > `/lists`, real `/list/[slug]` detail (owner-only per-item removal, owner-only
 > edit/delete list controls, no faked likes), and a real **Lists** section on
-> `/profile/[username]`. **Drag-and-drop/arbitrary reordering, curator notes,
-> list likes, follower-aware visibility, favorites, and follows remain
-> deferred**, and the catalog / community reviews still render from the
-> `@/lib/data` mock layer. The generated database types (`lib/database.types.ts`)
-> are real and drift-checked, the catalog migration owns all **28** curated
-> titles, and `seed.sql` references that catalog and remains **local only**.
+> `/profile/[username]`. The **persistent favorites loop** — favorite/unfavorite
+> a title on `/title/[slug]` (via the atomic idempotent
+> `public.set_favorite(...)` RPC) and see the ordered shelf on the owner's real
+> `/profile/[username]` — is now **wired end-to-end** too: a real
+> `FavoriteButton` toggle on the title page for signed-in viewers (signed-out
+> visitors get a neutral **Favorite** sign-in link) and a real **Favorites**
+> section on real profiles (visible to any visitor, since favorites are
+> publicly readable). **Drag-and-drop/arbitrary reordering, curator notes,
+> list likes, follower-aware visibility, arbitrary favorite reordering,
+> direct favorite-removal from the profile, and follows remain deferred**, and
+> the catalog / community reviews still render from the `@/lib/data` mock layer.
+> The generated database types (`lib/database.types.ts`) are real and
+> drift-checked, the catalog migration owns all **28** curated titles, and
+> `seed.sql` references that catalog and remains **local only**.
 > The app still builds and runs with **no** Supabase environment variables set —
 > public browsing keeps working and the auth/logging entry points show a
 > controlled unavailable state.
@@ -234,13 +247,18 @@ Remote/PR CI does **not** require Supabase credentials.
 ### Hosted verification status
 
 The hosted development project has been **deployed and verified** for the
-logging foundation, diary edit/delete, and the persistent list create/add/remove
-loop. All **16** migrations through `20260814160100_list_rpcs.sql` are recorded
-in the remote `schema_migrations` ledger — no drift. Generated database types
+logging foundation, diary edit/delete, and the **full** persistent list
+lifecycle (create/add/remove **and** edit/delete). All **17** migrations through
+`20260814160200_edit_delete_list_rpcs.sql` are recorded in the remote
+`schema_migrations` ledger — no drift. Generated database types
 (`lib/database.types.ts`, via `npm run supabase:types`) are real and
 drift-checked (a second generation is byte-identical). Hosted RPC
 security/grant checks and production list behavior — including private-list
-non-disclosure — have been confirmed.
+non-disclosure, immutable-slug edits, and the authoritative post-delete redirect
+to `/lists` (the former list URL correctly becomes not-found; commit `53eac02`
+fixed the client-navigation race) — have been confirmed. The newest migration —
+`20260814160300_set_favorite_rpc.sql` (the **18th**, the favorites loop) — is
+**local-only** and unverified on hosted Supabase until the owner deploys it.
 
 Historical note (2026-08-05): an earlier pass verified the first 8 migrations
 directly via read-only schema introspection plus disposable-account auth flows
@@ -255,24 +273,31 @@ trigger, sign-in, wrong-password rejection, owner onboarding update,
 case-insensitive duplicate-username rejection, RLS cross-user-update block, and
 sign-out.
 
-- **Schema & migrations (current)**: all **16** migrations through
-  `20260814160100` are on hosted Supabase — tables, both enums (`media_kind`,
+- **Schema & migrations (current)**: all **17** migrations through
+  `20260814160200` are on hosted Supabase — tables, both enums (`media_kind`,
   `list_visibility`), triggers/functions, constraints, indexes, RLS on every
-  table, diary RPCs, and list create/add/remove RPCs match the intended
-  owner-write / public-read model.
+  table, diary RPCs, and the full list create/add/remove **and** edit/delete
+  RPCs match the intended owner-write / public-read model.
 - **Database types (current)**: `lib/database.types.ts` is **genuinely
   generated** via `npm run supabase:types` and drift-checked; do not hand-edit
   it. Regenerate only when a migration changes the schema.
-- **List management edit/delete (local only)**: migration
+- **List management edit/delete (hosted)**: migration
   `20260814160200_edit_delete_list_rpcs.sql` (the 17th — `public.update_list` /
-  `public.delete_list`) is **applied and verified locally only** and is
-  **not yet** on hosted Supabase. Deploy later with a forward-only push (never
-  `db reset --linked`, never remote seed):
+  `public.delete_list`) is **deployed and verified** on hosted Supabase; list
+  metadata editing (immutable slug), whole-list deletion, and the post-delete
+  redirect to `/lists` are live.
+- **Favorites (local only)**: migration
+  `20260814160300_set_favorite_rpc.sql` (the 18th — `public.set_favorite`) is
+  **applied and verified locally only** and is **not yet** on hosted Supabase.
+  The `favorites` table and its RLS were laid down earlier (`20260805150600` /
+  `20260805150700`); this migration only adds the atomic idempotent write RPC.
+  Deploy later with a forward-only push (never `db reset --linked`, never remote
+  seed):
 
   ```bash
   supabase link --project-ref <hosted-dev-ref>   # confirm the exact project
   supabase migration list --linked               # inspect the remote ledger
-  supabase db push --dry-run                      # expect ONLY 20260814160200
+  supabase db push --dry-run                      # expect ONLY 20260814160300
   supabase db push                                # apply pending migrations
                                                   # (or: supabase migration up --linked)
   npm run supabase:types                          # regenerate types; second run
@@ -280,7 +305,7 @@ sign-out.
   ```
 
   Full post-deploy SQL checks and the manual production checklist live in
-  [`docs/backend-architecture.md`](docs/backend-architecture.md#deploying-the-list-management-migration-20260814160200).
+  [`docs/backend-architecture.md`](docs/backend-architecture.md#deploying-the-favorites-migration-20260814160300).
 
 - **Not exercised in the earliest hosted pass** (require a browser / real email
   inbox / dashboard): the sign-up UI + email-confirmation link, browser
@@ -708,6 +733,13 @@ titles can change without breaking links. Invalid slugs use Next.js
   adds the title atomically (via `mediaSlug`), and a link to the affected list
   after success. When the catalog slug is unknown (`mediaKnown: false`) or a read
   error occurs it shows a controlled unavailable state.
+- **Favorite.** The control is now real. A signed-in viewer gets a real
+  `FavoriteButton` toggle (Heart icon, `aria-pressed`, a pending/disabled state
+  that prevents duplicate submissions) that persists through `setFavoriteAction`
+  → `public.set_favorite(...)` and reflects server truth (never an optimistic
+  value). A signed-out visitor gets a neutral **Favorite** sign-in link (never a
+  personalized "Favorited") through the safe `returnTo` flow. The state is loaded
+  on the server (`getMyFavoriteState(slug)`) for authenticated viewers.
 
 ### Profile (`/profile/[username]`)
 
@@ -746,12 +778,21 @@ from the mutable `displayName`), so `/profile/jamie` is the primary demo
   visitors, all for the owner via RLS, with private lists visually identified
   for the owner). A real profile never inherits mock lists; **mock demo
   profiles** keep their mock list data.
+- **Real favorites on real profiles.** A **real** Supabase profile now shows a
+  real **Favorites** section ordered by position from `getRealFavoritesForUser`
+  (cross-media `MediaCard`s linking to `/title/[slug]`, honest owner/visitor
+  empty states, a controlled read-error state). Favorites are publicly readable,
+  so they appear for any visitor; only the owner can change them (from the title
+  page this phase). A real profile never inherits mock favorites; **mock demo
+  profiles** keep their mock favorites.
 - **Dynamic metadata.** `generateMetadata` derives the title
   (`Display Name (@username)`), description (the bio), and Open Graph / Twitter
   tags from the user, with the canonical URL built from `lib/site-config.ts`.
-- **Editing is out of scope.** Beyond the wired list surfaces, profile editing,
-  avatar uploads, and following/unfollowing remain out of scope — the mock
-  profile experience is read-only against the mock data layer.
+- **Editing is out of scope.** Beyond the wired list and favorites surfaces,
+  profile editing, avatar uploads, arbitrary favorite reordering, direct
+  favorite-removal from the profile, and following/unfollowing remain out of
+  scope — the rest of the mock profile experience is read-only against the mock
+  data layer.
 
 ---
 

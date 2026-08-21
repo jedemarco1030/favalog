@@ -5,8 +5,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // Mock the Server Action boundary so this UI test never imports server-only
 // modules; the action's real behavior is covered by its composed helpers.
 const logTitleAction = vi.fn();
+const setFavoriteAction = vi.fn();
 vi.mock("@/app/title/[slug]/actions", () => ({
   logTitleAction: (...args: unknown[]) => logTitleAction(...args),
+  setFavoriteAction: (...args: unknown[]) => setFavoriteAction(...args),
 }));
 
 // The edit/delete Server Actions are also server-only; mock them too so this
@@ -75,7 +77,7 @@ describe("MediaActions", () => {
       />,
     );
 
-    for (const name of ["Log", "Rate", "Review", "Add to list"]) {
+    for (const name of ["Log", "Rate", "Review", "Add to list", "Favorite"]) {
       const link = screen.getByRole("link", { name });
       expect(link).toHaveAttribute("href", signInHref);
     }
@@ -89,7 +91,7 @@ describe("MediaActions", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(
       screen.getByText(
-        /free account to log, rate, review, and add titles to lists/i,
+        /free account to log, rate, review, favorite titles, and add them to lists/i,
       ),
     ).toBeInTheDocument();
   });
@@ -106,6 +108,15 @@ describe("MediaActions", () => {
     );
 
     expect(screen.getByRole("link", { name: "Log" })).toBeInTheDocument();
+    // A signed-out visitor sees a neutral Favorite sign-in link, never a
+    // personalized "Favorited" toggle.
+    expect(screen.getByRole("link", { name: "Favorite" })).toHaveAttribute(
+      "href",
+      signInHref,
+    );
+    expect(
+      screen.queryByRole("button", { name: /from your favorites/i }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText(/Watched on/)).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /Edit log/ }),
