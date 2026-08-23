@@ -31,6 +31,7 @@ function makeRow(overrides: Partial<MediaItemRow> = {}): MediaItemRow {
     details: {},
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
+    search_tsv: null,
     ...overrides,
   };
 }

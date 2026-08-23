@@ -648,6 +648,116 @@ including mock favorites; a **real** Supabase profile renders real favorites and
 never inherits mock data. Without Supabase configured everything stays on the
 mock layer, and favorite writes/reads report a controlled `unavailable` state.
 
+## AI Discovery: hybrid catalog search (retrieval)
+
+**AI Discovery v1** adds real, catalog-backed search over the **28** curated
+`media_items` to `/explore`. It is **retrieval, not generative AI** — no
+LLM-generated text is produced — fusing Postgres full-text search (lexical) and
+pgvector cosine similarity (semantic) with **Reciprocal-Rank Fusion** (`k = 60`)
+plus **exact-title protection**. See
+[ADR 0003](./adr/0003-ai-discovery-hybrid-catalog-retrieval.md) and
+[`docs/ai-discovery-system-card.md`](./ai-discovery-system-card.md) for the
+decision and the system card.
+
+### New migrations (forward-only, after `20260814160300`)
+
+- **`20260815120000_catalog_enrich_media_items.sql`** — backfills
+  synopsis / subtitle / credits / details into the 28 curated `media_items`, and
+  adds an **IMMUTABLE** search-document function plus a **STORED generated**
+  `search_tsv` `tsvector` column with a **GIN** index. This lexical index lives
+  on the **public** catalog, so keyword search works with **zero embeddings**.
+- **`20260815120100_search_documents_and_pgvector.sql`** — enables the `vector`
+  extension in the `extensions` schema and creates the **private**
+  `public.media_search_documents` table: `embedding vector(512)` + `content` +
+  `content_hash` + provider / model / dimensions provenance + timestamps, a FK
+  to `media_items` `ON DELETE CASCADE`, and an **all-or-nothing embedding
+  CHECK**. **RLS is enabled with NO policies**, and `anon` / `authenticated` are
+  **revoked**, so raw vectors are never exposed via the Data API; only
+  `service_role` writes it. An **HNSW cosine** index backs semantic lookups.
+- **`20260815120200_search_functions.sql`** — the search functions (below).
+
+### The private embedding table + RLS posture
+
+`public.media_search_documents` is deliberately **private**. RLS is enabled but
+carries **no** policies, and EXECUTE/SELECT for `anon` and `authenticated` are
+revoked, which means the auto-generated Data API cannot read it under any role.
+Writes are performed **only** by trusted server-side processes using the
+**service-role key** (which bypasses RLS), never from a browser client. Raw
+embedding vectors therefore never leave the server: the only read path is the
+`SECURITY DEFINER` search functions, and those return **only** safe catalog
+fields + a rank — never the vector itself. Rows carry `provider` / `model` /
+`dimensions` provenance and a `content_hash`, so a model/dimension change or a
+stale document is detectable and re-embeddable.
+
+### Search functions and the SECURITY DEFINER justification
+
+- **`keyword_search`** is **`SECURITY INVOKER`** — it reads only the **public**
+  catalog (`media_items.search_tsv`), so it needs no elevated rights and RLS
+  applies normally.
+- **`semantic_search`** and **`hybrid_search`** are **`SECURITY DEFINER`** —
+  this is the **one narrow, justified exception**. They must read the
+  **private** `media_search_documents` table (which no client role may read),
+  so they run as the definer purely to reach the embedding rows. They are
+  hardened exactly like the diary/list/favorite RPCs and then some: a pinned
+  empty `search_path` with **fully schema-qualified** objects, **no dynamic
+  SQL**, **server-clamped limits**, strictly **read-only**, returning **only**
+  safe catalog fields + a rank (never the vector), with **EXECUTE revoked from
+  `public`** and granted to `anon` + `authenticated` (so signed-out visitors can
+  search). Untrusted query text is passed **only** through
+  `websearch_to_tsquery` — it is never interpolated into SQL. Hybrid fusion
+  applies RRF (`k = 60`) and **exact-title protection** so a direct title query
+  is never demoted.
+
+### The embedding pipeline
+
+- **Provider interface.** `lib/search/embedding-provider.ts` defines a small
+  internal `EmbeddingProvider`. A deterministic `FakeEmbeddingProvider` powers
+  tests / offline eval; a **server-only** OpenAI adapter uses a direct REST
+  `fetch` (no SDK dependency added — secret-free/offline builds stay
+  dependency-free — and swappable behind the interface).
+- **Canonical document.** `lib/search/canonical-document.ts` builds a **pure**,
+  **catalog-only** document (title, subtitle, kind, year, genres, credits by
+  kind, synopsis) with a stable field order + normalization, versioned
+  (`CANONICAL_DOCUMENT_VERSION = "v1"`) and folded with a **SHA-256** content
+  hash that drives **skip-unchanged** and **stale-on-change** re-embedding. It
+  contains **no user data, no secrets, and no mock-user attribution**.
+- **Config + kill switch.** `lib/search/config.ts` centralizes the model,
+  `dimensions = 512` (Matryoshka truncation for cost/storage), `RRF_K = 60`,
+  candidate limits (50), `DEFAULT_RESULT_LIMIT = 24`, `MAX_RESULT_LIMIT = 50`,
+  `MAX_QUERY_LENGTH = 200`, `EMBEDDING_TIMEOUT_MS = 2500`, and pipeline
+  batch/concurrency/retry knobs. The server-only `SEMANTIC_SEARCH_ENABLED` kill
+  switch disables semantic (keyword keeps working) when falsey; `OPENAI_API_KEY`
+  is server-only and never `NEXT_PUBLIC_`, logged, or surfaced in errors.
+- **Query execution + fallback.** A server-only service validates the query
+  (string, normalized, non-empty, ≤ 200 chars — an empty query never calls
+  OpenAI), always runs keyword, and — when semantic is enabled **and** configured
+  — requests **one** query embedding with a 2500 ms timeout then runs hybrid; on
+  timeout/failure it returns keyword results and never fails the page. Mode is
+  recorded as `hybrid` | `keyword` | `keyword_fallback`. The result limit is
+  server-clamped and the media-kind filter is allow-listed; the app (not the
+  browser) generates the trusted query embedding, and no client-supplied
+  vectors / weights / model / dimensions / SQL are accepted.
+- **Bulk embedding (`npm run embed:catalog`).** A local, service-role,
+  **manual** job embeds the catalog (skip-unchanged via the content hash,
+  re-embed when the versioned document changes). No automatic remote embedding
+  jobs and no hosted mutations exist this phase.
+
+### Privacy & logging
+
+Raw user query text is **never persisted**. Structured logs may include a
+correlation id, search mode, query **length**, embedding model, token count,
+keyword/embedding/db/total latency, result count, a safe error category, and a
+fallback reason — **never** the query itself, tokens/session, user identity, API
+responses, or vectors.
+
+> **Hosted status for AI Discovery.** The three migrations
+> (`20260815120000` / `20260815120100` / `20260815120200`) are forward-only and
+> additive. **No live semantic evaluation was run** in this environment (no
+> `OPENAI_API_KEY`), so no live semantic quality numbers are claimed; the
+> deterministic secret-free eval mode and the keyword baseline are the exercised
+> paths. Deploy the migrations and configure the server-only secret out of band
+> only when the owner chooses to (out of scope for this phase).
+
 ## Supabase clients
 
 Per current `@supabase/ssr` guidance (the deprecated `@supabase/auth-helpers-*`

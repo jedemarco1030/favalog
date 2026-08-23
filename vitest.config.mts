@@ -64,6 +64,22 @@ export default defineConfig({
         "lib/auth/errors.ts",
         "lib/auth/capability.ts",
         "lib/auth/profile.ts",
+        // AI Discovery: the pure/deterministic search core and the server
+        // search service + result mapping, all directly unit-tested (the
+        // provider boundary is mocked; ranking/metrics/pipeline logic is not).
+        "lib/search/config.ts",
+        "lib/search/canonical-document.ts",
+        "lib/search/query.ts",
+        "lib/search/rrf.ts",
+        "lib/search/embedding-errors.ts",
+        "lib/search/embedding-provider.ts",
+        "lib/search/openai-embedding-provider.ts",
+        "lib/search/retry.ts",
+        "lib/search/pipeline.ts",
+        "lib/search/log.ts",
+        "lib/search/eval/metrics.ts",
+        "lib/supabase/search.ts",
+        "lib/supabase/search-view-model.ts",
         // Interactive / conditional auth UI under test.
         "components/auth/auth-message.tsx",
         "components/auth/auth-field.tsx",
@@ -73,7 +89,6 @@ export default defineConfig({
         "components/layout/account-menu.tsx",
         "components/user/profile-avatar.tsx",
         // Interactive and conditional UI under test.
-        "components/media/explore-discovery.tsx",
         "components/media/media-card.tsx",
         "components/media/media-type-badge.tsx",
         "components/media/rating-breakdown.tsx",

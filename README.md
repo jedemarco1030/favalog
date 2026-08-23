@@ -386,6 +386,62 @@ Local defaults live in `supabase/config.toml` (`[auth]` `site_url` +
 
 ---
 
+## AI Discovery (catalog search)
+
+**AI Discovery v1** adds real, catalog-backed search to `/explore` over the
+**28** curated movies / TV / books. It is **retrieval, not generative AI** —
+every result is a real `media_items` row and **no** LLM-written text is
+produced. Two signals are fused: Postgres full-text search (lexical) and
+pgvector cosine similarity (semantic), combined with **Reciprocal-Rank Fusion**
+(`k = 60`) plus **exact-title protection** so typing a title always returns that
+title first.
+
+Full detail: [`docs/ai-discovery-system-card.md`](docs/ai-discovery-system-card.md)
+and [ADR 0003](docs/adr/0003-ai-discovery-hybrid-catalog-retrieval.md).
+
+### Features
+
+- Natural-language + keyword catalog search with a shareable `?q=` URL and
+  movie / TV / book filters, using the existing cross-media cards linking to
+  `/title/[slug]`.
+- Explicit submission (no paid request per keystroke) with loading / empty /
+  unavailable / safe-error states; raw similarity scores are never shown and the
+  feature is not advertised as AI-generated.
+- **Keyword search always works** — with no OpenAI key, the kill switch off, or
+  the semantic path unavailable, search falls back to keyword and the page never
+  fails. When Supabase is entirely unconfigured, the existing no-env public
+  browsing is preserved.
+- Embeddings use OpenAI `text-embedding-3-small` at `dimensions: 512`, generated
+  **server-side only**; raw vectors are never exposed to the browser.
+
+### New scripts
+
+```bash
+npm run embed:catalog      # Generate/refresh catalog embeddings (local; service
+                           # role; skip-unchanged / stale-on-change re-embed)
+npm run eval:search        # Run the offline search evaluation harness
+                           # (Recall@5, MRR, exact-title top-1, zero-result rate,
+                           # per-category; nonzero exit on threshold regression)
+```
+
+`embed:catalog` requires a local Supabase stack and `OPENAI_API_KEY`.
+`eval:search` runs a deterministic **secret-free** mode (fixture rankings) and a
+**keyword baseline** with no key; its **live hybrid** mode is gated on a local
+Supabase + `OPENAI_API_KEY`.
+
+### Environment variables
+
+| Variable                  | Exposure        | Notes                                                          |
+| ------------------------- | --------------- | -------------------------------------------------------------- |
+| `OPENAI_API_KEY`          | **server only** | Secret; embeds the query for semantic search. Optional.        |
+| `SEMANTIC_SEARCH_ENABLED` | **server only** | Kill switch; default enabled. Falsey disables semantic search. |
+
+Neither is required to build or run. With no `OPENAI_API_KEY` (or the kill
+switch off), catalog search runs **keyword-only**. `OPENAI_API_KEY` is never
+`NEXT_PUBLIC_`, never logged, and never sent to the browser.
+
+---
+
 ## Commands
 
 ```bash
@@ -426,6 +482,11 @@ npm run supabase:reset     # Re-apply migrations, then run seed.sql
 npm run supabase:types     # Regenerate lib/database.types.ts from the local DB
 npm run supabase:stop      # Stop the local stack
 npm run db:test            # Run pgTAP schema + RLS tests
+
+# AI Discovery (catalog search; see the AI Discovery section above)
+npm run embed:catalog      # Generate/refresh catalog embeddings (local; needs
+                           # a local Supabase stack + OPENAI_API_KEY)
+npm run eval:search        # Run the offline search evaluation harness
 ```
 
 To regenerate the placeholder artwork after editing the mock catalog:

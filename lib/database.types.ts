@@ -226,6 +226,7 @@ export type Database = {
           id: string
           kind: Database["public"]["Enums"]["media_kind"]
           poster_url: string | null
+          search_tsv: unknown
           slug: string
           source: string
           subtitle: string | null
@@ -244,6 +245,7 @@ export type Database = {
           id?: string
           kind: Database["public"]["Enums"]["media_kind"]
           poster_url?: string | null
+          search_tsv?: unknown
           slug: string
           source?: string
           subtitle?: string | null
@@ -262,6 +264,7 @@ export type Database = {
           id?: string
           kind?: Database["public"]["Enums"]["media_kind"]
           poster_url?: string | null
+          search_tsv?: unknown
           slug?: string
           source?: string
           subtitle?: string | null
@@ -271,6 +274,56 @@ export type Database = {
           year?: number
         }
         Relationships: []
+      }
+      media_search_documents: {
+        Row: {
+          content: string
+          content_hash: string
+          created_at: string
+          document_version: string
+          embedded_at: string | null
+          embedding: string | null
+          embedding_dimensions: number | null
+          embedding_model: string | null
+          embedding_provider: string | null
+          media_id: string
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          content_hash: string
+          created_at?: string
+          document_version?: string
+          embedded_at?: string | null
+          embedding?: string | null
+          embedding_dimensions?: number | null
+          embedding_model?: string | null
+          embedding_provider?: string | null
+          media_id: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          content_hash?: string
+          created_at?: string
+          document_version?: string
+          embedded_at?: string | null
+          embedding?: string | null
+          embedding_dimensions?: number | null
+          embedding_model?: string | null
+          embedding_provider?: string | null
+          media_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_search_documents_media_id_fkey"
+            columns: ["media_id"]
+            isOneToOne: true
+            referencedRelation: "media_items"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -387,6 +440,52 @@ export type Database = {
       }
       delete_diary_entry: { Args: { p_diary_entry_id: string }; Returns: Json }
       delete_list: { Args: { p_list_id: string }; Returns: Json }
+      hybrid_search: {
+        Args: {
+          p_kind?: Database["public"]["Enums"]["media_kind"]
+          p_limit?: number
+          p_query: string
+          p_query_embedding: string
+        }
+        Returns: {
+          average_rating: number
+          backdrop_url: string
+          details: Json
+          genres: string[]
+          kind: Database["public"]["Enums"]["media_kind"]
+          media_id: string
+          poster_url: string
+          rank: number
+          slug: string
+          subtitle: string
+          synopsis: string
+          title: string
+          year: number
+        }[]
+      }
+      jsonb_text_array_to_string: { Args: { p: Json }; Returns: string }
+      keyword_search: {
+        Args: {
+          p_kind?: Database["public"]["Enums"]["media_kind"]
+          p_limit?: number
+          p_query: string
+        }
+        Returns: {
+          average_rating: number
+          backdrop_url: string
+          details: Json
+          genres: string[]
+          kind: Database["public"]["Enums"]["media_kind"]
+          media_id: string
+          poster_url: string
+          rank: number
+          slug: string
+          subtitle: string
+          synopsis: string
+          title: string
+          year: number
+        }[]
+      }
       log_media: {
         Args: {
           p_contains_spoilers?: boolean
@@ -399,9 +498,41 @@ export type Database = {
         }
         Returns: Json
       }
+      media_items_search_document: {
+        Args: {
+          p_details: Json
+          p_genres: string[]
+          p_subtitle: string
+          p_synopsis: string
+          p_title: string
+        }
+        Returns: unknown
+      }
       remove_list_item: {
         Args: { p_list_id: string; p_media_slug: string }
         Returns: Json
+      }
+      semantic_search: {
+        Args: {
+          p_kind?: Database["public"]["Enums"]["media_kind"]
+          p_limit?: number
+          p_query_embedding: string
+        }
+        Returns: {
+          average_rating: number
+          backdrop_url: string
+          details: Json
+          genres: string[]
+          kind: Database["public"]["Enums"]["media_kind"]
+          media_id: string
+          poster_url: string
+          rank: number
+          slug: string
+          subtitle: string
+          synopsis: string
+          title: string
+          year: number
+        }[]
       }
       set_favorite: {
         Args: { p_is_favorite: boolean; p_media_slug: string }

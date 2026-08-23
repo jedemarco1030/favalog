@@ -327,8 +327,8 @@ exists (schema, RLS, clients) and the following are wired to it:
   end-to-end.** The full loop is now real: sign in → favorite a title → see
   the ordered shelf on the owner's real profile → unfavorite. The atomic
   idempotent `public.set_favorite(p_media_slug, p_is_favorite)` RPC (migration
-  `20260814160300_set_favorite_rpc.sql` — the **18th**, **local-only** and
-  unverified on hosted Supabase until the owner deploys it) follows the same
+  `20260814160300_set_favorite_rpc.sql` — the **18th**, now **hosted and
+  production-verified** via commit `d91894e`) follows the same
   security model as the diary and list RPCs (`SECURITY INVOKER`, pinned
   `search_path = ''`, fully schema-qualified, ownership from `auth.uid()`
   only — no client `user_id`/`media_id`/`username`/`position`/ownership
@@ -374,6 +374,43 @@ exists (schema, RLS, clients) and the following are wired to it:
   affected `/title/[slug]` and the authenticated owner's `/profile/[username]`
   (username from the auth DAL, never the client). Mock demo profiles keep their
   existing mock favorites; a real profile never inherits mock data.
+- **AI Discovery v1 — hybrid catalog search (retrieval, NOT generative) —
+  wired.** `/explore` keeps its editorial mock shelves (labelled examples) and
+  adds real `media_items`-backed search over the **28** curated titles with a
+  shareable `?q=` URL and movie/TV/book filters. Two signals are fused: Postgres
+  full-text search (lexical, a STORED `search_tsv` + GIN index on the public
+  catalog) and pgvector cosine (semantic) via **Reciprocal-Rank Fusion**
+  (`k = 60`) with **exact-title protection**. Three forward-only migrations after
+  `20260814160300` (`20260815120000` catalog enrich + `search_tsv`/GIN,
+  `20260815120100` private `media_search_documents` + pgvector,
+  `20260815120200` search functions). **Security model:** the private embedding
+  table has RLS enabled with **no** policies and `anon`/`authenticated` revoked
+  (raw vectors never leave the server; only `service_role` writes it);
+  `keyword_search` is `SECURITY INVOKER` (public catalog), while
+  `semantic_search`/`hybrid_search` are `SECURITY DEFINER` — the narrow,
+  justified exception to read the private table — hardened with a pinned empty
+  `search_path`, full schema-qualification, no dynamic SQL, clamped read-only
+  limits, safe-field-only returns, EXECUTE revoked from `public` and granted to
+  `anon`+`authenticated`; untrusted query text goes only through
+  `websearch_to_tsquery`. Embeddings use OpenAI `text-embedding-3-small` at
+  `dimensions: 512` behind an `EmbeddingProvider` interface
+  (`lib/search/`), with a deterministic `FakeEmbeddingProvider` for tests/eval
+  and a server-only REST adapter (no SDK dependency). `OPENAI_API_KEY` is
+  server-only (never `NEXT_PUBLIC_`, never logged), and a server-only
+  `SEMANTIC_SEARCH_ENABLED` **kill switch** disables semantic while keyword keeps
+  working. **Fallback:** the app generates one trusted query embedding
+  server-side with a 2500 ms timeout; on timeout/failure/disabled/unconfigured it
+  returns keyword results (mode `hybrid` | `keyword` | `keyword_fallback`) and
+  never fails the page — and with Supabase entirely unconfigured the no-env
+  public browsing is preserved. No LLM-generated text, no raw similarity scores
+  shown, no client-supplied vectors/weights/model/dimensions/SQL, and raw query
+  text is never persisted (logs carry length/mode/latency/category only). An
+  offline eval harness (`npm run eval:search`, plus `npm run embed:catalog`)
+  measures Recall@5 / MRR / exact-title top-1 / zero-result rate with a nonzero
+  exit on regression; **no live semantic quality numbers are claimed** (no
+  OpenAI key was available). See
+  [ADR 0003](docs/adr/0003-ai-discovery-hybrid-catalog-retrieval.md) and
+  [`docs/ai-discovery-system-card.md`](docs/ai-discovery-system-card.md).
 
 Everything else is still mock-data. Do **not** introduce any of the following
 without an explicit task: migrating the remaining product pages off mock data,
@@ -381,7 +418,9 @@ without an explicit task: migrating the remaining product pages off mock data,
 reordering and direct favorite-removal controls on the profile — favorite
 removal is from the title page only this phase), **curator notes**, a follows
 UI, likes (reviews or lists), follower-aware list visibility, external catalog
-APIs (TMDB, Open Library, Google Books), AI functionality, real notifications,
+APIs (TMDB, Open Library, Google Books), **generative AI** (LLM-written text,
+explanations, chat, or agents — AI Discovery v1 is retrieval only) and any AI
+beyond the wired hybrid catalog search, real notifications,
 real social relationships, real recommendation algorithms, additional OAuth
 providers, MFA/passkeys, or full account settings. Mock demo usernames
 (`jamie`, `mira`, …) still render their full mock profiles; other usernames

@@ -1,12 +1,8 @@
 import type { Metadata } from "next";
 import { Container } from "@/components/ui/container";
 import { HorizontalMediaRow } from "@/components/media/horizontal-media-row";
+import { ExploreSearch } from "@/components/media/explore-search";
 import {
-  ExploreDiscovery,
-  type ExploreFilter,
-} from "@/components/media/explore-discovery";
-import {
-  getAllMedia,
   getCriticallyAcclaimed,
   getHiddenGems,
   getNewAndNoteworthy,
@@ -14,47 +10,21 @@ import {
   getPopularMovies,
   getPopularTV,
   getTrendingMedia,
-  searchTermsFor,
 } from "@/lib/data";
 import type { MediaItem } from "@/lib/types";
+import { parseKindFilter } from "@/lib/search/query";
+import { searchCatalog } from "@/lib/supabase/search";
+import type { SearchOutcome } from "@/lib/supabase/search-view-model";
 
 export const metadata: Metadata = {
   title: "Explore",
   description:
-    "Find your next movie, show, or book. Search Favalog's catalog and browse editorial shelves across every media type.",
+    "Search Favalog's catalog by title, creator, genre, mood, or theme, and browse editorial shelves across movies, TV, and books.",
 };
-
-const VALID_FILTERS: ReadonlySet<ExploreFilter> = new Set([
-  "all",
-  "movie",
-  "tv",
-  "book",
-]);
-
-function parseFilter(raw: string | string[] | undefined): ExploreFilter {
-  const value = Array.isArray(raw) ? raw[0] : raw;
-  if (value && VALID_FILTERS.has(value as ExploreFilter)) {
-    return value as ExploreFilter;
-  }
-  return "all";
-}
 
 function parseQuery(raw: string | string[] | undefined): string {
   const value = Array.isArray(raw) ? raw[0] : raw;
   return typeof value === "string" ? value : "";
-}
-
-/**
- * Build the lowercase search haystack for each `MediaItem` up front, on the
- * server. This is cheap for a mock catalog and keeps the client from
- * needing to understand which discriminant carries which credit.
- */
-function buildHaystack(items: MediaItem[]): Record<string, string> {
-  const haystack: Record<string, string> = {};
-  for (const item of items) {
-    haystack[item.id] = searchTermsFor(item).join(" ").toLowerCase();
-  }
-  return haystack;
 }
 
 export default async function ExplorePage({
@@ -63,19 +33,17 @@ export default async function ExplorePage({
   searchParams: Promise<{ q?: string | string[]; type?: string | string[] }>;
 }) {
   const params = await searchParams;
-  const initialQuery = parseQuery(params.q);
-  const initialFilter = parseFilter(params.type);
+  const rawQuery = parseQuery(params.q).trim();
+  const initialFilter = parseKindFilter(params.type);
 
-  const allMedia = getAllMedia();
-  const haystack = buildHaystack(allMedia);
-
-  const trending = getTrendingMedia(10);
-  const popularMovies = getPopularMovies(5);
-  const popularBooks = getPopularBooks(5);
-  const popularTV = getPopularTV(5);
-  const criticallyAcclaimed = getCriticallyAcclaimed(5);
-  const newAndNoteworthy = getNewAndNoteworthy(5);
-  const hiddenGems = getHiddenGems();
+  // Real, server-side catalog search runs only when there is an active query, so
+  // no paid embedding request happens on a bare Explore visit. When Supabase is
+  // unconfigured the service returns `unavailable` and the page keeps showing the
+  // editorial shelves (no-environment public browsing is preserved).
+  const outcome: SearchOutcome | null =
+    rawQuery.length > 0
+      ? await searchCatalog({ query: rawQuery, kind: initialFilter })
+      : null;
 
   const shelves: Array<{
     key: string;
@@ -88,49 +56,52 @@ export default async function ExplorePage({
       key: "trending",
       title: "Trending now",
       description: "Movies, shows, and books rising across Favalog this week.",
-      items: trending,
+      items: getTrendingMedia(10),
       priorityFirst: true,
     },
     {
       key: "popular-movies",
       title: "Popular movies",
       description: "What people are watching on the big screen right now.",
-      items: popularMovies,
+      items: getPopularMovies(5),
     },
     {
       key: "popular-books",
       title: "Popular books",
       description: "Novels and nonfiction that keep coming back to the top.",
-      items: popularBooks,
+      items: getPopularBooks(5),
     },
     {
       key: "popular-tv",
       title: "Popular television",
       description: "Series with the strongest recent word of mouth.",
-      items: popularTV,
+      items: getPopularTV(5),
     },
     {
       key: "critically-acclaimed",
       title: "Critically acclaimed",
       description: "Highly rated across films, series, and books.",
-      items: criticallyAcclaimed,
+      items: getCriticallyAcclaimed(5),
     },
     {
       key: "new-and-noteworthy",
       title: "New & noteworthy",
       description: "Fresh releases worth a look.",
-      items: newAndNoteworthy,
+      items: getNewAndNoteworthy(5),
     },
     {
       key: "hidden-gems",
       title: "Hidden gems",
       description: "Quieter titles we think deserve a bigger audience.",
-      items: hiddenGems,
+      items: getHiddenGems(),
     },
   ];
 
   const defaultSections = (
     <div key="default-sections" className="flex flex-col gap-16">
+      <p className="text-xs font-medium uppercase tracking-wide text-foreground/40">
+        Editorial examples — curated demonstration shelves
+      </p>
       {shelves.map((shelf) => (
         <HorizontalMediaRow
           key={shelf.key}
@@ -150,14 +121,13 @@ export default async function ExplorePage({
           Explore
         </h1>
         <p className="mt-3 text-base text-foreground/70">
-          Find your next movie, show, or book.
+          Search the catalog by title, creator, genre, mood, or theme.
         </p>
       </header>
-      <ExploreDiscovery
-        items={allMedia}
-        haystack={haystack}
-        initialQuery={initialQuery}
+      <ExploreSearch
+        initialQuery={rawQuery}
         initialFilter={initialFilter}
+        outcome={outcome}
         defaultSections={defaultSections}
       />
     </Container>
