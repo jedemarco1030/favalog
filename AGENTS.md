@@ -380,11 +380,15 @@ exists (schema, RLS, clients) and the following are wired to it:
   shareable `?q=` URL and movie/TV/book filters. Two signals are fused: Postgres
   full-text search (lexical, a STORED `search_tsv` + GIN index on the public
   catalog) and pgvector cosine (semantic) via **Reciprocal-Rank Fusion**
-  (`k = 60`) with **exact-title protection**. Four forward-only migrations after
+  (`k = 60`) with **exact-title protection** and a **semantic relevance cutoff**
+  (maximum cosine distance `0.72`, minimum similarity ≈ 0.28) so typing a title
+  always returns that title first and low-quality semantic matches are rejected.
+  Five forward-only migrations after
   `20260814160300` (`20260815120000` catalog enrich + `search_tsv`/GIN,
   `20260815120100` private `media_search_documents` + pgvector,
-  `20260815120200` search functions, and `20260815120300` provenance-guarded
-  search — the **22nd** migration, **local-only** / not yet hosted). **Security
+  `20260815120200` search functions, `20260815120300` provenance-guarded
+  search, and `20260815120400` semantic similarity cutoff — the **23rd**
+  migration, **local-only** / not yet hosted). **Security
   model:** the private embedding
   table has RLS enabled with **no** policies and `anon`/`authenticated` revoked
   (raw vectors never leave the server; only `service_role` writes it);
@@ -430,15 +434,20 @@ exists (schema, RLS, clients) and the following are wired to it:
   shown, no client-supplied vectors/weights/model/dimensions/SQL, and raw query
   text is never persisted (logs carry length/mode/latency/category only). An
   offline eval harness (`npm run eval:search`, plus `npm run embed:catalog`)
-  measures Recall@5 / MRR / exact-title top-1 / zero-result rate with a nonzero
-  exit on regression and **fails closed** in `--live` mode (it verifies every
-  catalog title has a matching provider/model/dimensions/document-version
-  embedding and exits nonzero before evaluating if any fake/stale/incomplete/
-  incompatible vector remains). Its deterministic (fake) mode is a **secret-free
-  integration/regression** check of the retrieval plumbing, **not** proof of
-  semantic relevance; only a genuine `--live` OpenAI run is evidence of semantic
-  quality. **No live semantic quality numbers are claimed** (no
-  OpenAI key was available). See
+  measures Recall@5 / MRR / exact-title top-1 / positiveZeroResultRate /
+  negativeCleanRate with a nonzero exit on regression and **fails closed** in
+  `--live` mode (it verifies every catalog title has a matching
+  provider/model/dimensions/document-version embedding and exits nonzero before
+  evaluating if any fake/stale/incomplete/incompatible vector remains). Its
+  deterministic (fake) mode is a **secret-free integration/regression** check of
+  the retrieval plumbing, **not** proof of semantic relevance; only a genuine
+  `--live` OpenAI run is evidence of semantic quality.
+  **Final live metrics (local, 28-title catalog, 2026-08-25):** Recall@5 0.921,
+  MRR 1.000, exact-title top-1 1.000, positiveZeroResultRate 0.000,
+  negativeCleanRate 0.800 (hybrid). Keyword baseline: Recall@5 0.658, MRR 0.737,
+  exact-title top-1 1.000, positiveZeroResultRate 0.263, negativeCleanRate 1.000.
+  Threshold check: PASS. Hosted migrations, hosted embeddings, and production
+  semantic search remain **undeployed and unverified**. See
   [ADR 0003](docs/adr/0003-ai-discovery-hybrid-catalog-retrieval.md) and
   [`docs/ai-discovery-system-card.md`](docs/ai-discovery-system-card.md).
 

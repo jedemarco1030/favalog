@@ -27,8 +27,16 @@
 // relevance. Only a genuine --live OpenAI run is evidence of semantic quality.
 // Keys and raw vectors are never logged.
 //
-// Env: SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) and a key (SUPABASE_SECRET_KEY
-// or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY); OPENAI_API_KEY only for --live.
+// KEY SELECTION: the search + compatibility RPCs (keyword_search, semantic_search,
+// hybrid_search, compatible_embedding_count) are deliberately EXECUTABLE ONLY by
+// the `anon` and `authenticated` roles. This harness therefore uses the
+// PUBLISHABLE / anon key — the same user-facing key the app's Explore search
+// uses — never the service-role/secret key. A service-role key must not be
+// silently substituted for these user-facing RPCs.
+//
+// Env: SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) and a publishable/anon key
+// (NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, with the legacy local anon variables
+// supported as a fallback); OPENAI_API_KEY only for --live.
 
 import { existsSync } from "node:fs";
 
@@ -40,6 +48,7 @@ import {
   EMBEDDING_DIMENSIONS,
   EMBEDDING_MODEL,
   EMBEDDING_PROVIDER_ID,
+  SEMANTIC_MAX_COSINE_DISTANCE,
 } from "../lib/search/config.ts";
 import { CANONICAL_DOCUMENT_VERSION } from "../lib/search/canonical-document.ts";
 import { compareThresholds, evaluate } from "../lib/search/eval/metrics.ts";
@@ -90,7 +99,10 @@ function printSummary(label, metrics) {
     `  exact-title top-1:    ${metrics.exactTitleTop1Accuracy.toFixed(3)} ` +
       `(${metrics.exactTitleCases} cases)`,
   );
-  console.log(`  zero-result rate:     ${metrics.zeroResultRate.toFixed(3)}`);
+  console.log(
+    `  positive zero-result: ${metrics.positiveZeroResultRate.toFixed(3)} ` +
+      `(over ${metrics.scoredCases} positive cases)`,
+  );
   console.log(
     `  negative clean rate:  ${metrics.negativeCleanRate.toFixed(3)} ` +
       `(${metrics.negativeCases} cases)`,
@@ -112,15 +124,31 @@ async function main() {
 
   const url =
     process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-  const key =
-    process.env.SUPABASE_SECRET_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    "";
-  if (!url || !key) {
+  if (!url) {
     console.error(
-      "[eval:search] Missing Supabase config (SUPABASE_URL + a key). " +
-        "Start local Supabase and populate embeddings first.",
+      "[eval:search] Missing Supabase URL (SUPABASE_URL or " +
+        "NEXT_PUBLIC_SUPABASE_URL). Start local Supabase first.",
+    );
+    process.exit(1);
+  }
+
+  // Use the PUBLISHABLE / anon key: the search + compatibility RPCs are granted
+  // to anon + authenticated only, matching how the app itself calls them. Never
+  // fall back to a service-role/secret key for these user-facing RPCs.
+  const key =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.SUPABASE_PUBLISHABLE_KEY ||
+    // Legacy local anon-key variables (kept for existing local setups only).
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    "";
+  if (!key) {
+    console.error(
+      "[eval:search] Missing a publishable/anon Supabase key. Set " +
+        "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (or the legacy " +
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY). The search RPCs are executable only by " +
+        "the anon/authenticated roles, so a service-role/secret key must NOT be " +
+        "used here.",
     );
     process.exit(1);
   }
@@ -131,11 +159,15 @@ async function main() {
   if (args.live) {
     const providerResult = createOpenAIEmbeddingProvider();
     if (!providerResult.ok) {
+      // An EXPLICITLY requested live run without a key is a hard failure: the
+      // caller asked for live semantic evaluation and we cannot honestly provide
+      // it. (Run without --live for the deterministic, secret-free baseline.)
       console.error(
-        "[eval:search] SKIPPED live evaluation: OPENAI_API_KEY is not configured. " +
-          "No live semantic quality is claimed. Run without --live for the deterministic baseline.",
+        "[eval:search] FAILED: --live was requested but OPENAI_API_KEY is not " +
+          "configured. No live semantic quality can be produced. Run without " +
+          "--live for the deterministic baseline.",
       );
-      process.exit(0);
+      process.exit(1);
     }
     provider = providerResult.provider;
     mode = "live-hybrid (OpenAI)";
@@ -225,6 +257,8 @@ async function main() {
       p_document_version: identity.documentVersion,
       p_kind: c.kind ?? undefined,
       p_limit: 24,
+      // Same server-controlled semantic relevance floor the app applies.
+      p_max_distance: SEMANTIC_MAX_COSINE_DISTANCE,
     };
   });
 

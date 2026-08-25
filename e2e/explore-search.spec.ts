@@ -1,100 +1,68 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 /**
  * End-to-end coverage for Explore's catalog search (AI Discovery v1 — hybrid
  * retrieval, never generative).
  *
- * ENVIRONMENT NOTE (same model as `favorites.spec.ts` / `lists-persistence.spec.ts`)
- * ---------------------------------------------------------------------------------
- * `playwright.config.ts` builds and starts ONE production server that inherits
- * whatever Supabase configuration the machine provides. These tests are written
- * to be DETERMINISTIC and local-safe:
+ * The contract is split into two DELIBERATELY separate suites, routed to
+ * different servers by tag (see `playwright.config.ts`):
  *
- *  - They never require an OpenAI key. Semantic retrieval is a paid, optional
- *    arm; keyword search always works, and the app degrades to keyword-only
- *    when semantic is disabled/unconfigured/slow. Result assertions therefore
- *    hold for hybrid OR keyword modes.
- *  - They drive search through SHAREABLE URLs (`/explore?q=...&type=...`), the
- *    surface's own contract, rather than depending on per-keystroke behavior.
- *  - Catalog-result assertions are guarded so that with Supabase UNCONFIGURED
- *    (search returns `unavailable`) the suite still verifies the no-environment
- *    fallback (editorial shelves + search box) instead of failing.
- *  - The genuinely live semantic path is written but SKIPPED unless a real
- *    `OPENAI_API_KEY` is present.
+ *  - `@configured` — the STRICT seeded-catalog suite. Runs against the server
+ *    with Supabase configured and the local catalog seeded. Real results MUST
+ *    appear; there are no conditional/degrading branches, so a configured
+ *    regression (unavailable/error/empty/missing data) fails the suite.
+ *  - `@no-env` — the EXPLICIT no-environment suite. Runs against the server
+ *    whose Supabase variables are blanked. It asserts the intended editorial +
+ *    controlled-unavailable fallback, and rejects an arbitrary server error.
+ *
+ * No OpenAI key is required: keyword retrieval always runs, so the seeded
+ * catalog returns deterministic keyword results without the (optional, paid)
+ * semantic arm. The genuinely live semantic path is written but SKIPPED unless
+ * a real `OPENAI_API_KEY` is present.
  */
 
+/** Seeded titles surfaced by the queries below. */
 const DUNE_LINK = /Dune: Part Two \(Film, 2024\)/;
-
-/**
- * Any of Explore's controlled, non-crashing "no results" states: the catalog
- * empty state (`No matches yet.`), a safe failure (`went wrong`), or the
- * Supabase-unconfigured state (`available right now`). Which one appears depends
- * on the machine's environment and whether the local catalog is seeded, so the
- * deterministic guarantee is simply that ONE of them is shown — never a crash.
- */
-const CONTROLLED_NO_RESULTS = /No matches yet|went wrong|available right now/i;
+const AFTERGLOW_LINK = /Afterglow \(Film, 2023\)/;
 
 /**
  * The Explore page's own search box. The site-wide navigation also exposes a
- * "Search Favalog" searchbox, so every query is scoped to the page `main` to
- * stay unambiguous (matching `explore.spec.ts`).
+ * "Search Favalog" searchbox, so every query is scoped to the page `main`.
  */
-function exploreSearchbox(page: import("@playwright/test").Page) {
+function exploreSearchbox(page: Page) {
   return page
     .getByRole("main")
     .getByRole("searchbox", { name: "Search Favalog" });
 }
 
-/** Whether the current page rendered real catalog search results. */
-async function hasResults(page: import("@playwright/test").Page) {
-  return (
-    (await page
-      .getByRole("heading", { name: /Results for/ })
-      .isVisible()
-      .catch(() => false)) &&
-    (await page
-      .getByRole("listitem")
-      .first()
-      .isVisible()
-      .catch(() => false))
-  );
-}
-
-test.describe("Explore catalog search — shareable URL contract", () => {
-  test("exact-title search surfaces the matching title (or falls back to editorial browsing)", async ({
-    page,
-  }) => {
+test.describe("Explore catalog search — shareable URL contract @configured", () => {
+  test("exact-title search surfaces the matching title", async ({ page }) => {
     await page.goto("/explore?q=Dune%3A%20Part%20Two");
 
-    // The committed query is reflected back into the search box regardless of
-    // whether Supabase is configured.
+    // The committed query is reflected back into the search box.
     await expect(exploreSearchbox(page)).toHaveValue("Dune: Part Two");
 
-    if (await hasResults(page)) {
-      // Exact-title protection guarantees the matching title appears.
-      await expect(page.getByRole("link", { name: DUNE_LINK })).toBeVisible();
-    } else {
-      // Unseeded catalog / no Supabase env: a calm, controlled state, not a
-      // crash or a leaked error.
-      await expect(page.getByText(CONTROLLED_NO_RESULTS)).toBeVisible();
-    }
+    // Exact-title protection guarantees the matching title appears.
+    await expect(
+      page.getByRole("heading", { name: /Results for/ }),
+    ).toBeVisible();
+    await expect(page.getByRole("link", { name: DUNE_LINK })).toBeVisible();
   });
 
-  test("natural-language search returns at least one result (keyword or hybrid), or degrades gracefully", async ({
+  test("natural-language keyword search returns the matching title", async ({
     page,
   }) => {
-    await page.goto("/explore?q=memory%20and%20grief");
+    // All three words appear in Afterglow's seeded synopsis, so keyword-only
+    // full-text search deterministically surfaces it — no OpenAI needed.
+    await page.goto("/explore?q=composer%20coastal%20town");
 
-    await expect(exploreSearchbox(page)).toHaveValue("memory and grief");
-
-    if (await hasResults(page)) {
-      const cards = page.getByRole("listitem").getByRole("link");
-      expect(await cards.count()).toBeGreaterThan(0);
-    } else {
-      // Unseeded catalog / no Supabase env: a calm, controlled state, not a
-      // crash or a leaked error.
-      await expect(page.getByText(CONTROLLED_NO_RESULTS)).toBeVisible();
-    }
+    await expect(exploreSearchbox(page)).toHaveValue("composer coastal town");
+    await expect(
+      page.getByRole("heading", { name: /Results for/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: AFTERGLOW_LINK }),
+    ).toBeVisible();
   });
 
   test("shareable URL renders the query + filter state without any interaction", async ({
@@ -110,6 +78,8 @@ test.describe("Explore catalog search — shareable URL contract", () => {
     await expect(
       page.getByRole("button", { name: "All", exact: true }),
     ).toHaveAttribute("aria-pressed", "false");
+    // The matching result still renders under the movie filter.
+    await expect(page.getByRole("link", { name: DUNE_LINK })).toBeVisible();
   });
 
   test("selecting a media filter updates the URL and the pressed state", async ({
@@ -119,21 +89,25 @@ test.describe("Explore catalog search — shareable URL contract", () => {
 
     await page.getByRole("button", { name: "Movies", exact: true }).click();
 
-    // The filter navigates to a shareable URL carrying the `type` param.
+    // The filter navigates to a shareable URL carrying both params.
     await expect(page).toHaveURL(/[?&]type=movie/);
     await expect(page).toHaveURL(/[?&]q=Dune/);
     await expect(
       page.getByRole("button", { name: "Movies", exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("link", { name: DUNE_LINK })).toBeVisible();
   });
 });
 
-test.describe("Explore catalog search — security & product guarantees", () => {
+test.describe("Explore catalog search — security & product guarantees @configured", () => {
   test("no secret, raw vector, or 'AI-generated' claim leaks to the browser", async ({
     page,
   }) => {
-    await page.goto("/explore?q=memory%20and%20grief");
+    await page.goto("/explore?q=composer%20coastal%20town");
     await expect(exploreSearchbox(page)).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: /Results for/ }),
+    ).toBeVisible();
 
     const content = await page.content();
 
@@ -151,19 +125,51 @@ test.describe("Explore catalog search — security & product guarantees", () => 
     expect(content).not.toMatch(/AI-generated/i);
   });
 
-  test("no-environment fallback: Explore always renders editorial shelves and the search box", async ({
+  test("Explore renders editorial shelves and the search box", async ({
     page,
   }) => {
     await page.goto("/explore");
 
-    // The editorial examples label is present with or without Supabase, and the
-    // page never crashes.
     await expect(page.getByText(/Editorial examples/)).toBeVisible();
     await expect(exploreSearchbox(page)).toBeVisible();
   });
 });
 
-test.describe("Explore catalog search — live semantic (requires OpenAI)", () => {
+test.describe("Explore catalog search — no environment @no-env", () => {
+  test("editorial shelves and the search box render without Supabase", async ({
+    page,
+  }) => {
+    await page.goto("/explore");
+
+    // The editorial examples label and the search box are always present, and
+    // the page never crashes even with Supabase unconfigured.
+    await expect(page.getByText(/Editorial examples/)).toBeVisible();
+    await expect(exploreSearchbox(page)).toBeVisible();
+  });
+
+  test("search reports the controlled unavailable state, never an error", async ({
+    page,
+  }) => {
+    await page.goto("/explore?q=afterglow");
+
+    // The committed query is still reflected back into the search box.
+    await expect(exploreSearchbox(page)).toHaveValue("afterglow");
+
+    // The INTENDED fallback: the calm "search isn't available" state.
+    await expect(
+      page.getByText(/Search isn.t available right now/),
+    ).toBeVisible();
+
+    // An arbitrary server error or a real (seeded) result must NOT appear —
+    // the no-env path is a deliberate, controlled fallback only.
+    await expect(page.getByText(/Something went wrong/)).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { name: /Results for/ }),
+    ).toHaveCount(0);
+  });
+});
+
+test.describe("Explore catalog search — live semantic (requires OpenAI) @configured", () => {
   const hasOpenAi = !!process.env.OPENAI_API_KEY;
 
   test("natural-language query returns semantically relevant results", async ({

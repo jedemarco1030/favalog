@@ -27,6 +27,7 @@ import {
   EMBEDDING_MODEL,
   EMBEDDING_PROVIDER_ID,
   EMBEDDING_TIMEOUT_MS,
+  SEMANTIC_MAX_COSINE_DISTANCE,
   clampResultLimit,
   shouldAttemptSemanticSearch,
   type SearchMode,
@@ -233,6 +234,10 @@ export async function searchCatalog(
             ...EXPECTED_PROVENANCE,
             p_kind: dbKind ?? undefined,
             p_limit: limit,
+            // Server-controlled semantic relevance floor: irrelevant
+            // nearest-neighbours are filtered out before fusion so a nonsense or
+            // out-of-domain query cannot surface a confident-but-wrong hit.
+            p_max_distance: SEMANTIC_MAX_COSINE_DISTANCE,
           });
           dbMs = now() - hyStart;
 

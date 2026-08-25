@@ -16,7 +16,7 @@
 -- Run with the local stack: `npm run db:test` (requires Docker + Supabase CLI).
 
 begin;
-select plan(65);
+select plan(72);
 
 -- ---------------------------------------------------------------------------
 -- 1. Extension: pgvector installed, and living in the `extensions` schema.
@@ -128,29 +128,29 @@ select ok(
 -- semantic_search: SECURITY DEFINER, anon + authenticated, NOT public.
 select ok(
   has_function_privilege('anon',
-    'public.semantic_search(extensions.vector, text, text, integer, text, public.media_kind, integer)', 'execute'),
+    'public.semantic_search(extensions.vector, text, text, integer, text, public.media_kind, integer, real)', 'execute'),
   'anon may execute semantic_search');
 select ok(
   has_function_privilege('authenticated',
-    'public.semantic_search(extensions.vector, text, text, integer, text, public.media_kind, integer)', 'execute'),
+    'public.semantic_search(extensions.vector, text, text, integer, text, public.media_kind, integer, real)', 'execute'),
   'authenticated may execute semantic_search');
 select ok(
   not has_function_privilege('public',
-    'public.semantic_search(extensions.vector, text, text, integer, text, public.media_kind, integer)', 'execute'),
+    'public.semantic_search(extensions.vector, text, text, integer, text, public.media_kind, integer, real)', 'execute'),
   'public may not execute semantic_search');
 
 -- hybrid_search: SECURITY DEFINER, anon + authenticated, NOT public.
 select ok(
   has_function_privilege('anon',
-    'public.hybrid_search(text, extensions.vector, text, text, integer, text, public.media_kind, integer)', 'execute'),
+    'public.hybrid_search(text, extensions.vector, text, text, integer, text, public.media_kind, integer, real)', 'execute'),
   'anon may execute hybrid_search');
 select ok(
   has_function_privilege('authenticated',
-    'public.hybrid_search(text, extensions.vector, text, text, integer, text, public.media_kind, integer)', 'execute'),
+    'public.hybrid_search(text, extensions.vector, text, text, integer, text, public.media_kind, integer, real)', 'execute'),
   'authenticated may execute hybrid_search');
 select ok(
   not has_function_privilege('public',
-    'public.hybrid_search(text, extensions.vector, text, text, integer, text, public.media_kind, integer)', 'execute'),
+    'public.hybrid_search(text, extensions.vector, text, text, integer, text, public.media_kind, integer, real)', 'execute'),
   'public may not execute hybrid_search');
 
 -- compatible_embedding_count: SECURITY DEFINER, anon + authenticated, NOT public.
@@ -191,12 +191,12 @@ select is(
   'keyword_search is SECURITY INVOKER');
 select is(
   (select prosecdef from pg_proc
-    where oid = 'public.semantic_search(extensions.vector, text, text, integer, text, public.media_kind, integer)'::regprocedure),
+    where oid = 'public.semantic_search(extensions.vector, text, text, integer, text, public.media_kind, integer, real)'::regprocedure),
   true,
   'semantic_search is SECURITY DEFINER');
 select is(
   (select prosecdef from pg_proc
-    where oid = 'public.hybrid_search(text, extensions.vector, text, text, integer, text, public.media_kind, integer)'::regprocedure),
+    where oid = 'public.hybrid_search(text, extensions.vector, text, text, integer, text, public.media_kind, integer, real)'::regprocedure),
   true,
   'hybrid_search is SECURITY DEFINER');
 select is(
@@ -213,12 +213,12 @@ select ok(
   'keyword_search pins search_path to empty');
 select ok(
   (select proconfig from pg_proc
-    where oid = 'public.semantic_search(extensions.vector, text, text, integer, text, public.media_kind, integer)'::regprocedure)
+    where oid = 'public.semantic_search(extensions.vector, text, text, integer, text, public.media_kind, integer, real)'::regprocedure)
     @> array['search_path=""'],
   'semantic_search pins search_path to empty');
 select ok(
   (select proconfig from pg_proc
-    where oid = 'public.hybrid_search(text, extensions.vector, text, text, integer, text, public.media_kind, integer)'::regprocedure)
+    where oid = 'public.hybrid_search(text, extensions.vector, text, text, integer, text, public.media_kind, integer, real)'::regprocedure)
     @> array['search_path=""'],
   'hybrid_search pins search_path to empty');
 select ok(
@@ -235,14 +235,14 @@ select is(
   'keyword_search takes exactly three args');
 select is(
   (select pronargs from pg_proc
-    where oid = 'public.semantic_search(extensions.vector, text, text, integer, text, public.media_kind, integer)'::regprocedure)::int,
-  7,
-  'semantic_search takes exactly seven args');
+    where oid = 'public.semantic_search(extensions.vector, text, text, integer, text, public.media_kind, integer, real)'::regprocedure)::int,
+  8,
+  'semantic_search takes exactly eight args (incl. the relevance cutoff)');
 select is(
   (select pronargs from pg_proc
-    where oid = 'public.hybrid_search(text, extensions.vector, text, text, integer, text, public.media_kind, integer)'::regprocedure)::int,
-  8,
-  'hybrid_search takes exactly eight args');
+    where oid = 'public.hybrid_search(text, extensions.vector, text, text, integer, text, public.media_kind, integer, real)'::regprocedure)::int,
+  9,
+  'hybrid_search takes exactly nine args (incl. the relevance cutoff)');
 select is(
   (select pronargs from pg_proc
     where oid = 'public.compatible_embedding_count(text, text, integer, text)'::regprocedure)::int,
@@ -415,6 +415,78 @@ select is(
     limit 1),
   'afterglow',
   'hybrid_search still returns the keyword exact-title under a mismatched identity');
+
+-- ---------------------------------------------------------------------------
+-- 11c. Semantic relevance cutoff (p_max_distance).
+--      Seeded vectors: quiet-signal = axis-1, afterglow = axis-2. A query on
+--      axis-1 has distance 0 to quiet-signal and 1.0 (cosine) to afterglow; a
+--      query on the unrelated axis-3 has distance ~1.0 to BOTH. The cutoff must
+--      drop candidates whose distance exceeds it, BEFORE they enter fusion,
+--      while never touching keyword / exact-title results.
+-- ---------------------------------------------------------------------------
+-- Axis-1 query with a tight cutoff (0.5): the far neighbour (afterglow, dist 1.0)
+-- is dropped; the in-range neighbour (quiet-signal, dist 0) is kept.
+select is(
+  (select count(*)::int from public.semantic_search(
+     ('[1' || repeat(',0', 511) || ']')::extensions.vector,
+     'fake', 'fake', 512, 'v1', null, 5, 0.5::real)
+    where slug = 'afterglow'),
+  0,
+  'semantic_search drops a neighbour beyond the cosine cutoff');
+select is(
+  (select slug from public.semantic_search(
+     ('[1' || repeat(',0', 511) || ']')::extensions.vector,
+     'fake', 'fake', 512, 'v1', null, 5, 0.5::real)
+    limit 1),
+  'quiet-signal',
+  'semantic_search keeps the in-range neighbour under the cutoff');
+
+-- Axis-3 query: BOTH seeded vectors are ~1.0 away, so a 0.5 cutoff empties the
+-- semantic arm entirely (nearest-neighbour no longer returns something anyway).
+select is(
+  (select count(*)::int from public.semantic_search(
+     ('[0,0,1' || repeat(',0', 509) || ']')::extensions.vector,
+     'fake', 'fake', 512, 'v1', null, 5, 0.5::real)),
+  0,
+  'semantic_search returns nothing when no neighbour is within the cutoff');
+
+-- A null cutoff disables the floor (backward-compatible behaviour).
+select is(
+  (select count(*)::int from public.semantic_search(
+     ('[0,0,1' || repeat(',0', 509) || ']')::extensions.vector,
+     'fake', 'fake', 512, 'v1', null, 5, null::real)),
+  2,
+  'a null cutoff disables the relevance floor (returns all in-space rows)');
+
+-- Hybrid: a non-matching query text + far embedding + tight cutoff returns
+-- NOTHING (no keyword hit, and every semantic candidate is filtered out).
+select is(
+  (select count(*)::int from public.hybrid_search(
+     'zznomatchquery',
+     ('[0,0,1' || repeat(',0', 509) || ']')::extensions.vector,
+     'fake', 'fake', 512, 'v1', null, 5, 0.5::real)),
+  0,
+  'hybrid_search returns nothing for a non-matching query once the cutoff filters all semantic candidates');
+
+-- Hybrid: exact-title / keyword results SURVIVE the semantic cutoff. Query text
+-- 'afterglow' (exact title) with a far embedding + tight cutoff: afterglow is
+-- still first (keyword), and the semantic-only candidate is removed.
+select is(
+  (select slug from public.hybrid_search(
+     'afterglow',
+     ('[0,0,1' || repeat(',0', 509) || ']')::extensions.vector,
+     'fake', 'fake', 512, 'v1', null, 5, 0.5::real)
+    limit 1),
+  'afterglow',
+  'exact-title keyword result survives when the cutoff removes all semantic candidates');
+select is(
+  (select count(*)::int from public.hybrid_search(
+     'afterglow',
+     ('[0,0,1' || repeat(',0', 509) || ']')::extensions.vector,
+     'fake', 'fake', 512, 'v1', null, 5, 0.5::real)
+    where slug = 'quiet-signal'),
+  0,
+  'the cutoff removes the semantic-only candidate from hybrid fusion');
 
 -- ---------------------------------------------------------------------------
 -- 5. No ordinary-user access to the private embedding table (raw vectors).

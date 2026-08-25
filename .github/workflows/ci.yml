@@ -126,13 +126,111 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Run Playwright tests
-        run: npm run test:e2e
+      # Runs every suite EXCEPT the strict seeded-catalog Explore contract
+      # (the `configured` project), which requires a seeded Supabase and runs in
+      # the dedicated secret-free `explore-integration` job below.
+      #
+      # The `verify` build was produced with NO Supabase configuration, so its
+      # inlined `NEXT_PUBLIC_SUPABASE_*` values are absent — i.e. it is already a
+      # valid NO-ENV build. That single downloaded build therefore backs both:
+      #   - the `default` project (all existing specs; local-safe), and
+      #   - the `no-env` project (Explore's intentional editorial/unavailable
+      #     fallback with `isSupabaseConfigured()` false).
+      # Each `E2E_SUITE` value selects its own project set + server (see
+      # playwright.config.ts), so they run as two invocations against one build.
+      - name: Run default Playwright tests
+        run: E2E_SUITE=configured npx playwright test --project=default
+
+      - name: Run no-env Playwright tests
+        run: E2E_SUITE=no-env npx playwright test
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
+          path: playwright-report
+          retention-days: 7
+
+  # STRICT, secret-free Explore integration: the seeded-catalog contract runs
+  # against a throwaway local Supabase stack (Docker on GitHub-hosted runners),
+  # so a real, configured regression FAILS instead of silently degrading. It
+  # requires NO remote credentials and NO OpenAI key — keyword retrieval alone
+  # makes the assertions deterministic, and the semantic plumbing is exercised
+  # with deterministic FAKE embeddings.
+  #
+  # It does NOT reuse the `verify` artifact: Next inlines `NEXT_PUBLIC_SUPABASE_*`
+  # at BUILD time, and `verify` builds with NO Supabase config, so that artifact
+  # is a no-env build. This job builds its OWN Supabase-configured build (after
+  # exporting the local stack's public config) so `isSupabaseConfigured()` is
+  # true and the strict `configured` suite exercises real, seeded results.
+  explore-integration:
+    name: Explore E2E (seeded Supabase, secret-free)
+    runs-on: ubuntu-latest
+    needs: verify
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start local Supabase stack
+        run: npx supabase start
+
+      - name: Apply migrations + seed
+        # `db reset` re-applies every migration and then runs `seed.sql`
+        # (`[db.seed] enabled = true` in supabase/config.toml), guaranteeing the
+        # curated catalog (Afterglow, Dune: Part Two, …) is present.
+        run: npx supabase db reset
+
+      # Publish the local stack's public config so the `configured` server is
+      # actually Supabase-backed, and the service-role config so the fake
+      # embedding pipeline can write the private search table. No secrets are
+      # involved — these credentials belong to the throwaway local stack only.
+      - name: Export local Supabase config
+        run: |
+          npx supabase status -o env \
+            --override-name api.url=NEXT_PUBLIC_SUPABASE_URL \
+            --override-name auth.anon_key=NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY \
+            >> "$GITHUB_ENV"
+          npx supabase status -o env \
+            --override-name api.url=SUPABASE_URL \
+            --override-name auth.service_role_key=SUPABASE_SECRET_KEY \
+            >> "$GITHUB_ENV"
+
+      # Exercise the embedding plumbing with deterministic FAKE vectors (never
+      # OpenAI). Semantic retrieval stays off without OPENAI_API_KEY, so the
+      # strict tests below rely on keyword search — this only proves the pipeline
+      # runs end-to-end secret-free.
+      - name: Populate fake catalog embeddings
+        run: npm run embed:catalog -- --fake
+
+      # Build with the local stack's public config now present in the
+      # environment, so Next inlines a Supabase-CONFIGURED build for the strict
+      # `configured` suite.
+      - name: Production build (Supabase-configured)
+        run: npm run build
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run strict Explore Playwright tests
+        run: E2E_SUITE=configured npx playwright test --project=configured
+
+      - name: Stop local Supabase stack
+        if: ${{ always() }}
+        run: npx supabase stop --no-backup
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-explore-integration
           path: playwright-report
           retention-days: 7

@@ -24,19 +24,13 @@
 > removal and owner-only edit/delete list controls, and a real **Lists** section
 > on `/profile/[username]`). All **17** migrations through
 > `20260814160200_edit_delete_list_rpcs.sql` are **deployed and verified on
-> hosted Supabase**; the full list lifecycle — create / add / remove **and**
-> edit / delete (plus private non-disclosure, immutable-slug edits, and the
-> authoritative post-delete redirect to `/lists`, with the former list URL
-> correctly becoming not-found; commit `53eac02` fixed the client-navigation
-> race) — is production-verified. The **persistent favorites loop** — favorite /
-> unfavorite a title on `/title/[slug]` (the atomic idempotent
-> `public.set_favorite(...)` RPC) and see the ordered shelf on the owner's real
-> `/profile/[username]` — is now **wired end-to-end** through the database +
-> server layer (`lib/supabase/favorites.ts`, `app/title/[slug]/actions.ts`) and
-> UI (`components/media/favorite-button.tsx` via
-> `components/media/media-actions.tsx`); its migration
-> `20260814160300_set_favorite_rpc.sql` (the **18th** — `set_favorite`) is
-> **local-only** / unverified on hosted Supabase until the owner deploys it. The
+> hosted Supabase**. The **18th** (favorites), **19th–22nd** (AI Discovery
+> retrieval), and **23rd** (semantic cutoff) migrations are **local-only / not
+> yet hosted**. The AI Discovery v1 system (hybrid search over the **28**
+> curated titles) has been **evaluated locally** with a live OpenAI run
+> (2026-08-25): Recall@5 0.921, MRR 1.000, exact-title top-1 1.000,
+> positiveZeroResultRate 0.000, negativeCleanRate 0.800 (hybrid).
+> Hosted search remains undeployed and unverified. The
 > remaining product surfaces (catalog browsing, community reviews) still run on
 > the typed mock-data layer (`@/lib/data`), and **reordering, curator notes, list
 > likes, follower-aware visibility, direct favorite-removal from the profile, and
@@ -681,8 +675,13 @@ decision and the system card.
   `hybrid_search(text, vector, media_kind, integer)` overloads and recreates
   them taking the **server-supplied** expected provenance
   (`provider` / `model` / `dimensions` / `document_version`), and adds
-  `compatible_embedding_count(provider, model, dimensions, document_version)`
-  (below).
+  `compatible_embedding_count(provider, model, dimensions, document_version)`.
+- **`20260815120400_semantic_similarity_cutoff.sql`** — the **23rd** migration
+  overall (**local-only** / not yet hosted). It drops the previous
+  provenance-guarded search overloads and recreates them with a trailing
+  `p_max_distance real default null` parameter. This optional server-supplied
+  cosine distance cutoff filters out low-quality semantic candidates before RRF
+  fusion.
 
 ### The private embedding table + RLS posture
 
@@ -702,19 +701,15 @@ stale document is detectable and re-embeddable.
 - **`keyword_search`** is **`SECURITY INVOKER`** — it reads only the **public**
   catalog (`media_items.search_tsv`), so it needs no elevated rights and RLS
   applies normally.
-- **`semantic_search`** and **`hybrid_search`** are **`SECURITY DEFINER`** —
-  this is the **one narrow, justified exception**. They must read the
-  **private** `media_search_documents` table (which no client role may read),
-  so they run as the definer purely to reach the embedding rows. They are
-  hardened exactly like the diary/list/favorite RPCs and then some: a pinned
-  empty `search_path` with **fully schema-qualified** objects, **no dynamic
-  SQL**, **server-clamped limits**, strictly **read-only**, returning **only**
-  safe catalog fields + a rank (never the vector), with **EXECUTE revoked from
-  `public`** and granted to `anon` + `authenticated` (so signed-out visitors can
-  search). Untrusted query text is passed **only** through
-  `websearch_to_tsquery` — it is never interpolated into SQL. Hybrid fusion
-  applies RRF (`k = 60`) and **exact-title protection** so a direct title query
-  is never demoted.
+- **`semantic_search`** and **`hybrid_search`** are **`SECURITY DEFINER`**.
+  They read the **private** `media_search_documents` table, running as the
+  definer to reach the embedding rows. They are hardened (pinned empty
+  `search_path`, fully schema-qualified, no dynamic SQL, server-clamped limits,
+  read-only, EXECUTE revoked from `public` and granted to
+  `anon` + `authenticated`). The search overloads (migration `20260815120400`)
+  take the **server-supplied** expected provenance and an optional
+  `p_max_distance` relevance cutoff (server-supplied from
+  `SEMANTIC_MAX_COSINE_DISTANCE = 0.72`).
 - **Provenance-guarded (migration `20260815120300`).** The current
   `semantic_search` / `hybrid_search` take the **server-supplied** expected
   provenance (`provider` / `model` / `dimensions` / `document_version`) and only
@@ -787,15 +782,11 @@ keyword/embedding/db/total latency, result count, a safe error category, and a
 fallback reason — **never** the query itself, tokens/session, user identity, API
 responses, or vectors.
 
-> **Hosted status for AI Discovery.** The four migrations
-> (`20260815120000` / `20260815120100` / `20260815120200` /
-> `20260815120300`) are forward-only and additive; `20260815120300`
-> (provenance-guarded search + `compatible_embedding_count`, the **22nd**
-> migration) is **local-only** / not yet hosted. **No live semantic evaluation
-> was run** in this environment (no `OPENAI_API_KEY`), so no live semantic
-> quality numbers are claimed; the deterministic secret-free eval mode (a
-> secret-free integration/regression check of the retrieval plumbing, **not**
-> proof of semantic relevance) and the keyword baseline are the exercised paths.
+> The five AI Discovery migrations through `20260815120400` (the **23rd**
+> migration) are **local-only / not yet hosted**. A genuine live OpenAI
+> evaluation was performed locally (2026-08-25) against a local Supabase stack:
+> Recall@5 0.921, MRR 1.000, exact-title top-1 1.000, positiveZeroResultRate 0.000,
+> negativeCleanRate 0.800 (hybrid). Threshold check: PASS.
 > `npm run eval:search` **fails closed** in `--live` mode (it exits nonzero
 > before evaluating unless every catalog title has a provenance-matched
 > embedding), so only a genuine `--live` OpenAI run is evidence of semantic

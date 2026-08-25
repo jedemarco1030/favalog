@@ -47,6 +47,23 @@ No component library, no CSS-in-JS runtime, no state manager. Interactivity
 is opt-in via Client Components; every other component is a Server Component
 by default.
 
+### Local runtime
+
+This project standardizes on **Node.js 22 (LTS)** to match CI (GitHub Actions
+runs on Node 22) and the Vercel production runtime. The requirement is pinned
+in two places:
+
+- `.nvmrc` selects Node 22 — run `nvm use` (or `nvm install`) in the repo root
+  to switch your shell to the correct version.
+- `package.json` `engines` declares `"node": ">=22 <23"`, so `npm install`
+  warns if you are on a mismatched major.
+
+Node 22 provides the built-in `process.loadEnvFile()` used by the local
+tooling scripts (e.g. `scripts/embed-catalog.mjs`, `scripts/eval-search.mjs`)
+to read `.env.local`, so **no `dotenv` dependency is required**. If your shell
+resolves an older Node (for example an accidental system `/usr/local/bin/node`),
+run `nvm use` before invoking the npm scripts.
+
 ---
 
 ## Project structure
@@ -256,9 +273,9 @@ drift-checked (a second generation is byte-identical). Hosted RPC
 security/grant checks and production list behavior — including private-list
 non-disclosure, immutable-slug edits, and the authoritative post-delete redirect
 to `/lists` (the former list URL correctly becomes not-found; commit `53eac02`
-fixed the client-navigation race) — have been confirmed. The newest migration —
-`20260814160300_set_favorite_rpc.sql` (the **18th**, the favorites loop) — is
-**local-only** and unverified on hosted Supabase until the owner deploys it.
+fixed the client-navigation race) have been confirmed. Migrations for the
+favorites loop (**18th**), AI Discovery (**19th–22nd**), and the relevance
+cutoff (**23rd**) are **local-only** and unverified on hosted Supabase.
 
 Historical note (2026-08-05): an earlier pass verified the first 8 migrations
 directly via read-only schema introspection plus disposable-account auth flows
@@ -393,8 +410,9 @@ Local defaults live in `supabase/config.toml` (`[auth]` `site_url` +
 every result is a real `media_items` row and **no** LLM-written text is
 produced. Two signals are fused: Postgres full-text search (lexical) and
 pgvector cosine similarity (semantic), combined with **Reciprocal-Rank Fusion**
-(`k = 60`) plus **exact-title protection** so typing a title always returns that
-title first.
+(`k = 60`) plus **exact-title protection** and a **semantic relevance cutoff**
+(maximum cosine distance `0.72`) so typing a title always returns that title
+first and low-quality matches are rejected.
 
 Full detail: [`docs/ai-discovery-system-card.md`](docs/ai-discovery-system-card.md)
 and [ADR 0003](docs/adr/0003-ai-discovery-hybrid-catalog-retrieval.md).
@@ -428,8 +446,8 @@ npm run embed:catalog      # Generate/refresh catalog embeddings (local; service
                            # provider / model / dimensions / document version /
                            # content — changes; --force re-embeds everything)
 npm run eval:search        # Run the offline search evaluation harness
-                           # (Recall@5, MRR, exact-title top-1, zero-result rate,
-                           # per-category; nonzero exit on threshold regression)
+                           # (Recall@5, MRR, exact-title top-1, positive zero-result
+                           # rate, negative clean rate, per-category; nonzero exit)
 ```
 
 `embed:catalog` requires a local Supabase stack and `OPENAI_API_KEY`. A stored
@@ -438,13 +456,13 @@ version, **and** content hash all match what the current run would produce (so a
 later real OpenAI run automatically re-embeds rows left by the deterministic
 fake provider); `--force` is a recovery escape hatch, not a substitute for that
 automatic detection. `eval:search` runs a deterministic **secret-free** mode
-(fixture rankings) and a **keyword baseline** with no key; its **live hybrid**
-mode is gated on a local Supabase + `OPENAI_API_KEY`. The deterministic mode is
-a secret-free integration/regression check of the retrieval plumbing, **not**
-proof of semantic relevance — only a genuine `--live` OpenAI run is evidence of
-semantic quality, and in `--live` mode the harness **fails closed**, exiting
-nonzero before evaluating if any fake / stale / incomplete / incompatible vector
-remains rather than reporting metrics for a mismatched corpus.
+(fixtures) and a **keyword baseline**; its **live hybrid** mode is gated on a local
+Supabase + `OPENAI_API_KEY`. It enforces quality gates: `minRecallAt5 = 0.55`,
+`minMrr = 0.6`, `minExactTitleTop1Accuracy = 1.0`, `maxPositiveZeroResultRate = 0.3`,
+and `minNegativeCleanRate = 0.8`. In `--live` mode it **fails closed** if any
+stale vector remains. **Live metrics (local, 28-title catalog, 2026-08-25):**
+Recall@5 0.921, MRR 1.000, exact-title top-1 1.000, positiveZeroResultRate 0.000,
+negativeCleanRate 0.800 (hybrid). Threshold check: PASS.
 
 ### Environment variables
 

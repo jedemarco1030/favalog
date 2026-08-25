@@ -170,24 +170,80 @@ export const GOLDEN_CASES: GoldenCase[] = [
     rationale: "TV creator credit.",
     tags: ["person"],
   },
-  // --- Negative --------------------------------------------------------------
+  // --- Negative controls -----------------------------------------------------
+  // Human-reviewed queries with NO defensible catalog match. A confident result
+  // for any of these is WRONG: nearest-neighbour search will always find a
+  // closest vector, so these exercise the semantic relevance cutoff (plus the
+  // keyword + exact-title contracts) doing their job. Each covers a distinct
+  // failure mode. NOTE (small-catalog limitation): with only 28 curated titles
+  // this is a deliberately small, coarse negative set — it demonstrates the
+  // rejection behaviour rather than proving a finely-fit decision boundary.
   {
     id: "negative-zombies",
     query: "zombie apocalypse horror survival",
     relevantSlugs: [],
-    rationale: "No catalog title matches; a confident match would be wrong.",
-    tags: ["negative"],
+    rationale:
+      "Clearly unavailable genre/premise: the catalog carries no zombie/horror survival title, so a confident match would be wrong.",
+    tags: ["negative", "unavailable-media"],
+  },
+  {
+    id: "negative-unavailable-title",
+    query: "The Lord of the Rings: The Return of the King",
+    relevantSlugs: [],
+    rationale:
+      "A famous, specific title Favalog does not carry. Exact-title protection must not fabricate a match, and no neighbour is a defensible substitute.",
+    tags: ["negative", "unavailable-media", "exact-title-absent"],
+  },
+  {
+    id: "negative-out-of-domain-taxes",
+    query: "how to file my income taxes online this year",
+    relevantSlugs: [],
+    rationale:
+      "Out-of-domain: a how-to/finance request has nothing to do with the movies/TV/books catalog.",
+    tags: ["negative", "out-of-domain"],
+  },
+  {
+    id: "negative-out-of-domain-espresso",
+    query: "best espresso machine for a home barista under 500 dollars",
+    relevantSlugs: [],
+    rationale:
+      "Out-of-domain product-shopping query with no defensible catalog match.",
+    tags: ["negative", "out-of-domain"],
+  },
+  {
+    id: "negative-gibberish",
+    query: "asdf qwerty zxcvbnm plmoknijb wxyz",
+    relevantSlugs: [],
+    rationale:
+      "Nonsense/gibberish: no lexical match and no meaningful embedding neighbour should clear the relevance floor.",
+    tags: ["negative", "gibberish"],
   },
 ];
 
 /**
  * Committed quality gates. A run exits non-zero if any is regressed. Tuned to
- * the deterministic (fake-embedding) baseline over the current catalog; live
- * OpenAI hybrid is expected to meet or exceed these.
+ * the deterministic (fake-embedding) baseline over the current catalog so the
+ * secret-free regression check always enforces them; the live OpenAI hybrid is
+ * expected to meet or exceed these.
+ *
+ * Note the two separate zero-result gates (see {@link EvalThresholds}):
+ * `maxPositiveZeroResultRate` fails when a query that SHOULD match returns
+ * nothing, while `minNegativeCleanRate` fails when a query that should NOT match
+ * starts returning something (i.e. the semantic relevance cutoff / keyword /
+ * exact-title rejection regressed). In deterministic mode the semantic arm's
+ * fake vectors are (correctly) filtered out by the cosine cutoff, so hybrid
+ * behaves like the KEYWORD baseline: negatives stay clean via lexical
+ * non-matching, but purely natural-language positive queries with no lexical
+ * overlap can miss. `maxPositiveZeroResultRate` is therefore set to the keyword
+ * baseline's floor (which the deterministic gate must always meet); the live
+ * OpenAI hybrid recovers most of those misses via the semantic arm and is
+ * expected to sit far below this ceiling — that is where the cutoff earns its
+ * keep on real vectors.
  */
 export const DEFAULT_THRESHOLDS: EvalThresholds = {
   minRecallAt5: 0.55,
   minMrr: 0.6,
   minExactTitleTop1Accuracy: 1.0,
-  maxZeroResultRate: 0.12,
+  maxPositiveZeroResultRate: 0.3,
+  minNegativeCleanRate: 0.8,
 };

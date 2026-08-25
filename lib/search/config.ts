@@ -45,6 +45,44 @@ export const EMBEDDING_PROVIDER_ID = "openai" as const;
 export const RRF_K = 60 as const;
 
 /**
+ * Semantic relevance cutoff — the maximum cosine DISTANCE a stored catalog
+ * vector may have from the query embedding to still be considered a semantic
+ * candidate. pgvector's `<=>` operator returns cosine distance in `[0, 2]`
+ * (`distance = 1 - cosineSimilarity` for the unit vectors we store), so this
+ * value is equivalently a MINIMUM cosine similarity of
+ * `1 - SEMANTIC_MAX_COSINE_DISTANCE` (≈ {@link SEMANTIC_MIN_COSINE_SIMILARITY}).
+ *
+ * WHY: nearest-neighbour search always returns *something* — the closest vector
+ * even when nothing is genuinely relevant. Without a floor, an out-of-domain or
+ * nonsense query ("zombie apocalypse", "asdf qwerty") would still surface a
+ * confident-looking-but-wrong semantic hit. Applying this cutoff BEFORE fusion
+ * means such candidates never enter RRF, so the semantic arm can legitimately
+ * return nothing. Keyword matches and exact-title protection are unaffected.
+ *
+ * This is SERVER-CONTROLLED (a constant here, passed into the SQL functions as
+ * `p_max_distance`); it is never accepted from the client, and neither the raw
+ * vectors nor the underlying distances are ever exposed in the UI.
+ *
+ * CALIBRATION: for `text-embedding-3-small` at 512 dims, genuinely relevant
+ * catalog pairs in the offline live evaluation cluster well below this distance
+ * while unrelated/negative queries sit above it. The value is deliberately
+ * conservative to preserve recall on the small (28-title) catalog; it is tuned
+ * against the golden-dataset evaluation (`npm run eval:search -- --live`), not a
+ * single example. SMALL-CATALOG LIMITATION: with only 28 titles this threshold
+ * is a coarse floor, not a finely-fit boundary — it should be re-calibrated if
+ * the catalog, model, or dimensions change.
+ */
+export const SEMANTIC_MAX_COSINE_DISTANCE = 0.72 as const;
+
+/**
+ * Equivalent minimum cosine similarity implied by
+ * {@link SEMANTIC_MAX_COSINE_DISTANCE}. Exported for documentation and tests;
+ * the SQL functions receive the distance form.
+ */
+export const SEMANTIC_MIN_COSINE_SIMILARITY = (1 -
+  SEMANTIC_MAX_COSINE_DISTANCE) as number;
+
+/**
  * How many candidates each retrieval arm (keyword, semantic) contributes to the
  * fusion pool before the final limit is applied. Bounded to keep the database
  * work — and latency — predictable.

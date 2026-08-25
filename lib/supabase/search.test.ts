@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EmbeddingError } from "@/lib/search/embedding-errors";
+import { SEMANTIC_MAX_COSINE_DISTANCE } from "@/lib/search/config";
 import {
   FakeEmbeddingProvider,
   type EmbeddingProvider,
@@ -186,6 +187,9 @@ describe("searchCatalog", () => {
     expect(args.p_model).toBe("text-embedding-3-small");
     expect(args.p_dimensions).toBe(512);
     expect(args.p_document_version).toBe("v1");
+    // The server-controlled semantic relevance cutoff is always applied so
+    // irrelevant nearest-neighbours are filtered out before fusion.
+    expect(args.p_max_distance).toBe(SEMANTIC_MAX_COSINE_DISTANCE);
   });
 
   it("stays keyword-only (no embedding) when no compatible corpus exists", async () => {

@@ -125,12 +125,47 @@ describe("evaluate", () => {
     expect(metrics.exactTitleTop1Accuracy).toBe(1);
   });
 
-  it("computes zero-result rate and negative-clean rate", () => {
+  it("separates positive-query zero-result rate from negative rejection", () => {
     const metrics = evaluate(buildResults());
-    // Two of four cases returned nothing (genre + negative).
-    expect(metrics.zeroResultRate).toBeCloseTo(2 / 4, 6);
+    // Only the POSITIVE (scored) cases count toward positiveZeroResultRate:
+    // exact + theme returned results, genre returned nothing -> 1/3. The
+    // negative case returning nothing must NOT inflate this failure metric.
+    expect(metrics.positiveZeroResultRate).toBeCloseTo(1 / 3, 6);
     // The single negative case correctly returned nothing.
     expect(metrics.negativeCleanRate).toBe(1);
+  });
+
+  it("counts a negative case that leaks a result against the clean rate only", () => {
+    const results: CaseResult[] = [
+      // A positive case that DOES return its relevant hit.
+      {
+        case: makeCase({ id: "pos", relevantSlugs: ["a"], tags: ["theme"] }),
+        retrieved: ["a"],
+      },
+      // Two negatives: one clean (no results), one that wrongly leaks a hit.
+      {
+        case: makeCase({
+          id: "neg-clean",
+          relevantSlugs: [],
+          tags: ["negative"],
+        }),
+        retrieved: [],
+      },
+      {
+        case: makeCase({
+          id: "neg-leak",
+          relevantSlugs: [],
+          tags: ["negative"],
+        }),
+        retrieved: ["something-irrelevant"],
+      },
+    ];
+    const metrics = evaluate(results);
+    // The positive case found its hit, so no positive miss.
+    expect(metrics.positiveZeroResultRate).toBe(0);
+    // One of two negatives stayed clean.
+    expect(metrics.negativeCases).toBe(2);
+    expect(metrics.negativeCleanRate).toBeCloseTo(1 / 2, 6);
   });
 
   it("rolls up per-tag metrics for scored tags", () => {
@@ -165,8 +200,8 @@ describe("compareThresholds", () => {
     mrr: 0.8,
     exactTitleCases: 1,
     exactTitleTop1Accuracy: 1,
-    zeroResultRate: 0.05,
-    negativeCases: 0,
+    positiveZeroResultRate: 0.05,
+    negativeCases: 2,
     negativeCleanRate: 1,
     perTag: {},
   };
@@ -175,7 +210,8 @@ describe("compareThresholds", () => {
     minRecallAt5: 0.7,
     minMrr: 0.6,
     minExactTitleTop1Accuracy: 0.9,
-    maxZeroResultRate: 0.1,
+    maxPositiveZeroResultRate: 0.1,
+    minNegativeCleanRate: 0.8,
   };
 
   it("passes with no failures when all gates are met", () => {
@@ -184,20 +220,41 @@ describe("compareThresholds", () => {
     expect(result.failures).toEqual([]);
   });
 
-  it("fails with a non-empty failures list when gates are violated", () => {
+  it("fails with a non-empty failures list when every gate is violated", () => {
     const result = compareThresholds(
       {
         ...passingMetrics,
         recallAt5: 0.5,
         mrr: 0.4,
         exactTitleTop1Accuracy: 0.5,
-        zeroResultRate: 0.5,
+        positiveZeroResultRate: 0.5,
+        negativeCleanRate: 0.1,
       },
       thresholds,
     );
     expect(result.pass).toBe(false);
-    expect(result.failures.length).toBeGreaterThan(0);
-    // Every gate contributed a failure line.
-    expect(result.failures).toHaveLength(4);
+    // All five gates contributed a failure line.
+    expect(result.failures).toHaveLength(5);
+  });
+
+  it("fails specifically when negative-query rejection regresses", () => {
+    // Everything else passes; only the negative clean rate drops below the gate.
+    const result = compareThresholds(
+      { ...passingMetrics, negativeCleanRate: 0.5 },
+      thresholds,
+    );
+    expect(result.pass).toBe(false);
+    expect(result.failures).toHaveLength(1);
+    expect(result.failures[0]).toContain("negativeCleanRate");
+  });
+
+  it("fails specifically when positive queries start missing", () => {
+    const result = compareThresholds(
+      { ...passingMetrics, positiveZeroResultRate: 0.9 },
+      thresholds,
+    );
+    expect(result.pass).toBe(false);
+    expect(result.failures).toHaveLength(1);
+    expect(result.failures[0]).toContain("positiveZeroResultRate");
   });
 });

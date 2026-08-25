@@ -54,9 +54,20 @@ export interface EvalMetrics {
   mrr: number;
   exactTitleCases: number;
   exactTitleTop1Accuracy: number;
-  zeroResultRate: number;
+  /**
+   * Fraction of POSITIVE (scored) cases that returned NO results. A positive
+   * query is expected to find something, so a zero result here is a FAILURE.
+   * Deliberately kept separate from {@link negativeCleanRate}: a negative query
+   * returning nothing is a SUCCESS, and the two must never be conflated.
+   */
+  positiveZeroResultRate: number;
   negativeCases: number;
-  /** Fraction of negative cases that correctly returned no results. */
+  /**
+   * Fraction of negative cases that correctly returned NO results. A negative
+   * query has no defensible catalog match, so returning nothing is the desired
+   * behaviour and a higher rate is BETTER (this is the semantic cutoff /
+   * exact-title / keyword contract working as intended).
+   */
   negativeCleanRate: number;
   perTag: Record<string, TagMetrics>;
   latency?: LatencySummary;
@@ -129,7 +140,12 @@ export function evaluate(results: readonly CaseResult[], k = 5): EvalMetrics {
     isTop1Relevant(r.retrieved, new Set(r.case.relevantSlugs)) ? 1 : 0,
   );
 
-  const zeroResults = results.filter((r) => r.retrieved.length === 0).length;
+  // Positive-query zero-result rate: only POSITIVE (scored) cases where an empty
+  // result is a genuine miss. Negative cases returning nothing are handled by
+  // negativeCleanRate below and are never counted as failures here.
+  const positiveZeroResults = scored.filter(
+    (r) => r.retrieved.length === 0,
+  ).length;
   const negativeClean = negatives.filter(
     (r) => r.retrieved.length === 0,
   ).length;
@@ -182,7 +198,8 @@ export function evaluate(results: readonly CaseResult[], k = 5): EvalMetrics {
     mrr: mean(rrs),
     exactTitleCases: exactTitle.length,
     exactTitleTop1Accuracy: mean(exactTop1),
-    zeroResultRate: results.length === 0 ? 0 : zeroResults / results.length,
+    positiveZeroResultRate:
+      scored.length === 0 ? 0 : positiveZeroResults / scored.length,
     negativeCases: negatives.length,
     negativeCleanRate:
       negatives.length === 0 ? 1 : negativeClean / negatives.length,
@@ -196,7 +213,16 @@ export interface EvalThresholds {
   minRecallAt5: number;
   minMrr: number;
   minExactTitleTop1Accuracy: number;
-  maxZeroResultRate: number;
+  /** Max fraction of POSITIVE cases allowed to return nothing (a miss). */
+  maxPositiveZeroResultRate: number;
+  /**
+   * Min fraction of NEGATIVE cases that must correctly return nothing. This is
+   * the gate that fails when negative-query rejection regresses (e.g. the
+   * semantic cutoff is removed and nonsense queries start matching). Target
+   * >= 0.80 so the harness does not accept a system that always returns
+   * something merely because a vector is closest.
+   */
+  minNegativeCleanRate: number;
 }
 
 /** Compare metrics to thresholds; returns pass + human-readable failures. */
@@ -218,9 +244,14 @@ export function compareThresholds(
       `exactTitleTop1 ${metrics.exactTitleTop1Accuracy.toFixed(3)} < ${thresholds.minExactTitleTop1Accuracy}`,
     );
   }
-  if (metrics.zeroResultRate > thresholds.maxZeroResultRate) {
+  if (metrics.positiveZeroResultRate > thresholds.maxPositiveZeroResultRate) {
     failures.push(
-      `zeroResultRate ${metrics.zeroResultRate.toFixed(3)} > ${thresholds.maxZeroResultRate}`,
+      `positiveZeroResultRate ${metrics.positiveZeroResultRate.toFixed(3)} > ${thresholds.maxPositiveZeroResultRate}`,
+    );
+  }
+  if (metrics.negativeCleanRate < thresholds.minNegativeCleanRate) {
+    failures.push(
+      `negativeCleanRate ${metrics.negativeCleanRate.toFixed(3)} < ${thresholds.minNegativeCleanRate}`,
     );
   }
   return { pass: failures.length === 0, failures };

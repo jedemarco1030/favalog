@@ -455,6 +455,7 @@ export type Database = {
           p_document_version: string
           p_kind?: Database["public"]["Enums"]["media_kind"]
           p_limit?: number
+          p_max_distance?: number
           p_model: string
           p_provider: string
           p_query: string
@@ -531,6 +532,7 @@ export type Database = {
           p_document_version: string
           p_kind?: Database["public"]["Enums"]["media_kind"]
           p_limit?: number
+          p_max_distance?: number
           p_model: string
           p_provider: string
           p_query_embedding: string
