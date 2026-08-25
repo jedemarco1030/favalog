@@ -62,10 +62,38 @@ function makeRecordingProvider(): {
 const retry = { sleep: async () => {}, random: () => 0 };
 const baseOptions = { documentVersion: "v1", retry } as const;
 
+/** The provider identity the fake-backed runs produce (provider/model/dims). */
+const FAKE = new FakeEmbeddingProvider();
+const expectedIdentity = {
+  provider: FAKE.id,
+  model: FAKE.model,
+  dimensions: FAKE.dimensions,
+  documentVersion: "v1",
+} as const;
+
+/** Build an existing row that fully matches {@link expectedIdentity} by default. */
+function makeExisting(
+  overrides: Partial<ExistingEmbedding> = {},
+): ExistingEmbedding {
+  return {
+    contentHash: "same",
+    hasEmbedding: true,
+    provider: FAKE.id,
+    model: FAKE.model,
+    dimensions: FAKE.dimensions,
+    documentVersion: "v1",
+    ...overrides,
+  };
+}
+
 describe("selectStale", () => {
   it("marks a record with no existing row as stale", () => {
     const record = makeRecord({ mediaId: "m1" });
-    const { toEmbed, unchanged } = selectStale([record], new Map());
+    const { toEmbed, unchanged } = selectStale(
+      [record],
+      new Map(),
+      expectedIdentity,
+    );
     expect(toEmbed).toEqual([record]);
     expect(unchanged).toEqual([]);
   });
@@ -73,29 +101,107 @@ describe("selectStale", () => {
   it("marks a record whose content hash differs as stale", () => {
     const record = makeRecord({ mediaId: "m1", contentHash: "new" });
     const existing = new Map<string, ExistingEmbedding>([
-      ["m1", { contentHash: "old", hasEmbedding: true }],
+      ["m1", makeExisting({ contentHash: "old" })],
     ]);
-    const { toEmbed } = selectStale([record], existing);
+    const { toEmbed } = selectStale([record], existing, expectedIdentity);
     expect(toEmbed).toEqual([record]);
   });
 
   it("marks a record whose existing row lacks an embedding as stale", () => {
     const record = makeRecord({ mediaId: "m1", contentHash: "same" });
     const existing = new Map<string, ExistingEmbedding>([
-      ["m1", { contentHash: "same", hasEmbedding: false }],
+      [
+        "m1",
+        makeExisting({
+          hasEmbedding: false,
+          provider: null,
+          model: null,
+          dimensions: null,
+          documentVersion: null,
+        }),
+      ],
     ]);
-    const { toEmbed } = selectStale([record], existing);
+    const { toEmbed } = selectStale([record], existing, expectedIdentity);
     expect(toEmbed).toEqual([record]);
   });
 
-  it("treats an equal hash with an existing embedding as unchanged", () => {
+  it("marks a fake-provider row stale when the expected provider is OpenAI", () => {
     const record = makeRecord({ mediaId: "m1", contentHash: "same" });
     const existing = new Map<string, ExistingEmbedding>([
-      ["m1", { contentHash: "same", hasEmbedding: true }],
+      ["m1", makeExisting({ provider: "fake", model: "fake-model" })],
     ]);
-    const { toEmbed, unchanged } = selectStale([record], existing);
+    const { toEmbed } = selectStale([record], existing, {
+      provider: "openai",
+      model: "text-embedding-3-small",
+      dimensions: 512,
+      documentVersion: "v1",
+    });
+    expect(toEmbed).toEqual([record]);
+  });
+
+  it("marks a record stale when only the provider differs", () => {
+    const record = makeRecord({ mediaId: "m1", contentHash: "same" });
+    const existing = new Map<string, ExistingEmbedding>([
+      ["m1", makeExisting({ provider: "other" })],
+    ]);
+    const { toEmbed } = selectStale([record], existing, expectedIdentity);
+    expect(toEmbed).toEqual([record]);
+  });
+
+  it("marks a record stale when only the model differs", () => {
+    const record = makeRecord({ mediaId: "m1", contentHash: "same" });
+    const existing = new Map<string, ExistingEmbedding>([
+      ["m1", makeExisting({ model: "some-other-model" })],
+    ]);
+    const { toEmbed } = selectStale([record], existing, expectedIdentity);
+    expect(toEmbed).toEqual([record]);
+  });
+
+  it("marks a record stale when only the dimensions differ", () => {
+    const record = makeRecord({ mediaId: "m1", contentHash: "same" });
+    const existing = new Map<string, ExistingEmbedding>([
+      ["m1", makeExisting({ dimensions: 1536 })],
+    ]);
+    const { toEmbed } = selectStale([record], existing, expectedIdentity);
+    expect(toEmbed).toEqual([record]);
+  });
+
+  it("marks a record stale when only the document version differs", () => {
+    const record = makeRecord({ mediaId: "m1", contentHash: "same" });
+    const existing = new Map<string, ExistingEmbedding>([
+      ["m1", makeExisting({ documentVersion: "v0" })],
+    ]);
+    const { toEmbed } = selectStale([record], existing, expectedIdentity);
+    expect(toEmbed).toEqual([record]);
+  });
+
+  it("treats a complete, exact identity match as unchanged", () => {
+    const record = makeRecord({ mediaId: "m1", contentHash: "same" });
+    const existing = new Map<string, ExistingEmbedding>([
+      ["m1", makeExisting({ contentHash: "same" })],
+    ]);
+    const { toEmbed, unchanged } = selectStale(
+      [record],
+      existing,
+      expectedIdentity,
+    );
     expect(toEmbed).toEqual([]);
     expect(unchanged).toEqual([record]);
+  });
+
+  it("re-embeds an otherwise-fresh row when force is set", () => {
+    const record = makeRecord({ mediaId: "m1", contentHash: "same" });
+    const existing = new Map<string, ExistingEmbedding>([
+      ["m1", makeExisting({ contentHash: "same" })],
+    ]);
+    const { toEmbed, unchanged } = selectStale(
+      [record],
+      existing,
+      expectedIdentity,
+      { force: true },
+    );
+    expect(toEmbed).toEqual([record]);
+    expect(unchanged).toEqual([]);
   });
 });
 
@@ -153,7 +259,7 @@ describe("runEmbeddingPipeline", () => {
   it("skips unchanged records", async () => {
     const record = makeRecord({ mediaId: "m1", contentHash: "same" });
     const existing = new Map<string, ExistingEmbedding>([
-      ["m1", { contentHash: "same", hasEmbedding: true }],
+      ["m1", makeExisting({ contentHash: "same" })],
     ]);
     const { store, upserts } = makeStore(existing);
 
@@ -168,6 +274,89 @@ describe("runEmbeddingPipeline", () => {
     expect(report.unchanged).toBe(1);
     expect(report.updated).toBe(0);
     expect(upserts).toHaveLength(0);
+  });
+
+  it("is idempotent: a second run with identical provenance embeds nothing", async () => {
+    const records = [
+      makeRecord({ mediaId: "m1", slug: "a", contentHash: "h1" }),
+      makeRecord({ mediaId: "m2", slug: "b", contentHash: "h2" }),
+    ];
+    const provider = new FakeEmbeddingProvider();
+
+    // First run against an empty store: everything is embedded and recorded.
+    const existing = new Map<string, ExistingEmbedding>();
+    const store: EmbeddingStore = {
+      loadExisting: async () => existing,
+      upsert: async (row) => {
+        existing.set(row.mediaId, {
+          contentHash: row.contentHash,
+          hasEmbedding: true,
+          provider: row.provider,
+          model: row.model,
+          dimensions: row.dimensions,
+          documentVersion: row.documentVersion,
+        });
+      },
+    };
+
+    const first = await runEmbeddingPipeline(
+      records,
+      store,
+      provider,
+      baseOptions,
+    );
+    expect(first.updated).toBe(2);
+
+    // Second identical run: same provider/model/dimensions/version/content →
+    // zero embedding calls and zero writes.
+    const { provider: recording, calls } = makeRecordingProvider();
+    const secondUpserts: EmbeddingUpsert[] = [];
+    const second = await runEmbeddingPipeline(
+      records,
+      {
+        loadExisting: async () => existing,
+        upsert: async (row) => {
+          secondUpserts.push(row);
+        },
+      },
+      recording,
+      baseOptions,
+    );
+
+    expect(second.attempted).toBe(0);
+    expect(second.updated).toBe(0);
+    expect(second.unchanged).toBe(2);
+    expect(calls).toHaveLength(0);
+    expect(secondUpserts).toHaveLength(0);
+  });
+
+  it("re-embeds every row when the expected provider changes (fake → openai)", async () => {
+    const records = [
+      makeRecord({ mediaId: "m1", slug: "a", contentHash: "h1" }),
+      makeRecord({ mediaId: "m2", slug: "b", contentHash: "h2" }),
+    ];
+    // Store already holds complete FAKE-provider rows with matching content.
+    const existing = new Map<string, ExistingEmbedding>([
+      ["m1", makeExisting({ contentHash: "h1" })],
+      ["m2", makeExisting({ contentHash: "h2" })],
+    ]);
+    const { store, upserts } = makeStore(existing);
+
+    // A provider advertising the OpenAI identity marks every fake row stale.
+    const openaiLike: EmbeddingProvider = {
+      id: "openai",
+      model: "text-embedding-3-small",
+      dimensions: 512,
+      embed: async (texts) => new FakeEmbeddingProvider().embed(texts),
+    };
+
+    const report = await runEmbeddingPipeline(records, store, openaiLike, {
+      ...baseOptions,
+    });
+
+    expect(report.attempted).toBe(2);
+    expect(report.updated).toBe(2);
+    expect(upserts.every((row) => row.provider === "openai")).toBe(true);
   });
 
   it("accumulates token usage from the provider", async () => {

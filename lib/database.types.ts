@@ -428,6 +428,15 @@ export type Database = {
         Args: { p_list_id: string; p_media_slug: string }
         Returns: Json
       }
+      compatible_embedding_count: {
+        Args: {
+          p_dimensions: number
+          p_document_version: string
+          p_model: string
+          p_provider: string
+        }
+        Returns: number
+      }
       create_list: {
         Args: {
           p_description?: string
@@ -442,8 +451,12 @@ export type Database = {
       delete_list: { Args: { p_list_id: string }; Returns: Json }
       hybrid_search: {
         Args: {
+          p_dimensions: number
+          p_document_version: string
           p_kind?: Database["public"]["Enums"]["media_kind"]
           p_limit?: number
+          p_model: string
+          p_provider: string
           p_query: string
           p_query_embedding: string
         }
@@ -514,8 +527,12 @@ export type Database = {
       }
       semantic_search: {
         Args: {
+          p_dimensions: number
+          p_document_version: string
           p_kind?: Database["public"]["Enums"]["media_kind"]
           p_limit?: number
+          p_model: string
+          p_provider: string
           p_query_embedding: string
         }
         Returns: {

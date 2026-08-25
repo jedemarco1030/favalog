@@ -23,11 +23,15 @@
 
 import {
   DEFAULT_RESULT_LIMIT,
+  EMBEDDING_DIMENSIONS,
+  EMBEDDING_MODEL,
+  EMBEDDING_PROVIDER_ID,
   EMBEDDING_TIMEOUT_MS,
   clampResultLimit,
   shouldAttemptSemanticSearch,
   type SearchMode,
 } from "@/lib/search/config";
+import { CANONICAL_DOCUMENT_VERSION } from "@/lib/search/canonical-document";
 import { createOpenAIEmbeddingProvider } from "@/lib/search/openai-embedding-provider";
 import type { EmbeddingProvider } from "@/lib/search/embedding-provider";
 import {
@@ -54,16 +58,35 @@ import {
   type SearchRpcRow,
 } from "./search-view-model";
 
-/** The minimal Supabase surface the service needs (an `rpc` caller). */
+/**
+ * The minimal Supabase surface the service needs (an `rpc` caller).
+ *
+ * `data` is deliberately `unknown` because the service calls both table-returning
+ * functions (keyword/hybrid → rows) and a scalar-returning one
+ * (`compatible_embedding_count` → a number); each call site narrows it.
+ */
 interface SearchClient {
   rpc: (
     fn: string,
     args: Record<string, unknown>,
   ) => Promise<{
-    data: SearchRpcRow[] | null;
+    data: unknown;
     error: { message?: string } | null;
   }>;
 }
+
+/**
+ * The embedding identity the SERVER expects the stored semantic corpus to carry.
+ * These are server-controlled constants (never client input); the DB semantic
+ * arm only considers rows matching all four, so a query embedding is only ever
+ * compared against vectors in the same embedding space.
+ */
+const EXPECTED_PROVENANCE = {
+  p_provider: EMBEDDING_PROVIDER_ID,
+  p_model: EMBEDDING_MODEL,
+  p_dimensions: EMBEDDING_DIMENSIONS,
+  p_document_version: CANONICAL_DOCUMENT_VERSION,
+} as const;
 
 /** Injectable dependencies (all optional; production defaults are used). */
 export interface SearchDeps {
@@ -149,7 +172,7 @@ export async function searchCatalog(
     return { status: "error", category: "database" };
   }
 
-  let rows: SearchRpcRow[] = keyword.data ?? [];
+  let rows: SearchRpcRow[] = (keyword.data as SearchRpcRow[] | null) ?? [];
   let mode: SearchMode = "keyword";
   let fallbackReason: FallbackReason | undefined;
   let embeddingModel: string | undefined;
@@ -160,52 +183,75 @@ export async function searchCatalog(
   // --- Semantic upgrade (best-effort) --------------------------------------
   const attemptSemantic = deps.attemptSemantic ?? shouldAttemptSemanticSearch;
   if (attemptSemantic()) {
-    const providerResult = (
-      deps.createProvider ?? createOpenAIEmbeddingProvider
-    )();
-    if (!providerResult.ok) {
-      // Configured-but-unbuildable (e.g. key vanished): stay keyword-only.
+    // Cheap corpus-compatibility check FIRST: if no stored vector matches the
+    // server's expected embedding identity, there is nothing compatible to
+    // search — stay keyword-only and never pay for a query embedding. This also
+    // guarantees we never claim `hybrid` mode when no compatible corpus was used.
+    const compatStart = now();
+    const compat = await client.rpc(
+      "compatible_embedding_count",
+      EXPECTED_PROVENANCE,
+    );
+    dbMs = now() - compatStart;
+    const compatibleCount =
+      typeof compat.data === "number" ? compat.data : Number(compat.data ?? 0);
+
+    if (compat.error) {
       mode = "keyword_fallback";
-      fallbackReason = providerResult.error.kind;
+      fallbackReason = "database";
+    } else if (!(compatibleCount > 0)) {
+      // Missing / partial / stale / incompatible semantic corpus.
+      mode = "keyword_fallback";
+      fallbackReason = "incompatible_corpus";
     } else {
-      const timeoutMs = deps.embeddingTimeoutMs ?? EMBEDDING_TIMEOUT_MS;
-      const embStart = now();
-      try {
-        const embedding = await providerResult.provider.embed([query], {
-          signal: AbortSignal.timeout(timeoutMs),
-        });
-        embeddingMs = now() - embStart;
-        embeddingModel = embedding.model;
-        embeddingTokens = embedding.usage?.totalTokens;
-
-        const vector = embedding.vectors[0];
-        if (!vector)
-          throw new EmbeddingError("unknown", "empty embedding vector");
-
-        const hyStart = now();
-        const hybrid = await client.rpc("hybrid_search", {
-          p_query: query,
-          p_query_embedding: JSON.stringify(vector),
-          p_kind: dbKind ?? undefined,
-          p_limit: limit,
-        });
-        dbMs = now() - hyStart;
-
-        if (hybrid.error) {
-          // DB failure on the hybrid arm: keep keyword results.
-          mode = "keyword_fallback";
-          fallbackReason = "database";
-        } else {
-          rows = hybrid.data ?? [];
-          mode = "hybrid";
-        }
-      } catch (error) {
-        embeddingMs = now() - embStart;
+      const providerResult = (
+        deps.createProvider ?? createOpenAIEmbeddingProvider
+      )();
+      if (!providerResult.ok) {
+        // Configured-but-unbuildable (e.g. key vanished): stay keyword-only.
         mode = "keyword_fallback";
-        fallbackReason =
-          error instanceof Error && error.name === "TimeoutError"
-            ? "timeout"
-            : toSafeErrorCategory(error);
+        fallbackReason = providerResult.error.kind;
+      } else {
+        const timeoutMs = deps.embeddingTimeoutMs ?? EMBEDDING_TIMEOUT_MS;
+        const embStart = now();
+        try {
+          const embedding = await providerResult.provider.embed([query], {
+            signal: AbortSignal.timeout(timeoutMs),
+          });
+          embeddingMs = now() - embStart;
+          embeddingModel = embedding.model;
+          embeddingTokens = embedding.usage?.totalTokens;
+
+          const vector = embedding.vectors[0];
+          if (!vector)
+            throw new EmbeddingError("unknown", "empty embedding vector");
+
+          const hyStart = now();
+          const hybrid = await client.rpc("hybrid_search", {
+            p_query: query,
+            p_query_embedding: JSON.stringify(vector),
+            ...EXPECTED_PROVENANCE,
+            p_kind: dbKind ?? undefined,
+            p_limit: limit,
+          });
+          dbMs = now() - hyStart;
+
+          if (hybrid.error) {
+            // DB failure on the hybrid arm: keep keyword results.
+            mode = "keyword_fallback";
+            fallbackReason = "database";
+          } else {
+            rows = (hybrid.data as SearchRpcRow[] | null) ?? [];
+            mode = "hybrid";
+          }
+        } catch (error) {
+          embeddingMs = now() - embStart;
+          mode = "keyword_fallback";
+          fallbackReason =
+            error instanceof Error && error.name === "TimeoutError"
+              ? "timeout"
+              : toSafeErrorCategory(error);
+        }
       }
     }
   }

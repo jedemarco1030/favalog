@@ -380,10 +380,12 @@ exists (schema, RLS, clients) and the following are wired to it:
   shareable `?q=` URL and movie/TV/book filters. Two signals are fused: Postgres
   full-text search (lexical, a STORED `search_tsv` + GIN index on the public
   catalog) and pgvector cosine (semantic) via **Reciprocal-Rank Fusion**
-  (`k = 60`) with **exact-title protection**. Three forward-only migrations after
+  (`k = 60`) with **exact-title protection**. Four forward-only migrations after
   `20260814160300` (`20260815120000` catalog enrich + `search_tsv`/GIN,
   `20260815120100` private `media_search_documents` + pgvector,
-  `20260815120200` search functions). **Security model:** the private embedding
+  `20260815120200` search functions, and `20260815120300` provenance-guarded
+  search — the **22nd** migration, **local-only** / not yet hosted). **Security
+  model:** the private embedding
   table has RLS enabled with **no** policies and `anon`/`authenticated` revoked
   (raw vectors never leave the server; only `service_role` writes it);
   `keyword_search` is `SECURITY INVOKER` (public catalog), while
@@ -392,22 +394,50 @@ exists (schema, RLS, clients) and the following are wired to it:
   `search_path`, full schema-qualification, no dynamic SQL, clamped read-only
   limits, safe-field-only returns, EXECUTE revoked from `public` and granted to
   `anon`+`authenticated`; untrusted query text goes only through
-  `websearch_to_tsquery`. Embeddings use OpenAI `text-embedding-3-small` at
-  `dimensions: 512` behind an `EmbeddingProvider` interface
-  (`lib/search/`), with a deterministic `FakeEmbeddingProvider` for tests/eval
-  and a server-only REST adapter (no SDK dependency). `OPENAI_API_KEY` is
+  `websearch_to_tsquery`. **Provenance-guarded semantic retrieval:** migration
+  `20260815120300` drops the old unguarded `semantic_search` / `hybrid_search`
+  overloads and recreates them taking the **server-supplied** expected
+  provenance (`provider`, `model`, `dimensions`, `document_version`) so the
+  semantic arm only considers stored rows whose provider/model/dimensions/
+  document-version match all four (the same embedding space as the query) and
+  that carry a complete vector; it also adds
+  `compatible_embedding_count(provider, model, dimensions, document_version)` so
+  the app can cheaply detect a missing/partial/stale/incompatible corpus. The
+  expected provenance comes from the server (config constants +
+  `CANONICAL_DOCUMENT_VERSION`), never from browser input. Embeddings use OpenAI
+  `text-embedding-3-small` at `dimensions: 512` behind an `EmbeddingProvider`
+  interface (`lib/search/`), with a deterministic `FakeEmbeddingProvider` for
+  tests/eval and a server-only adapter using the official `openai` SDK (behind
+  the provider seam; imported only in server code, so client bundles are
+  unaffected). The bulk pipeline treats a stored row as **unchanged** only when
+  content hash, document version, provider, model, dimensions, and a complete
+  embedding all match the current run — so a later real OpenAI run auto-re-embeds
+  rows left by the fake provider; `--force` on `npm run embed:catalog` is a
+  recovery escape hatch, not a substitute. `OPENAI_API_KEY` is
   server-only (never `NEXT_PUBLIC_`, never logged), and a server-only
   `SEMANTIC_SEARCH_ENABLED` **kill switch** disables semantic while keyword keeps
-  working. **Fallback:** the app generates one trusted query embedding
+  working. **Fallback:** `lib/supabase/search.ts` calls
+  `compatible_embedding_count` **first**; with no compatible corpus it stays
+  keyword-only, does **not** pay for a query embedding, and records mode
+  `keyword_fallback` with reason `incompatible_corpus`. Otherwise it generates
+  one trusted query embedding
   server-side with a 2500 ms timeout; on timeout/failure/disabled/unconfigured it
   returns keyword results (mode `hybrid` | `keyword` | `keyword_fallback`) and
-  never fails the page — and with Supabase entirely unconfigured the no-env
+  never fails the page — and it never claims `hybrid` unless a compatible
+  semantic corpus was actually used, and with Supabase entirely unconfigured the
+  no-env
   public browsing is preserved. No LLM-generated text, no raw similarity scores
   shown, no client-supplied vectors/weights/model/dimensions/SQL, and raw query
   text is never persisted (logs carry length/mode/latency/category only). An
   offline eval harness (`npm run eval:search`, plus `npm run embed:catalog`)
   measures Recall@5 / MRR / exact-title top-1 / zero-result rate with a nonzero
-  exit on regression; **no live semantic quality numbers are claimed** (no
+  exit on regression and **fails closed** in `--live` mode (it verifies every
+  catalog title has a matching provider/model/dimensions/document-version
+  embedding and exits nonzero before evaluating if any fake/stale/incomplete/
+  incompatible vector remains). Its deterministic (fake) mode is a **secret-free
+  integration/regression** check of the retrieval plumbing, **not** proof of
+  semantic relevance; only a genuine `--live` OpenAI run is evidence of semantic
+  quality. **No live semantic quality numbers are claimed** (no
   OpenAI key was available). See
   [ADR 0003](docs/adr/0003-ai-discovery-hybrid-catalog-retrieval.md) and
   [`docs/ai-discovery-system-card.md`](docs/ai-discovery-system-card.md).

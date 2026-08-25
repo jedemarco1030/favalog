@@ -17,8 +17,16 @@ import { randomUUID } from "node:crypto";
 import type { EmbeddingErrorKind } from "./embedding-errors";
 import type { SearchMode } from "./config";
 
-/** Why the search fell back to keyword-only (only set when it did). */
-export type FallbackReason = "timeout" | "database" | EmbeddingErrorKind;
+/**
+ * Why the search fell back to keyword-only (only set when it did).
+ *
+ * `incompatible_corpus` means the stored semantic corpus does not match the
+ * server's expected embedding identity (provider/model/dimensions/document
+ * version), so no compatible vectors exist to search — we stay keyword-only and
+ * never pay for a query embedding.
+ */
+export type FallbackReason =
+  "timeout" | "database" | "incompatible_corpus" | EmbeddingErrorKind;
 
 /** The safe, closed set of fields a search log line may contain. */
 export interface SearchLogFields {

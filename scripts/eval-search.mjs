@@ -6,14 +6,26 @@
 // measurable, not asserted.
 //
 // Modes:
-//   node scripts/eval-search.mjs            # deterministic: fake query embeddings
+//   node scripts/eval-search.mjs            # DETERMINISTIC: fake query embeddings
 //                                           # (secret-free) + keyword baseline, vs local DB
-//   node scripts/eval-search.mjs --live     # live: OpenAI query embeddings (needs OPENAI_API_KEY)
+//   node scripts/eval-search.mjs --live     # LIVE: OpenAI query embeddings (needs OPENAI_API_KEY)
 //   node scripts/eval-search.mjs --json     # emit machine-readable JSON only
 //
 // Requires local Supabase (like `npm run db:test`) with embeddings populated
-// (`npm run embed:catalog -- --fake` for deterministic mode). Never claims live
-// semantic quality unless the OpenAI-backed run genuinely executed.
+// (`npm run embed:catalog -- --fake` for deterministic mode).
+//
+// FAIL-CLOSED PROVENANCE GATE: before any hybrid evaluation the harness confirms
+// that EVERY catalog title has a stored embedding matching the ACTIVE identity
+// (provider/model/dimensions/document version). In --live mode, if any fake,
+// stale, incomplete, or otherwise incompatible catalog vectors remain, it exits
+// NON-ZERO before evaluating and never reports live semantic metrics for a
+// mismatched corpus. The report always includes the evaluated identity and the
+// compatible-corpus count.
+//
+// HONEST LABELING: the deterministic (fake) mode is a SECRET-FREE integration /
+// regression evaluation of the retrieval plumbing — it is NOT proof of semantic
+// relevance. Only a genuine --live OpenAI run is evidence of semantic quality.
+// Keys and raw vectors are never logged.
 //
 // Env: SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) and a key (SUPABASE_SECRET_KEY
 // or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY); OPENAI_API_KEY only for --live.
@@ -24,6 +36,12 @@ import { createClient } from "@supabase/supabase-js";
 
 import { FakeEmbeddingProvider } from "../lib/search/embedding-provider.ts";
 import { createOpenAIEmbeddingProvider } from "../lib/search/openai-embedding-provider.ts";
+import {
+  EMBEDDING_DIMENSIONS,
+  EMBEDDING_MODEL,
+  EMBEDDING_PROVIDER_ID,
+} from "../lib/search/config.ts";
+import { CANONICAL_DOCUMENT_VERSION } from "../lib/search/canonical-document.ts";
 import { compareThresholds, evaluate } from "../lib/search/eval/metrics.ts";
 import {
   DEFAULT_THRESHOLDS,
@@ -130,17 +148,81 @@ async function main() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
+  // The embedding identity these results will be evaluated against. In --live
+  // mode this is the real OpenAI identity; in deterministic mode it is the fake
+  // provider's identity (which is what `embed:catalog --fake` wrote).
+  const identity = args.live
+    ? {
+        provider: EMBEDDING_PROVIDER_ID,
+        model: EMBEDDING_MODEL,
+        dimensions: EMBEDDING_DIMENSIONS,
+        documentVersion: CANONICAL_DOCUMENT_VERSION,
+      }
+    : {
+        provider: provider.id,
+        model: provider.model,
+        dimensions: provider.dimensions,
+        documentVersion: CANONICAL_DOCUMENT_VERSION,
+      };
+
+  // --- Fail-closed provenance gate -----------------------------------------
+  const { count: catalogCount, error: catalogError } = await supabase
+    .from("media_items")
+    .select("*", { count: "exact", head: true });
+  if (catalogError) {
+    console.error(
+      `[eval:search] Failed to count the catalog: ${catalogError.message}`,
+    );
+    process.exit(1);
+  }
+  const { data: compatibleCount, error: compatError } = await supabase.rpc(
+    "compatible_embedding_count",
+    {
+      p_provider: identity.provider,
+      p_model: identity.model,
+      p_dimensions: identity.dimensions,
+      p_document_version: identity.documentVersion,
+    },
+  );
+  if (compatError) {
+    console.error(
+      `[eval:search] Failed to read the compatible-corpus count: ${compatError.message}`,
+    );
+    process.exit(1);
+  }
+  const compatible = Number(compatibleCount ?? 0);
+  const corpusComplete = catalogCount > 0 && compatible >= catalogCount;
+
+  if (args.live && !corpusComplete) {
+    console.error(
+      `[eval:search] FAIL-CLOSED: the stored catalog embeddings are not a complete ` +
+        `match for the active identity (provider=${identity.provider}, ` +
+        `model=${identity.model}, dimensions=${identity.dimensions}, ` +
+        `document_version=${identity.documentVersion}). ` +
+        `compatible ${compatible}/${catalogCount}. ` +
+        `Re-run \`npm run embed:catalog\` to backfill real embeddings; ` +
+        `no live semantic metrics are reported for a mismatched corpus.`,
+    );
+    process.exit(1);
+  }
+
   const keywordResults = await runArm(supabase, "keyword_search", (c) => ({
     p_query: c.query,
     p_kind: c.kind ?? undefined,
     p_limit: 24,
   }));
 
+  let embeddingTokens = 0;
   const hybridResults = await runArm(supabase, "hybrid_search", async (c) => {
     const embedding = await provider.embed([c.query]);
+    embeddingTokens += embedding.usage?.totalTokens ?? 0;
     return {
       p_query: c.query,
       p_query_embedding: JSON.stringify(embedding.vectors[0]),
+      p_provider: identity.provider,
+      p_model: identity.model,
+      p_dimensions: identity.dimensions,
+      p_document_version: identity.documentVersion,
       p_kind: c.kind ?? undefined,
       p_limit: 24,
     };
@@ -153,6 +235,17 @@ async function main() {
   const report = {
     event: "eval_search_report",
     mode,
+    live: args.live,
+    // The deterministic mode is a secret-free integration/regression check of the
+    // retrieval plumbing, NOT evidence of semantic relevance. Only --live is.
+    evaluationKind: args.live
+      ? "live-semantic-quality"
+      : "deterministic-integration-regression (secret-free; NOT semantic-quality evidence)",
+    identity,
+    catalogCount,
+    compatibleCorpusCount: compatible,
+    corpusComplete,
+    embeddingTokens,
     thresholds: DEFAULT_THRESHOLDS,
     keyword: keywordMetrics,
     hybrid: hybridMetrics,
@@ -163,6 +256,21 @@ async function main() {
     console.log(JSON.stringify(report, null, 2));
   } else {
     console.log(`[eval:search] mode: ${mode}`);
+    console.log(`[eval:search] evaluation kind: ${report.evaluationKind}`);
+    console.log(
+      `[eval:search] identity: provider=${identity.provider} model=${identity.model} ` +
+        `dimensions=${identity.dimensions} document_version=${identity.documentVersion}`,
+    );
+    console.log(
+      `[eval:search] compatible corpus: ${compatible}/${catalogCount}` +
+        (args.live ? ` (embedding tokens: ${embeddingTokens})` : ""),
+    );
+    if (!args.live) {
+      console.log(
+        "[eval:search] NOTE: deterministic fake mode is a secret-free integration/" +
+          "regression check — NOT proof of semantic relevance.",
+      );
+    }
     printSummary("Keyword baseline", keywordMetrics);
     printSummary(`Hybrid (${mode})`, hybridMetrics);
     console.log(

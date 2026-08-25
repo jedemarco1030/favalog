@@ -34,10 +34,34 @@ export interface EmbeddingRecord {
   contentHash: string;
 }
 
-/** What the store already knows about an existing embedding row. */
+/**
+ * What the store already knows about an existing embedding row.
+ *
+ * The provenance fields (`provider`, `model`, `dimensions`, `documentVersion`)
+ * are part of the embedding IDENTITY: a row is only "unchanged" when they all
+ * match the provider identity the current run would produce. They are null on a
+ * content-only row that has no embedding yet (`hasEmbedding: false`).
+ */
 export interface ExistingEmbedding {
   contentHash: string;
   hasEmbedding: boolean;
+  provider: string | null;
+  model: string | null;
+  dimensions: number | null;
+  documentVersion: string | null;
+}
+
+/**
+ * The complete embedding identity the current run would produce. A stored row is
+ * only skipped when every one of these matches (in addition to an equal content
+ * hash and a present embedding). Supplied by the server/pipeline — never by a
+ * client — so fake or otherwise incompatible vectors are always re-embedded.
+ */
+export interface ExpectedEmbeddingIdentity {
+  provider: string;
+  model: string;
+  dimensions: number;
+  documentVersion: string;
 }
 
 /** A fully-embedded row to persist (all-or-nothing embedding provenance). */
@@ -81,6 +105,12 @@ export interface PipelineOptions {
   timestamp?: () => string;
   /** Retry overrides (injectable sleep/random for deterministic tests). */
   retry?: RetryOptions;
+  /**
+   * Re-embed every record regardless of stored provenance (recovery escape
+   * hatch). This never replaces the automatic provenance staleness detection —
+   * it only forces work the detection would otherwise skip.
+   */
+  force?: boolean;
   /** Optional safe progress callback (never receives keys/vectors). */
   onProgress?: (info: {
     batch: number;
@@ -92,20 +122,38 @@ export interface PipelineOptions {
 
 /**
  * Partition records into those needing (re)embedding and those unchanged.
- * A record is stale when there is no existing row, the content hash differs, or
- * the existing row has no embedding yet.
+ *
+ * A record is UNCHANGED only when a prior row exists AND it carries a complete
+ * embedding AND its content hash matches AND its full embedding identity
+ * (provider, model, dimensions, document version) matches the {@link
+ * ExpectedEmbeddingIdentity} the current run would produce. Any other state —
+ * no row, missing embedding, differing hash, or a provenance mismatch (e.g. a
+ * fake row facing a real OpenAI run, or a provider/model/dimensions/version
+ * change) — is treated as STALE and re-embedded.
+ *
+ * When `force` is set every record is stale (a recovery escape hatch); it never
+ * substitutes for the automatic provenance detection above.
  */
 export function selectStale(
   records: readonly EmbeddingRecord[],
   existing: ReadonlyMap<string, ExistingEmbedding>,
+  expected: ExpectedEmbeddingIdentity,
+  options: { force?: boolean } = {},
 ): { toEmbed: EmbeddingRecord[]; unchanged: EmbeddingRecord[] } {
   const toEmbed: EmbeddingRecord[] = [];
   const unchanged: EmbeddingRecord[] = [];
   for (const record of records) {
     const prior = existing.get(record.mediaId);
-    const isStale =
-      !prior || !prior.hasEmbedding || prior.contentHash !== record.contentHash;
-    (isStale ? toEmbed : unchanged).push(record);
+    const isFresh =
+      !options.force &&
+      !!prior &&
+      prior.hasEmbedding &&
+      prior.contentHash === record.contentHash &&
+      prior.provider === expected.provider &&
+      prior.model === expected.model &&
+      prior.dimensions === expected.dimensions &&
+      prior.documentVersion === expected.documentVersion;
+    (isFresh ? unchanged : toEmbed).push(record);
   }
   return { toEmbed, unchanged };
 }
@@ -154,7 +202,15 @@ export async function runEmbeddingPipeline(
   const startedAt = now();
 
   const existing = await store.loadExisting();
-  const { toEmbed, unchanged } = selectStale(records, existing);
+  const expected: ExpectedEmbeddingIdentity = {
+    provider: provider.id,
+    model: provider.model,
+    dimensions: provider.dimensions,
+    documentVersion: options.documentVersion,
+  };
+  const { toEmbed, unchanged } = selectStale(records, existing, expected, {
+    force: options.force,
+  });
 
   const report: PipelineReport = {
     attempted: toEmbed.length,

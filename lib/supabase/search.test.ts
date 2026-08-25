@@ -40,18 +40,28 @@ interface FakeRpcResult {
   error: { message?: string } | null;
 }
 
+interface FakeCountResult {
+  data: number | null;
+  error: { message?: string } | null;
+}
+
 /** Build a fake Supabase client returning per-function canned results. */
 function makeClient(
   results: {
     keyword?: FakeRpcResult;
     hybrid?: FakeRpcResult;
+    /** Compatible-corpus count (defaults to a positive, compatible corpus). */
+    compatibleCount?: FakeCountResult;
   } = {},
 ) {
   const rpc = vi.fn(
     async (
       ...args: [fn: string, params: Record<string, unknown>]
-    ): Promise<FakeRpcResult> => {
+    ): Promise<FakeRpcResult | FakeCountResult> => {
       const [fn] = args;
+      if (fn === "compatible_embedding_count") {
+        return results.compatibleCount ?? { data: 3, error: null };
+      }
       if (fn === "hybrid_search") {
         return results.hybrid ?? { data: HYBRID_ROWS, error: null };
       }
@@ -164,13 +174,72 @@ describe("searchCatalog", () => {
     expect(outcome.mode).toBe("hybrid");
     expect(outcome.items.map((i) => i.slug)).toEqual(["hybrid-hit"]);
 
-    // The hybrid RPC was called with a serialized string embedding.
+    // The hybrid RPC was called with a serialized string embedding AND the
+    // server-supplied expected provenance (never client input).
     const hybridCall = client.rpc.mock.calls.find(
       ([fn]) => fn === "hybrid_search",
     );
     expect(hybridCall).toBeDefined();
     const args = hybridCall![1];
     expect(typeof args.p_query_embedding).toBe("string");
+    expect(args.p_provider).toBe("openai");
+    expect(args.p_model).toBe("text-embedding-3-small");
+    expect(args.p_dimensions).toBe(512);
+    expect(args.p_document_version).toBe("v1");
+  });
+
+  it("stays keyword-only (no embedding) when no compatible corpus exists", async () => {
+    const client = makeClient({ compatibleCount: { data: 0, error: null } });
+    const createProvider = vi.fn();
+    const outcome = await searchCatalog(
+      { query: "afterglow" },
+      {
+        getClient: async () => client,
+        attemptSemantic: () => true,
+        createProvider,
+        log: vi.fn(),
+        now: makeClock(),
+      },
+    );
+
+    expect(outcome.status).toBe("ok");
+    if (outcome.status !== "ok") throw new Error("expected ok");
+    expect(outcome.mode).toBe("keyword_fallback");
+    expect(outcome.fallbackReason).toBe("incompatible_corpus");
+    expect(outcome.items.map((i) => i.slug)).toEqual(["keyword-hit"]);
+
+    // No query embedding was paid for, and the hybrid RPC was never called.
+    expect(createProvider).not.toHaveBeenCalled();
+    expect(client.rpc.mock.calls.some(([fn]) => fn === "hybrid_search")).toBe(
+      false,
+    );
+  });
+
+  it("falls back to keyword when the compatible-corpus count errors", async () => {
+    const client = makeClient({
+      compatibleCount: { data: null, error: { message: "boom" } },
+    });
+    const outcome = await searchCatalog(
+      { query: "afterglow" },
+      {
+        getClient: async () => client,
+        attemptSemantic: () => true,
+        createProvider: () => ({
+          ok: true,
+          provider: new FakeEmbeddingProvider(),
+        }),
+        log: vi.fn(),
+        now: makeClock(),
+      },
+    );
+
+    expect(outcome.status).toBe("ok");
+    if (outcome.status !== "ok") throw new Error("expected ok");
+    expect(outcome.mode).toBe("keyword_fallback");
+    expect(outcome.fallbackReason).toBe("database");
+    expect(client.rpc.mock.calls.some(([fn]) => fn === "hybrid_search")).toBe(
+      false,
+    );
   });
 
   it("falls back to keyword on an embedding timeout", async () => {

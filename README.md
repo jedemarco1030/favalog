@@ -407,27 +407,44 @@ and [ADR 0003](docs/adr/0003-ai-discovery-hybrid-catalog-retrieval.md).
 - Explicit submission (no paid request per keystroke) with loading / empty /
   unavailable / safe-error states; raw similarity scores are never shown and the
   feature is not advertised as AI-generated.
-- **Keyword search always works** — with no OpenAI key, the kill switch off, or
-  the semantic path unavailable, search falls back to keyword and the page never
-  fails. When Supabase is entirely unconfigured, the existing no-env public
-  browsing is preserved.
+- **Keyword search always works** — with no OpenAI key, the kill switch off, the
+  semantic path unavailable, or **no compatible embedding corpus** (the stored
+  vectors' provider / model / dimensions / document version don't match the
+  active query embedding), search falls back to keyword and the page never
+  fails. In that last case the app detects the mismatch cheaply and stays
+  keyword-only **without paying for a query embedding** (mode `keyword_fallback`,
+  reason `incompatible_corpus`); it never claims `hybrid` unless a compatible
+  semantic corpus was actually used. When Supabase is entirely unconfigured, the
+  existing no-env public browsing is preserved.
 - Embeddings use OpenAI `text-embedding-3-small` at `dimensions: 512`, generated
-  **server-side only**; raw vectors are never exposed to the browser.
+  **server-side only** via the official `openai` SDK behind the
+  `EmbeddingProvider` seam; raw vectors are never exposed to the browser.
 
 ### New scripts
 
 ```bash
 npm run embed:catalog      # Generate/refresh catalog embeddings (local; service
-                           # role; skip-unchanged / stale-on-change re-embed)
+                           # role; re-embeds when the full embedding identity —
+                           # provider / model / dimensions / document version /
+                           # content — changes; --force re-embeds everything)
 npm run eval:search        # Run the offline search evaluation harness
                            # (Recall@5, MRR, exact-title top-1, zero-result rate,
                            # per-category; nonzero exit on threshold regression)
 ```
 
-`embed:catalog` requires a local Supabase stack and `OPENAI_API_KEY`.
-`eval:search` runs a deterministic **secret-free** mode (fixture rankings) and a
-**keyword baseline** with no key; its **live hybrid** mode is gated on a local
-Supabase + `OPENAI_API_KEY`.
+`embed:catalog` requires a local Supabase stack and `OPENAI_API_KEY`. A stored
+row is treated as unchanged only when the provider, model, dimensions, document
+version, **and** content hash all match what the current run would produce (so a
+later real OpenAI run automatically re-embeds rows left by the deterministic
+fake provider); `--force` is a recovery escape hatch, not a substitute for that
+automatic detection. `eval:search` runs a deterministic **secret-free** mode
+(fixture rankings) and a **keyword baseline** with no key; its **live hybrid**
+mode is gated on a local Supabase + `OPENAI_API_KEY`. The deterministic mode is
+a secret-free integration/regression check of the retrieval plumbing, **not**
+proof of semantic relevance — only a genuine `--live` OpenAI run is evidence of
+semantic quality, and in `--live` mode the harness **fails closed**, exiting
+nonzero before evaluating if any fake / stale / incomplete / incompatible vector
+remains rather than reporting metrics for a mismatched corpus.
 
 ### Environment variables
 

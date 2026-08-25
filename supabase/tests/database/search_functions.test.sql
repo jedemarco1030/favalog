@@ -16,7 +16,7 @@
 -- Run with the local stack: `npm run db:test` (requires Docker + Supabase CLI).
 
 begin;
-select plan(47);
+select plan(65);
 
 -- ---------------------------------------------------------------------------
 -- 1. Extension: pgvector installed, and living in the `extensions` schema.
@@ -104,6 +104,12 @@ select is(
 
 -- ---------------------------------------------------------------------------
 -- 4. Execution grants + security configuration.
+--
+-- Signatures reflect the PROVENANCE-GUARDED overloads (migration 20260815120300):
+--   semantic_search(vector, provider, model, dimensions, document_version, kind, limit)
+--   hybrid_search(text, vector, provider, model, dimensions, document_version, kind, limit)
+--   compatible_embedding_count(provider, model, dimensions, document_version)
+-- The old unguarded overloads are dropped (asserted below).
 -- ---------------------------------------------------------------------------
 -- keyword_search: SECURITY INVOKER, anon + authenticated, NOT public.
 select ok(
@@ -122,32 +128,62 @@ select ok(
 -- semantic_search: SECURITY DEFINER, anon + authenticated, NOT public.
 select ok(
   has_function_privilege('anon',
-    'public.semantic_search(extensions.vector, public.media_kind, integer)', 'execute'),
+    'public.semantic_search(extensions.vector, text, text, integer, text, public.media_kind, integer)', 'execute'),
   'anon may execute semantic_search');
 select ok(
   has_function_privilege('authenticated',
-    'public.semantic_search(extensions.vector, public.media_kind, integer)', 'execute'),
+    'public.semantic_search(extensions.vector, text, text, integer, text, public.media_kind, integer)', 'execute'),
   'authenticated may execute semantic_search');
 select ok(
   not has_function_privilege('public',
-    'public.semantic_search(extensions.vector, public.media_kind, integer)', 'execute'),
+    'public.semantic_search(extensions.vector, text, text, integer, text, public.media_kind, integer)', 'execute'),
   'public may not execute semantic_search');
 
 -- hybrid_search: SECURITY DEFINER, anon + authenticated, NOT public.
 select ok(
   has_function_privilege('anon',
-    'public.hybrid_search(text, extensions.vector, public.media_kind, integer)', 'execute'),
+    'public.hybrid_search(text, extensions.vector, text, text, integer, text, public.media_kind, integer)', 'execute'),
   'anon may execute hybrid_search');
 select ok(
   has_function_privilege('authenticated',
-    'public.hybrid_search(text, extensions.vector, public.media_kind, integer)', 'execute'),
+    'public.hybrid_search(text, extensions.vector, text, text, integer, text, public.media_kind, integer)', 'execute'),
   'authenticated may execute hybrid_search');
 select ok(
   not has_function_privilege('public',
-    'public.hybrid_search(text, extensions.vector, public.media_kind, integer)', 'execute'),
+    'public.hybrid_search(text, extensions.vector, text, text, integer, text, public.media_kind, integer)', 'execute'),
   'public may not execute hybrid_search');
 
--- prosecdef: keyword INVOKER (false), semantic + hybrid DEFINER (true).
+-- compatible_embedding_count: SECURITY DEFINER, anon + authenticated, NOT public.
+select ok(
+  has_function_privilege('anon',
+    'public.compatible_embedding_count(text, text, integer, text)', 'execute'),
+  'anon may execute compatible_embedding_count');
+select ok(
+  has_function_privilege('authenticated',
+    'public.compatible_embedding_count(text, text, integer, text)', 'execute'),
+  'authenticated may execute compatible_embedding_count');
+select ok(
+  not has_function_privilege('public',
+    'public.compatible_embedding_count(text, text, integer, text)', 'execute'),
+  'public may not execute compatible_embedding_count');
+
+-- The OLD unguarded overloads must no longer exist (dropped in 20260815120300).
+select is(
+  (select count(*)::int from pg_proc
+    where proname = 'semantic_search'
+      and pronamespace = 'public'::regnamespace
+      and pronargs = 3),
+  0,
+  'the old unguarded semantic_search(vector, kind, limit) overload is removed');
+select is(
+  (select count(*)::int from pg_proc
+    where proname = 'hybrid_search'
+      and pronamespace = 'public'::regnamespace
+      and pronargs = 4),
+  0,
+  'the old unguarded hybrid_search(text, vector, kind, limit) overload is removed');
+
+-- prosecdef: keyword INVOKER (false), semantic + hybrid + count DEFINER (true).
 select is(
   (select prosecdef from pg_proc
     where oid = 'public.keyword_search(text, public.media_kind, integer)'::regprocedure),
@@ -155,16 +191,21 @@ select is(
   'keyword_search is SECURITY INVOKER');
 select is(
   (select prosecdef from pg_proc
-    where oid = 'public.semantic_search(extensions.vector, public.media_kind, integer)'::regprocedure),
+    where oid = 'public.semantic_search(extensions.vector, text, text, integer, text, public.media_kind, integer)'::regprocedure),
   true,
   'semantic_search is SECURITY DEFINER');
 select is(
   (select prosecdef from pg_proc
-    where oid = 'public.hybrid_search(text, extensions.vector, public.media_kind, integer)'::regprocedure),
+    where oid = 'public.hybrid_search(text, extensions.vector, text, text, integer, text, public.media_kind, integer)'::regprocedure),
   true,
   'hybrid_search is SECURITY DEFINER');
+select is(
+  (select prosecdef from pg_proc
+    where oid = 'public.compatible_embedding_count(text, text, integer, text)'::regprocedure),
+  true,
+  'compatible_embedding_count is SECURITY DEFINER');
 
--- proconfig: all three pin search_path to empty.
+-- proconfig: all four pin search_path to empty.
 select ok(
   (select proconfig from pg_proc
     where oid = 'public.keyword_search(text, public.media_kind, integer)'::regprocedure)
@@ -172,14 +213,19 @@ select ok(
   'keyword_search pins search_path to empty');
 select ok(
   (select proconfig from pg_proc
-    where oid = 'public.semantic_search(extensions.vector, public.media_kind, integer)'::regprocedure)
+    where oid = 'public.semantic_search(extensions.vector, text, text, integer, text, public.media_kind, integer)'::regprocedure)
     @> array['search_path=""'],
   'semantic_search pins search_path to empty');
 select ok(
   (select proconfig from pg_proc
-    where oid = 'public.hybrid_search(text, extensions.vector, public.media_kind, integer)'::regprocedure)
+    where oid = 'public.hybrid_search(text, extensions.vector, text, text, integer, text, public.media_kind, integer)'::regprocedure)
     @> array['search_path=""'],
   'hybrid_search pins search_path to empty');
+select ok(
+  (select proconfig from pg_proc
+    where oid = 'public.compatible_embedding_count(text, text, integer, text)'::regprocedure)
+    @> array['search_path=""'],
+  'compatible_embedding_count pins search_path to empty');
 
 -- Exactly the intended argument counts.
 select is(
@@ -189,14 +235,19 @@ select is(
   'keyword_search takes exactly three args');
 select is(
   (select pronargs from pg_proc
-    where oid = 'public.semantic_search(extensions.vector, public.media_kind, integer)'::regprocedure)::int,
-  3,
-  'semantic_search takes exactly three args');
+    where oid = 'public.semantic_search(extensions.vector, text, text, integer, text, public.media_kind, integer)'::regprocedure)::int,
+  7,
+  'semantic_search takes exactly seven args');
 select is(
   (select pronargs from pg_proc
-    where oid = 'public.hybrid_search(text, extensions.vector, public.media_kind, integer)'::regprocedure)::int,
+    where oid = 'public.hybrid_search(text, extensions.vector, text, text, integer, text, public.media_kind, integer)'::regprocedure)::int,
+  8,
+  'hybrid_search takes exactly eight args');
+select is(
+  (select pronargs from pg_proc
+    where oid = 'public.compatible_embedding_count(text, text, integer, text)'::regprocedure)::int,
   4,
-  'hybrid_search takes exactly four args');
+  'compatible_embedding_count takes exactly four args');
 
 -- ---------------------------------------------------------------------------
 -- Seed two deterministic embeddings (as the default superuser pgTAP role):
@@ -262,7 +313,8 @@ select is(
   'an empty query returns no rows');
 select is(
   (select count(*)::int
-     from public.semantic_search(null::extensions.vector, null, 5)),
+     from public.semantic_search(
+       null::extensions.vector, 'fake', 'fake', 512, 'v1', null, 5)),
   0,
   'a null query embedding returns no rows');
 
@@ -272,10 +324,11 @@ select is(
 -- ---------------------------------------------------------------------------
 select is(
   (select slug from public.semantic_search(
-     ('[0.9,0.1' || repeat(',0', 510) || ']')::extensions.vector, null, 5)
+     ('[0.9,0.1' || repeat(',0', 510) || ']')::extensions.vector,
+     'fake', 'fake', 512, 'v1', null, 5)
     limit 1),
   'quiet-signal',
-  'semantic_search returns the cosine-nearest title first');
+  'semantic_search returns the cosine-nearest title first (matching provenance)');
 
 -- ---------------------------------------------------------------------------
 -- 11. Hybrid RRF + exact-title protection.
@@ -286,17 +339,82 @@ select is(
 select is(
   (select slug from public.hybrid_search(
      'afterglow',
-     ('[1' || repeat(',0', 511) || ']')::extensions.vector, null, 5)
+     ('[1' || repeat(',0', 511) || ']')::extensions.vector,
+     'fake', 'fake', 512, 'v1', null, 5)
     limit 1),
   'afterglow',
   'exact-title protection keeps the title first in hybrid_search');
 select is(
   (select count(distinct slug)::int from public.hybrid_search(
      'afterglow',
-     ('[1' || repeat(',0', 511) || ']')::extensions.vector, null, 5)
+     ('[1' || repeat(',0', 511) || ']')::extensions.vector,
+     'fake', 'fake', 512, 'v1', null, 5)
     where slug in ('afterglow', 'quiet-signal')),
   2,
   'hybrid_search fuses a keyword hit and a semantic hit');
+
+-- ---------------------------------------------------------------------------
+-- 11b. Provenance guard: only rows in the same embedding space participate.
+--      The seeded corpus is provider='fake', model='fake', dims=512, version='v1'.
+-- ---------------------------------------------------------------------------
+select is(
+  public.compatible_embedding_count('fake', 'fake', 512, 'v1'),
+  2,
+  'compatible_embedding_count counts the two matching fake embeddings');
+select is(
+  public.compatible_embedding_count('openai', 'text-embedding-3-small', 512, 'v1'),
+  0,
+  'compatible_embedding_count is 0 for a mismatched (OpenAI) identity');
+select is(
+  public.compatible_embedding_count('fake', 'some-other-model', 512, 'v1'),
+  0,
+  'compatible_embedding_count is 0 when the model does not match');
+select is(
+  public.compatible_embedding_count('fake', 'fake', 512, 'v0'),
+  0,
+  'compatible_embedding_count is 0 when the document version does not match');
+
+select is(
+  (select count(*)::int from public.semantic_search(
+     ('[0.9,0.1' || repeat(',0', 510) || ']')::extensions.vector,
+     'openai', 'fake', 512, 'v1', null, 5)),
+  0,
+  'semantic_search excludes rows when the provider does not match');
+select is(
+  (select count(*)::int from public.semantic_search(
+     ('[0.9,0.1' || repeat(',0', 510) || ']')::extensions.vector,
+     'fake', 'other-model', 512, 'v1', null, 5)),
+  0,
+  'semantic_search excludes rows when the model does not match');
+select is(
+  (select count(*)::int from public.semantic_search(
+     ('[0.9,0.1' || repeat(',0', 510) || ']')::extensions.vector,
+     'fake', 'fake', 256, 'v1', null, 5)),
+  0,
+  'semantic_search excludes rows when the dimensions do not match');
+select is(
+  (select count(*)::int from public.semantic_search(
+     ('[0.9,0.1' || repeat(',0', 510) || ']')::extensions.vector,
+     'fake', 'fake', 512, 'v0', null, 5)),
+  0,
+  'semantic_search excludes rows when the document version does not match');
+
+select is(
+  (select count(*)::int from public.hybrid_search(
+     'afterglow',
+     ('[1' || repeat(',0', 511) || ']')::extensions.vector,
+     'openai', 'text-embedding-3-small', 512, 'v1', null, 5)
+    where slug = 'quiet-signal'),
+  0,
+  'hybrid_search drops the semantic-only hit under a mismatched identity');
+select is(
+  (select slug from public.hybrid_search(
+     'afterglow',
+     ('[1' || repeat(',0', 511) || ']')::extensions.vector,
+     'openai', 'text-embedding-3-small', 512, 'v1', null, 5)
+    limit 1),
+  'afterglow',
+  'hybrid_search still returns the keyword exact-title under a mismatched identity');
 
 -- ---------------------------------------------------------------------------
 -- 5. No ordinary-user access to the private embedding table (raw vectors).
@@ -322,7 +440,8 @@ select lives_ok(
   'anon can run keyword_search');
 select lives_ok(
   $$ select * from public.semantic_search(
-       ('[0.9,0.1' || repeat(',0', 510) || ']')::extensions.vector, null, 5) $$,
+       ('[0.9,0.1' || repeat(',0', 510) || ']')::extensions.vector,
+       'fake', 'fake', 512, 'v1', null, 5) $$,
   'anon can run semantic_search even though the table is private');
 
 reset role;

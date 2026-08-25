@@ -16,6 +16,14 @@
 //   node scripts/embed-catalog.mjs --dry-run  # report what WOULD be embedded (no key/writes)
 //   node scripts/embed-catalog.mjs --fake     # deterministic local vectors (no key) — dev only
 //   node scripts/embed-catalog.mjs --limit 5  # cap catalog rows processed
+//   node scripts/embed-catalog.mjs --force    # re-embed every row (recovery only)
+//
+// Staleness is driven by the COMPLETE embedding identity, not just the content
+// hash: a stored row is skipped only when its content hash, document version,
+// embedding provider, embedding model, and embedding dimensions all match what
+// this run would produce and a full embedding is present. Any mismatch (e.g.
+// fake rows facing a real OpenAI run) is re-embedded automatically; --force is a
+// recovery escape hatch that never substitutes for that detection.
 //
 // Env: SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL), SUPABASE_SECRET_KEY (or
 // SUPABASE_SERVICE_ROLE_KEY), and OPENAI_API_KEY (unless --dry-run/--fake).
@@ -40,11 +48,12 @@ try {
 }
 
 function parseArgs(argv) {
-  const args = { dryRun: false, fake: false, limit: undefined };
+  const args = { dryRun: false, fake: false, force: false, limit: undefined };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--dry-run") args.dryRun = true;
     else if (arg === "--fake") args.fake = true;
+    else if (arg === "--force") args.force = true;
     else if (arg === "--limit") args.limit = Number.parseInt(argv[++i], 10);
   }
   return args;
@@ -161,13 +170,20 @@ async function main() {
     async loadExisting() {
       const { data, error } = await supabase
         .from("media_search_documents")
-        .select("media_id, content_hash, embedded_at");
+        .select(
+          "media_id, content_hash, document_version, embedding_provider, " +
+            "embedding_model, embedding_dimensions, embedded_at",
+        );
       if (error) throw new Error(`loadExisting failed: ${error.message}`);
       const existing = new Map();
       for (const row of data ?? []) {
         existing.set(row.media_id, {
           contentHash: row.content_hash,
           hasEmbedding: row.embedded_at !== null,
+          provider: row.embedding_provider ?? null,
+          model: row.embedding_model ?? null,
+          dimensions: row.embedding_dimensions ?? null,
+          documentVersion: row.document_version ?? null,
         });
       }
       return existing;
@@ -195,6 +211,7 @@ async function main() {
   try {
     const report = await runEmbeddingPipeline(records, store, provider, {
       dryRun: args.dryRun,
+      force: args.force,
       documentVersion: CANONICAL_DOCUMENT_VERSION,
       onProgress: ({ batch, batches, updated, failed }) => {
         console.log(

@@ -43,19 +43,22 @@ flowchart TD
     V -->|yes| K[keyword_search<br/>Postgres FTS + GIN]
     A --> SW{SEMANTIC_SEARCH_ENABLED<br/>and OPENAI_API_KEY set?}
     SW -->|no| KR[Return keyword results<br/>mode = keyword]
-    SW -->|yes| E[EmbeddingProvider<br/>one query embedding<br/>timeout 2500ms]
+    SW -->|yes| CC{compatible_embedding_count > 0?<br/>provider/model/dims/doc-version}
+    CC -->|no| KI[Return keyword results<br/>mode = keyword_fallback<br/>reason = incompatible_corpus<br/>no query embedding]
+    CC -->|yes| E[EmbeddingProvider<br/>one query embedding<br/>timeout 2500ms]
     E -->|timeout / failure| FB[Return keyword results<br/>mode = keyword_fallback]
-    E -->|ok| H[hybrid_search<br/>RRF k=60 + exact-title protection]
+    E -->|ok| H[hybrid_search<br/>server-supplied provenance guard<br/>RRF k=60 + exact-title protection]
     K --> H
     H --> HR[Return fused results<br/>mode = hybrid]
     KR --> UI[Explore results<br/>cross-media cards -> /title/slug]
+    KI --> UI
     FB --> UI
     HR --> UI
 
-    subgraph Offline pipeline (service_role, local/manual)
+    subgraph offline["Offline pipeline (service_role, local/manual)"]
         C[Catalog media_items] --> CD[Canonical document v1<br/>pure, catalog-only + SHA-256 hash]
-        CD --> P[embed:catalog pipeline<br/>skip-unchanged / stale-on-change]
-        P --> MSD[(media_search_documents<br/>vector 512, RLS no policies)]
+        CD --> P[embed:catalog pipeline<br/>re-embed on full-identity change<br/>provider/model/dims/doc-version/content]
+        P --> MSD[(media_search_documents<br/>vector 512 + provenance, RLS no policies)]
     end
     MSD -. read by SECURITY DEFINER .-> H
     MSD -. read by SECURITY DEFINER .-> E
@@ -66,9 +69,15 @@ flowchart TD
 - **Catalog only.** The embedding input is the versioned **canonical document**
   (`lib/search/canonical-document.ts`, `CANONICAL_DOCUMENT_VERSION = "v1"`): a
   pure, normalized, stable-field-order composition of title, subtitle, kind,
-  year, genres, credits (by kind), and synopsis from `media_items`. A SHA-256
-  content hash folds into the version to drive skip-unchanged and
-  stale-on-change re-embedding.
+  year, genres, credits (by kind), and synopsis from `media_items`. A stored row
+  is treated as **unchanged** only when its **complete embedding identity** —
+  content hash, document version, embedding provider, embedding model, embedding
+  dimensions, **and** a complete vector — matches what the current run would
+  produce; any mismatch (including a fake→OpenAI provider change) is re-embedded
+  automatically. Idempotency is preserved: a re-run with the same
+  provider/model/dimensions/document-version/content performs zero embedding
+  calls and zero writes. A `--force` flag on `npm run embed:catalog` is a
+  recovery escape hatch only, never a substitute for this automatic detection.
 - **No user data, no secrets, no mock-user attribution** ever enters an
   embedding document.
 - **Query input** is the user's search text (string, normalized, non-empty,
@@ -96,11 +105,23 @@ flowchart TD
 | **Latency**                | Keyword / embedding / db / total (live mode only) |
 
 - The harness enforces thresholds and **exits nonzero on a regression**, so a
-  quality drop blocks CI. It emits both JSON and human-readable output.
-- **No live semantic numbers are asserted here.** The exercised paths in this
-  environment are the deterministic secret-free mode (fixture rankings via
-  `FakeEmbeddingProvider`) and the keyword baseline; the live hybrid mode is
-  gated on a local Supabase + `OPENAI_API_KEY`.
+  quality drop blocks CI. It emits both JSON and human-readable output; the JSON
+  report includes the evaluated `identity` (provider / model / dimensions /
+  documentVersion), `catalogCount`, `compatibleCorpusCount`, `corpusComplete`,
+  and `embeddingTokens`.
+- **The harness fails closed in `--live` mode.** Before hybrid evaluation it
+  verifies that **every** catalog title has a stored embedding matching the
+  active provider / model / dimensions / document version; if any fake, stale,
+  incomplete, or incompatible vector remains it **exits nonzero before
+  evaluating** rather than reporting live semantic metrics for a mismatched
+  corpus.
+- **No live semantic numbers are asserted here.** The deterministic secret-free
+  mode (fixture rankings via `FakeEmbeddingProvider`) is explicitly a
+  **secret-free integration / regression** check of the retrieval plumbing —
+  **not** proof of semantic relevance; fake-vector cosine similarity does not
+  demonstrate semantic quality. Only a genuine `--live` OpenAI run (gated on a
+  local Supabase + `OPENAI_API_KEY`) is evidence of semantic quality, and it
+  remains the source of real semantic-quality evidence.
 
 ## Known limitations
 
@@ -110,13 +131,23 @@ flowchart TD
   Matryoshka truncation trades a little theoretical recall for ~3× smaller
   storage/index. Live impact is unmeasured in this environment.
 - Embeddings can go **stale** if the canonical document changes without a
-  re-embed; semantic quality silently degrades until `embed:catalog` runs.
+  re-embed. This is now guarded on both sides: `embed:catalog` re-embeds any row
+  whose complete embedding identity (content / document version / provider /
+  model / dimensions) no longer matches, and the database semantic arm only
+  considers rows whose provenance matches the query's — a stale or incompatible
+  corpus degrades safely to keyword-only rather than mixing embedding spaces.
 - English-oriented full-text configuration; no multilingual handling yet.
 
 ## Failure modes
 
 - **OpenAI unconfigured / kill switch off / embedding timeout or error** →
   return keyword results, mode `keyword_fallback`; the page never errors.
+- **No compatible embedding corpus** (missing / partial / stale / incompatible —
+  the stored provider / model / dimensions / document version do not match the
+  active query embedding) → `compatible_embedding_count` detects it **first**, so
+  the app stays keyword-only **without paying for a query embedding** and records
+  mode `keyword_fallback` with reason `incompatible_corpus`; `hybrid` is never
+  claimed unless a compatible semantic corpus was actually used.
 - **Supabase entirely unconfigured** → existing no-env public browsing is
   preserved; search reports a controlled unavailable state.
 - **Empty / too-long / invalid query** → validated out before any OpenAI call
@@ -150,7 +181,9 @@ flowchart TD
 ## Rollout plan
 
 1. Land the forward-only migrations (catalog enrichment + `search_tsv`/GIN, the
-   private embedding table + pgvector, and the search functions) locally.
+   private embedding table + pgvector, the search functions, and the
+   provenance-guarded search migration `20260815120300` — **local-only** / not
+   yet hosted) locally.
 2. Ship keyword search on `/explore` first — it needs **zero** embeddings and
    works with no OpenAI key.
 3. Generate catalog embeddings locally with `npm run embed:catalog` (service

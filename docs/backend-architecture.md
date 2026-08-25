@@ -675,6 +675,14 @@ decision and the system card.
   **revoked**, so raw vectors are never exposed via the Data API; only
   `service_role` writes it. An **HNSW cosine** index backs semantic lookups.
 - **`20260815120200_search_functions.sql`** — the search functions (below).
+- **`20260815120300_provenance_guarded_search.sql`** — the **22nd** migration
+  overall (**local-only** / not yet hosted). It **drops** the old unguarded
+  `semantic_search(vector, media_kind, integer)` /
+  `hybrid_search(text, vector, media_kind, integer)` overloads and recreates
+  them taking the **server-supplied** expected provenance
+  (`provider` / `model` / `dimensions` / `document_version`), and adds
+  `compatible_embedding_count(provider, model, dimensions, document_version)`
+  (below).
 
 ### The private embedding table + RLS posture
 
@@ -707,20 +715,39 @@ stale document is detectable and re-embeddable.
   `websearch_to_tsquery` — it is never interpolated into SQL. Hybrid fusion
   applies RRF (`k = 60`) and **exact-title protection** so a direct title query
   is never demoted.
+- **Provenance-guarded (migration `20260815120300`).** The current
+  `semantic_search` / `hybrid_search` take the **server-supplied** expected
+  provenance (`provider` / `model` / `dimensions` / `document_version`) and only
+  consider stored rows whose `embedding_provider` / `embedding_model` /
+  `embedding_dimensions` / `document_version` match all four **and** that carry a
+  complete vector — i.e. the same embedding space as the query, never a
+  fake-vs-real mismatch. The expected values always come from the server (config
+  constants + `CANONICAL_DOCUMENT_VERSION`), never from browser input.
+- **`compatible_embedding_count(...)`** — taking the same
+  `provider` / `model` / `dimensions` / `document_version` and returning an
+  `integer` (also `SECURITY DEFINER`, same hardening) — lets the app detect a
+  missing / partial / stale / incompatible corpus cheaply **before** paying for a
+  query embedding.
 
 ### The embedding pipeline
 
 - **Provider interface.** `lib/search/embedding-provider.ts` defines a small
   internal `EmbeddingProvider`. A deterministic `FakeEmbeddingProvider` powers
-  tests / offline eval; a **server-only** OpenAI adapter uses a direct REST
-  `fetch` (no SDK dependency added — secret-free/offline builds stay
-  dependency-free — and swappable behind the interface).
+  tests / offline eval; a **server-only** OpenAI adapter
+  (`lib/search/openai-embedding-provider.ts`) uses the official `openai` npm SDK
+  (v7.x) behind the interface, preserving the strict timeout/abort passthrough,
+  retry/error classification, and API-key redaction. It is imported only in
+  server code, so client bundles are unaffected.
 - **Canonical document.** `lib/search/canonical-document.ts` builds a **pure**,
   **catalog-only** document (title, subtitle, kind, year, genres, credits by
   kind, synopsis) with a stable field order + normalization, versioned
   (`CANONICAL_DOCUMENT_VERSION = "v1"`) and folded with a **SHA-256** content
-  hash that drives **skip-unchanged** and **stale-on-change** re-embedding. It
-  contains **no user data, no secrets, and no mock-user attribution**.
+  hash. Skip-unchanged / stale-on-change re-embedding keys off the **complete
+  embedding identity** — content hash, document version, embedding provider,
+  embedding model, embedding dimensions, **and** a complete vector — so a stored
+  row is re-embedded on **any** mismatch (including a fake→OpenAI provider change)
+  and left untouched (zero calls, zero writes) when all match. It contains **no
+  user data, no secrets, and no mock-user attribution**.
 - **Config + kill switch.** `lib/search/config.ts` centralizes the model,
   `dimensions = 512` (Matryoshka truncation for cost/storage), `RRF_K = 60`,
   candidate limits (50), `DEFAULT_RESULT_LIMIT = 24`, `MAX_RESULT_LIMIT = 50`,
@@ -728,19 +755,29 @@ stale document is detectable and re-embeddable.
   batch/concurrency/retry knobs. The server-only `SEMANTIC_SEARCH_ENABLED` kill
   switch disables semantic (keyword keeps working) when falsey; `OPENAI_API_KEY`
   is server-only and never `NEXT_PUBLIC_`, logged, or surfaced in errors.
-- **Query execution + fallback.** A server-only service validates the query
-  (string, normalized, non-empty, ≤ 200 chars — an empty query never calls
-  OpenAI), always runs keyword, and — when semantic is enabled **and** configured
-  — requests **one** query embedding with a 2500 ms timeout then runs hybrid; on
+- **Query execution + fallback.** A server-only service (`lib/supabase/search.ts`)
+  validates the query (string, normalized, non-empty, ≤ 200 chars — an empty
+  query never calls OpenAI) and always runs keyword. When semantic is enabled
+  **and** configured it calls `compatible_embedding_count` **first**: with **no**
+  compatible corpus it stays keyword-only, does **not** pay for a query
+  embedding, and records mode `keyword_fallback` with reason
+  `incompatible_corpus`. Otherwise it requests **one** query embedding with a
+  2500 ms timeout then runs the provenance-guarded `hybrid_search`; on
   timeout/failure it returns keyword results and never fails the page. Mode is
-  recorded as `hybrid` | `keyword` | `keyword_fallback`. The result limit is
-  server-clamped and the media-kind filter is allow-listed; the app (not the
-  browser) generates the trusted query embedding, and no client-supplied
-  vectors / weights / model / dimensions / SQL are accepted.
+  recorded as `hybrid` | `keyword` | `keyword_fallback`, and `hybrid` is **never**
+  claimed unless a compatible semantic corpus was actually used. The result limit
+  is server-clamped and the media-kind filter is allow-listed; the app (not the
+  browser) generates the trusted query embedding and the expected provenance, and
+  no client-supplied vectors / weights / model / dimensions / SQL are accepted.
 - **Bulk embedding (`npm run embed:catalog`).** A local, service-role,
-  **manual** job embeds the catalog (skip-unchanged via the content hash,
-  re-embed when the versioned document changes). No automatic remote embedding
-  jobs and no hosted mutations exist this phase.
+  **manual** job embeds the catalog, re-embedding only when the **complete
+  embedding identity** (content hash / document version / provider / model /
+  dimensions / complete vector) changes; `embed-catalog.mjs` loads
+  `embedding_provider` / `embedding_model` / `embedding_dimensions` /
+  `document_version` alongside content/embedding state to make that
+  determination. A `--force` flag is a recovery escape hatch that re-embeds
+  everything (not a substitute for the automatic detection). No automatic remote
+  embedding jobs and no hosted mutations exist this phase.
 
 ### Privacy & logging
 
@@ -750,12 +787,19 @@ keyword/embedding/db/total latency, result count, a safe error category, and a
 fallback reason — **never** the query itself, tokens/session, user identity, API
 responses, or vectors.
 
-> **Hosted status for AI Discovery.** The three migrations
-> (`20260815120000` / `20260815120100` / `20260815120200`) are forward-only and
-> additive. **No live semantic evaluation was run** in this environment (no
-> `OPENAI_API_KEY`), so no live semantic quality numbers are claimed; the
-> deterministic secret-free eval mode and the keyword baseline are the exercised
-> paths. Deploy the migrations and configure the server-only secret out of band
+> **Hosted status for AI Discovery.** The four migrations
+> (`20260815120000` / `20260815120100` / `20260815120200` /
+> `20260815120300`) are forward-only and additive; `20260815120300`
+> (provenance-guarded search + `compatible_embedding_count`, the **22nd**
+> migration) is **local-only** / not yet hosted. **No live semantic evaluation
+> was run** in this environment (no `OPENAI_API_KEY`), so no live semantic
+> quality numbers are claimed; the deterministic secret-free eval mode (a
+> secret-free integration/regression check of the retrieval plumbing, **not**
+> proof of semantic relevance) and the keyword baseline are the exercised paths.
+> `npm run eval:search` **fails closed** in `--live` mode (it exits nonzero
+> before evaluating unless every catalog title has a provenance-matched
+> embedding), so only a genuine `--live` OpenAI run is evidence of semantic
+> quality. Deploy the migrations and configure the server-only secret out of band
 > only when the owner chooses to (out of scope for this phase).
 
 ## Supabase clients

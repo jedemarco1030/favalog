@@ -1,3 +1,4 @@
+import { APIError, APIUserAbortError } from "openai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EmbeddingError } from "@/lib/search/embedding-errors";
@@ -6,19 +7,37 @@ import {
   createOpenAIEmbeddingProvider,
 } from "@/lib/search/openai-embedding-provider";
 
-/** Build a minimal fetch Response stand-in with a JSON payload. */
-function makeResponse(ok: boolean, status: number, payload: unknown): Response {
+// The captured mock for `client.embeddings.create`. `vi.mock` is hoisted, so
+// the factory below must not close over module-scope bindings; the shared spy
+// is exposed through the mocked module and re-read in each test.
+const embeddingsCreate = vi.fn();
+
+vi.mock("openai", async (importOriginal) => {
+  // Keep the real error classes (APIError / APIUserAbortError) so the adapter's
+  // `instanceof` checks behave exactly as in production; only the client is
+  // faked so no network call is made and no real key is required.
+  const actual = await importOriginal<typeof import("openai")>();
+  class MockOpenAI {
+    embeddings = { create: embeddingsCreate };
+    constructor(_config: { apiKey: string }) {
+      void _config;
+    }
+  }
   return {
-    ok,
-    status,
-    json: async () => payload,
-  } as unknown as Response;
+    ...actual,
+    default: MockOpenAI,
+  };
+});
+
+/** Build an OpenAI SDK `APIError` for a given HTTP status. */
+function makeApiError(status: number): APIError {
+  return new APIError(status, undefined, "provider detail", new Headers());
 }
 
 const originalApiKey = process.env.OPENAI_API_KEY;
 
 afterEach(() => {
-  vi.unstubAllGlobals();
+  embeddingsCreate.mockReset();
   if (originalApiKey === undefined) {
     delete process.env.OPENAI_API_KEY;
   } else {
@@ -28,18 +47,15 @@ afterEach(() => {
 
 describe("OpenAIEmbeddingProvider.embed", () => {
   it("resolves vectors in input order even when response rows are shuffled by index", async () => {
-    const fetchMock = vi.fn(async () =>
-      makeResponse(true, 200, {
-        model: "text-embedding-3-small",
-        data: [
-          { index: 2, embedding: [0.3] },
-          { index: 0, embedding: [0.1] },
-          { index: 1, embedding: [0.2] },
-        ],
-        usage: { total_tokens: 7 },
-      }),
-    );
-    vi.stubGlobal("fetch", fetchMock);
+    embeddingsCreate.mockResolvedValue({
+      model: "text-embedding-3-small",
+      data: [
+        { index: 2, embedding: [0.3] },
+        { index: 0, embedding: [0.1] },
+        { index: 1, embedding: [0.2] },
+      ],
+      usage: { total_tokens: 7 },
+    });
 
     const provider = new OpenAIEmbeddingProvider("sk-test");
     const response = await provider.embed(["a", "b", "c"]);
@@ -48,20 +64,16 @@ describe("OpenAIEmbeddingProvider.embed", () => {
     expect(response.usage?.totalTokens).toBe(7);
   });
 
-  it("does not call fetch for an empty input array and returns empty vectors", async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-
+  it("does not call the API for an empty input array and returns empty vectors", async () => {
     const provider = new OpenAIEmbeddingProvider("sk-test");
     const response = await provider.embed([]);
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(embeddingsCreate).not.toHaveBeenCalled();
     expect(response.vectors).toEqual([]);
   });
 
-  it("sends the API key only in the Authorization header and never leaks it in errors", async () => {
-    const fetchMock = vi.fn(async () => makeResponse(false, 401, {}));
-    vi.stubGlobal("fetch", fetchMock);
+  it("passes the key only to the SDK client and never leaks it in errors", async () => {
+    embeddingsCreate.mockRejectedValue(makeApiError(401));
 
     const provider = new OpenAIEmbeddingProvider("sk-super-secret");
 
@@ -72,13 +84,9 @@ describe("OpenAIEmbeddingProvider.embed", () => {
       thrown = error;
     }
 
-    // The Authorization header carries `Bearer <key>`.
-    const [, init] = fetchMock.mock.calls[0] as unknown as [
-      string,
-      RequestInit,
-    ];
-    const headers = init.headers as Record<string, string>;
-    expect(headers.Authorization).toBe("Bearer sk-super-secret");
+    // The request payload the adapter sends never contains the key.
+    const [body] = embeddingsCreate.mock.calls[0] as [Record<string, unknown>];
+    expect(JSON.stringify(body)).not.toContain("sk-super-secret");
 
     // The key is never present in the thrown error message.
     expect(thrown).toBeInstanceOf(EmbeddingError);
@@ -93,19 +101,15 @@ describe("OpenAIEmbeddingProvider.embed", () => {
   ] as const)(
     "maps a %s response to an EmbeddingError of kind %s",
     async (status, kind) => {
-      const fetchMock = vi.fn(async () => makeResponse(false, status, {}));
-      vi.stubGlobal("fetch", fetchMock);
+      embeddingsCreate.mockRejectedValue(makeApiError(status));
 
       const provider = new OpenAIEmbeddingProvider("sk-test");
       await expect(provider.embed(["a"])).rejects.toMatchObject({ kind });
     },
   );
 
-  it("wraps a rejected fetch (network failure) as a transient EmbeddingError", async () => {
-    const fetchMock = vi.fn(async () => {
-      throw new TypeError("fetch failed");
-    });
-    vi.stubGlobal("fetch", fetchMock);
+  it("wraps a network failure (statusless error) as a transient EmbeddingError", async () => {
+    embeddingsCreate.mockRejectedValue(new TypeError("fetch failed"));
 
     const provider = new OpenAIEmbeddingProvider("sk-test");
     await expect(provider.embed(["a"])).rejects.toMatchObject({
@@ -113,12 +117,17 @@ describe("OpenAIEmbeddingProvider.embed", () => {
     });
   });
 
-  it("rethrows an AbortError as-is (not wrapped)", async () => {
+  it("rethrows an APIUserAbortError as-is (not wrapped)", async () => {
+    const abort = new APIUserAbortError();
+    embeddingsCreate.mockRejectedValue(abort);
+
+    const provider = new OpenAIEmbeddingProvider("sk-test");
+    await expect(provider.embed(["a"])).rejects.toBe(abort);
+  });
+
+  it("rethrows a raw AbortError as-is (not wrapped)", async () => {
     const abort = Object.assign(new Error("aborted"), { name: "AbortError" });
-    const fetchMock = vi.fn(async () => {
-      throw abort;
-    });
-    vi.stubGlobal("fetch", fetchMock);
+    embeddingsCreate.mockRejectedValue(abort);
 
     const provider = new OpenAIEmbeddingProvider("sk-test");
     await expect(provider.embed(["a"])).rejects.toBe(abort);
