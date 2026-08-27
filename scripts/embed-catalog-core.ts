@@ -49,10 +49,52 @@ export interface EmbedArgs {
 }
 
 /**
- * Parse `process.argv`-style tokens into {@link EmbedArgs}. Deterministic and
- * side-effect free so it is safe to unit test. Unknown flags are ignored.
+ * The outcome of {@link parseArgs}: either the validated arguments or a safe,
+ * secret-free error message explaining the first problem encountered.
  */
-export function parseArgs(argv: readonly string[]): EmbedArgs {
+export type ParseResult =
+  { ok: true; args: EmbedArgs } | { ok: false; error: string };
+
+/**
+ * A concise, secret-free usage message printed on any invalid input. It lists
+ * only the supported option forms and never echoes an environment value or key.
+ */
+export const USAGE = [
+  "Usage: node scripts/embed-catalog.mjs [options]",
+  "",
+  "Supported options:",
+  "  --dry-run                        Preview without writing (no OpenAI key needed).",
+  "  --fake                           Use deterministic FAKE local vectors (dev only).",
+  "  --force                          Re-embed every row (recovery only).",
+  "  --limit <n> | --limit=<n>        Cap catalog rows processed (positive integer).",
+  "  --allow-remote                   Permit a guarded remote (hosted) live write.",
+  "  --confirm-project-ref <ref>      Confirm the exact hosted project reference.",
+  "  --confirm-project-ref=<ref>      (same, `=` form)",
+].join("\n");
+
+/**
+ * Validate a `--limit` token. Accepts ONLY a positive base-10 integer; a
+ * non-integer, decimal, zero, negative, or non-numeric value returns `null`.
+ */
+function parseLimit(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
+  const value = Number.parseInt(trimmed, 10);
+  if (!Number.isInteger(value) || value < 1) return null;
+  return value;
+}
+
+/**
+ * Parse `process.argv`-style tokens into {@link EmbedArgs}. Deterministic and
+ * side-effect free so it is safe to unit test.
+ *
+ * SAFETY-CRITICAL: invalid input is REJECTED rather than silently ignored. An
+ * unknown/misspelled flag (e.g. a typo like `--dryrun`), a missing option value,
+ * an invalid limit, an empty project reference, or a duplicated option all fail
+ * with `ok: false` so the caller can exit nonzero. This prevents a typo from
+ * ever being interpreted as permission to perform a normal (write) run.
+ */
+export function parseArgs(argv: readonly string[]): ParseResult {
   const args: EmbedArgs = {
     dryRun: false,
     fake: false,
@@ -61,22 +103,88 @@ export function parseArgs(argv: readonly string[]): EmbedArgs {
     allowRemote: false,
     confirmProjectRef: undefined,
   };
+  const seen = new Set<string>();
+  const markSeen = (name: string): string | undefined =>
+    seen.has(name)
+      ? `Duplicate or conflicting option '${name}'.`
+      : (seen.add(name), undefined);
+
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg === "--dry-run") args.dryRun = true;
-    else if (arg === "--fake") args.fake = true;
-    else if (arg === "--force") args.force = true;
-    else if (arg === "--allow-remote") args.allowRemote = true;
-    else if (arg === "--limit") args.limit = Number.parseInt(argv[++i], 10);
-    else if (arg === "--confirm-project-ref") {
-      args.confirmProjectRef = argv[++i];
-    } else if (arg.startsWith("--confirm-project-ref=")) {
-      args.confirmProjectRef = arg.slice("--confirm-project-ref=".length);
+
+    if (arg === "--dry-run") {
+      const dup = markSeen("--dry-run");
+      if (dup) return { ok: false, error: dup };
+      args.dryRun = true;
+    } else if (arg === "--fake") {
+      const dup = markSeen("--fake");
+      if (dup) return { ok: false, error: dup };
+      args.fake = true;
+    } else if (arg === "--force") {
+      const dup = markSeen("--force");
+      if (dup) return { ok: false, error: dup };
+      args.force = true;
+    } else if (arg === "--allow-remote") {
+      const dup = markSeen("--allow-remote");
+      if (dup) return { ok: false, error: dup };
+      args.allowRemote = true;
+    } else if (arg === "--limit") {
+      const dup = markSeen("--limit");
+      if (dup) return { ok: false, error: dup };
+      const value = argv[i + 1];
+      if (value === undefined || value.startsWith("--")) {
+        return { ok: false, error: "Missing value for '--limit'." };
+      }
+      i++;
+      const parsed = parseLimit(value);
+      if (parsed === null) {
+        return {
+          ok: false,
+          error: `Invalid --limit value '${value}'; expected a positive integer.`,
+        };
+      }
+      args.limit = parsed;
     } else if (arg.startsWith("--limit=")) {
-      args.limit = Number.parseInt(arg.slice("--limit=".length), 10);
+      const dup = markSeen("--limit");
+      if (dup) return { ok: false, error: dup };
+      const value = arg.slice("--limit=".length);
+      const parsed = parseLimit(value);
+      if (parsed === null) {
+        return {
+          ok: false,
+          error: `Invalid --limit value '${value}'; expected a positive integer.`,
+        };
+      }
+      args.limit = parsed;
+    } else if (arg === "--confirm-project-ref") {
+      const dup = markSeen("--confirm-project-ref");
+      if (dup) return { ok: false, error: dup };
+      const value = argv[i + 1];
+      if (value === undefined || value.startsWith("--")) {
+        return {
+          ok: false,
+          error: "Missing value for '--confirm-project-ref'.",
+        };
+      }
+      i++;
+      if (value.trim() === "") {
+        return { ok: false, error: "Empty value for '--confirm-project-ref'." };
+      }
+      args.confirmProjectRef = value;
+    } else if (arg.startsWith("--confirm-project-ref=")) {
+      const dup = markSeen("--confirm-project-ref");
+      if (dup) return { ok: false, error: dup };
+      const value = arg.slice("--confirm-project-ref=".length);
+      if (value.trim() === "") {
+        return { ok: false, error: "Empty value for '--confirm-project-ref'." };
+      }
+      args.confirmProjectRef = value;
+    } else {
+      return { ok: false, error: `Unknown option '${arg}'.` };
     }
   }
-  return args;
+
+  return { ok: true, args };
 }
 
 /** How a resolved Supabase URL is classified for write-safety decisions. */
@@ -374,8 +482,15 @@ export async function runEmbedCatalog(
   argv: readonly string[],
   deps: EmbedDeps,
 ): Promise<number> {
-  const args = parseArgs(argv);
   const { env, logger } = deps;
+
+  const parsed = parseArgs(argv);
+  if (!parsed.ok) {
+    logger.error(`[embed-catalog] ${parsed.error}`);
+    logger.error(USAGE);
+    return 1;
+  }
+  const args = parsed.args;
 
   const url = env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || "";
   const serviceKey =
@@ -428,11 +543,15 @@ export async function runEmbedCatalog(
       if (args.dryRun) {
         provider = deps.createFakeProvider();
       } else {
+        // A real (non-dry-run, non-fake) embedding run with no usable OpenAI
+        // provider is a FAILURE, never a silent clean no-op: exit nonzero so
+        // automation cannot mistake a missing key for a successful embed.
         logger.error(
-          "[embed-catalog] OPENAI_API_KEY is not configured. Set it to embed, " +
-            "or run with --dry-run to preview, or --fake for deterministic local vectors.",
+          "[embed-catalog] OPENAI_API_KEY is not configured or unusable. Set it " +
+            "to embed, or run with --dry-run to preview, or --fake for " +
+            "deterministic local vectors.",
         );
-        return 0;
+        return 1;
       }
     } else {
       provider = providerResult.provider;

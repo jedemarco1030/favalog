@@ -148,9 +148,16 @@ function createHarness(
 // parseArgs
 // ---------------------------------------------------------------------------
 
-describe("parseArgs", () => {
+/** Assert a successful parse and return the parsed args. */
+function okArgs(argv: string[]) {
+  const result = parseArgs(argv);
+  if (!result.ok) throw new Error(`expected ok parse, got: ${result.error}`);
+  return result.args;
+}
+
+describe("parseArgs — supported forms", () => {
   it("defaults every flag off", () => {
-    expect(parseArgs([])).toEqual({
+    expect(okArgs([])).toEqual({
       dryRun: false,
       fake: false,
       force: false,
@@ -160,18 +167,100 @@ describe("parseArgs", () => {
     });
   });
 
+  it("accepts every supported boolean flag", () => {
+    expect(
+      okArgs(["--dry-run", "--fake", "--force", "--allow-remote"]),
+    ).toEqual({
+      dryRun: true,
+      fake: true,
+      force: true,
+      limit: undefined,
+      allowRemote: true,
+      confirmProjectRef: undefined,
+    });
+  });
+
   it("parses the remote-safety flags in both `=` and space forms", () => {
     expect(
-      parseArgs(["--allow-remote", "--confirm-project-ref=ref123"]),
+      okArgs(["--allow-remote", "--confirm-project-ref=ref123"]),
     ).toMatchObject({ allowRemote: true, confirmProjectRef: "ref123" });
-    expect(parseArgs(["--confirm-project-ref", "ref456"])).toMatchObject({
+    expect(okArgs(["--confirm-project-ref", "ref456"])).toMatchObject({
       confirmProjectRef: "ref456",
     });
   });
 
   it("parses --limit in both forms", () => {
-    expect(parseArgs(["--limit", "5"]).limit).toBe(5);
-    expect(parseArgs(["--limit=7"]).limit).toBe(7);
+    expect(okArgs(["--limit", "5"]).limit).toBe(5);
+    expect(okArgs(["--limit=7"]).limit).toBe(7);
+  });
+});
+
+describe("parseArgs — rejects invalid input (fail-closed)", () => {
+  /** Assert the parse failed with a nonzero-worthy, secret-free error. */
+  function expectRejected(argv: string[]) {
+    const result = parseArgs(argv);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBeTruthy();
+      expect(result.error).not.toContain(SERVICE_KEY);
+    }
+    return result;
+  }
+
+  it("rejects a completely unknown flag", () => {
+    expectRejected(["--nope"]);
+  });
+
+  it("rejects a misspelled flag — a `--dryrun` typo is NOT --dry-run", () => {
+    const result = expectRejected(["--dryrun"]);
+    // Critically, it must not have been silently treated as a dry run.
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects other misspellings of real flags", () => {
+    expectRejected(["--drt-run"]);
+    expectRejected(["--fak"]);
+    expectRejected(["--allowremote"]);
+    expectRejected(["--confirm_project_ref=abc"]);
+  });
+
+  it("rejects a missing --limit value (end of args)", () => {
+    expectRejected(["--limit"]);
+  });
+
+  it("rejects a missing --limit value (followed by another flag)", () => {
+    expectRejected(["--limit", "--fake"]);
+  });
+
+  it("rejects a missing --confirm-project-ref value (end of args)", () => {
+    expectRejected(["--confirm-project-ref"]);
+  });
+
+  it("rejects a missing --confirm-project-ref value (followed by a flag)", () => {
+    expectRejected(["--confirm-project-ref", "--allow-remote"]);
+  });
+
+  it("rejects invalid limits: non-integer, decimal, zero, negative", () => {
+    expectRejected(["--limit", "abc"]);
+    expectRejected(["--limit=abc"]);
+    expectRejected(["--limit", "3.5"]);
+    expectRejected(["--limit=3.5"]);
+    expectRejected(["--limit", "0"]);
+    expectRejected(["--limit=0"]);
+    expectRejected(["--limit", "-5"]);
+    expectRejected(["--limit=-5"]);
+  });
+
+  it("rejects an empty project reference in both forms", () => {
+    expectRejected(["--confirm-project-ref="]);
+    expectRejected(["--confirm-project-ref", "   "]);
+  });
+
+  it("rejects conflicting or ambiguous duplicate options", () => {
+    expectRejected(["--fake", "--fake"]);
+    expectRejected(["--limit", "5", "--limit=7"]);
+    expectRejected(["--allow-remote", "--allow-remote"]);
+    expectRejected(["--confirm-project-ref=a", "--confirm-project-ref=b"]);
   });
 });
 
@@ -440,5 +529,83 @@ describe("runEmbedCatalog", () => {
     });
     const code = await runEmbedCatalog(["--fake"], h.deps);
     expect(code).toBe(2);
+  });
+
+  it("rejects a `--dryrun` typo and never reaches the pipeline", async () => {
+    const h = createHarness({
+      env: { SUPABASE_URL: LOCAL_URL, SUPABASE_SECRET_KEY: SERVICE_KEY },
+    });
+    const code = await runEmbedCatalog(["--dryrun"], h.deps);
+    expect(code).toBe(1);
+    expect(h.runPipeline).not.toHaveBeenCalled();
+    expect(h.supabase.upsertCalls).toHaveLength(0);
+    // A safe usage message is printed; no secret leaks.
+    const all = [...h.logs, ...h.errors].join("\n");
+    expect(all).toContain("Unknown option");
+    expect(all).not.toContain(SERVICE_KEY);
+  });
+
+  it("fails on an unknown flag even alongside valid remote authorization, before DB access", async () => {
+    const h = createHarness({
+      env: { SUPABASE_URL: REMOTE_URL, SUPABASE_SECRET_KEY: SERVICE_KEY },
+      openAiOk: true,
+    });
+    const code = await runEmbedCatalog(
+      ["--allow-remote", `--confirm-project-ref=${REMOTE_REF}`, "--bogus"],
+      h.deps,
+    );
+    expect(code).toBe(1);
+    expect(h.runPipeline).not.toHaveBeenCalled();
+    expect(h.supabase.upsertCalls).toHaveLength(0);
+  });
+
+  it("fails on a missing argument value (--limit with no value)", async () => {
+    const h = createHarness({
+      env: { SUPABASE_URL: LOCAL_URL, SUPABASE_SECRET_KEY: SERVICE_KEY },
+    });
+    const code = await runEmbedCatalog(["--limit"], h.deps);
+    expect(code).toBe(1);
+    expect(h.runPipeline).not.toHaveBeenCalled();
+  });
+
+  it("fails on an invalid limit", async () => {
+    const h = createHarness({
+      env: { SUPABASE_URL: LOCAL_URL, SUPABASE_SECRET_KEY: SERVICE_KEY },
+    });
+    const code = await runEmbedCatalog(["--limit", "0"], h.deps);
+    expect(code).toBe(1);
+    expect(h.runPipeline).not.toHaveBeenCalled();
+  });
+
+  it("a real run without an OpenAI key exits nonzero (never a clean no-op)", async () => {
+    const h = createHarness({
+      env: { SUPABASE_URL: LOCAL_URL, SUPABASE_SECRET_KEY: SERVICE_KEY },
+      openAiOk: false,
+    });
+    const code = await runEmbedCatalog([], h.deps);
+    expect(code).toBe(1);
+    expect(h.runPipeline).not.toHaveBeenCalled();
+    expect(h.supabase.upsertCalls).toHaveLength(0);
+  });
+
+  it("a dry run remains possible without an OpenAI key", async () => {
+    const h = createHarness({
+      env: { SUPABASE_URL: LOCAL_URL, SUPABASE_SECRET_KEY: SERVICE_KEY },
+      openAiOk: false,
+    });
+    const code = await runEmbedCatalog(["--dry-run"], h.deps);
+    expect(code).toBe(0);
+    expect(h.runPipeline).toHaveBeenCalledTimes(1);
+    expect((h.captured.options as { dryRun: boolean }).dryRun).toBe(true);
+  });
+
+  it("a fake local run remains possible without an OpenAI key", async () => {
+    const h = createHarness({
+      env: { SUPABASE_URL: LOCAL_URL, SUPABASE_SECRET_KEY: SERVICE_KEY },
+      openAiOk: false,
+    });
+    const code = await runEmbedCatalog(["--fake"], h.deps);
+    expect(code).toBe(0);
+    expect(h.runPipeline).toHaveBeenCalledTimes(1);
   });
 });
