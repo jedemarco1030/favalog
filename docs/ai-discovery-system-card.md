@@ -3,7 +3,9 @@
 > **Status:** documentation for the **AI Discovery v1** hybrid catalog-retrieval
 > phase. This card describes a **retrieval** system over Favalog's curated
 > catalog. It generates **no** text: every result is a real `media_items` row.
-> Real local evaluation results (2026-08-25) are recorded below.
+> Real local evaluation results (2026-08-25) are recorded below, and AI
+> Discovery v1 is **production-active and verified** as of 2026-08-27 (see
+> **Production state**).
 
 ## Intended use
 
@@ -28,12 +30,11 @@
   feature as "AI-generated".
 - **No client-side embedding** and **no** client-supplied vectors, weights,
   model, dimensions, or SQL — the app generates the trusted query embedding.
-- **No automatic remote embedding jobs.** Schema migrations are applied to
-  hosted Supabase and the app is deployed to production, but writing the
-  embedding corpus to a remote project is never automatic — it is an
-  owner-controlled step gated behind explicit guards (see **Production state**
-  below). The hosted embedding corpus is currently empty, so production runs
-  keyword-only.
+- **No automatic remote embedding jobs.** Writing the embedding corpus to a
+  remote project is never automatic — it is an owner-controlled step gated
+  behind explicit guards (see **Production state** below). Production semantic
+  search was enabled via one such guarded, owner-run backfill; that guard
+  remains the required process for any future production re-embedding.
 
 ## Architecture / data flow
 
@@ -182,30 +183,52 @@ flowchart TD
 
 ## Production state (2026-08-27)
 
+AI Discovery v1 is **production-active and verified**. Production semantic
+retrieval is **enabled and working** on Vercel: hybrid search runs over the
+hosted catalog and still degrades safely to keyword-only on any semantic
+failure.
+
 - **Schema/functions:** all 23 migrations through `20260815120400` — including
   the forward-only AI Discovery migrations (catalog enrichment +
   `search_tsv`/GIN `20260815120000`, the private embedding table + pgvector
   `20260815120100`, the search functions `20260815120200`, the
   provenance-guarded search migration `20260815120300`, and the semantic
   relevance cutoff `20260815120400`) — are **applied to hosted Supabase** (the
-  hosted migration ledger contains them). Commit `2c9ab54` is **deployed to
-  Vercel production** (status Ready).
-- **Hosted embedding corpus is empty.** An accidental hosted fake-embedding
-  write occurred and was cleaned up; the expected state of
-  `public.media_search_documents` is **zero rows** in every category (total,
-  fake-provider, openai-provider, incomplete-provenance), subject to a
-  read-only count verification.
-- **Production semantic retrieval is NOT yet enabled/verified.** Because there
-  are no compatible hosted vectors, `compatible_embedding_count` returns 0 and
-  production serves **keyword-only** results via the existing compatible-corpus
-  fallback (mode `keyword_fallback` / `keyword`). Keyword search remains fully
-  available in production.
-- **Evidence of semantic quality is local.** The live OpenAI evaluation
-  (2026-08-25, above) remains the documented evidence of semantic quality; it
-  was measured locally, not in production.
-- **Enabling production semantic search is an owner-controlled step** (not done
-  in this phase). It requires running the guarded remote backfill and
-  re-verifying:
+  hosted migration ledger contains them). Application commit `2c9ab54` is
+  **deployed to Vercel production** (status Ready); the current repository tip
+  includes commits `77790be` and `d9453e5`.
+- **Hosted embedding corpus is populated.** The guarded, owner-controlled
+  OpenAI backfill (below) **completed successfully**, so
+  `public.media_search_documents` now holds a complete, compatible embedding
+  corpus for the catalog (provider `openai`, model `text-embedding-3-small`,
+  `dimensions: 512`, document version `v1`). The read-only hosted corpus,
+  provenance, compatible-corpus (`compatible_embedding_count` for that exact
+  provenance, matching the 28-title catalog), security, and idempotency checks
+  **all returned their documented expected results**.
+- **Resolved incident (superseded).** An earlier accidental hosted **fake**-
+  embedding write occurred and was **cleaned up before** the guarded real
+  backfill, so no placeholder vectors remained when the OpenAI corpus was
+  written. The remote-write guard (below) was added in response and **remains
+  the required process** for any future production re-embedding.
+- **Production browser verification (2026-08-27).** On the deployed `/explore`,
+  the intent query `a thoughtful sci-fi story about memory and grief` returned
+  relevant catalog results, and the out-of-catalog query `how to file my income
+taxes online this year` returned zero results with the controlled
+  "No matches yet" state.
+- **Four verification layers stay distinct:**
+  - _Local deterministic (fake) evaluation_ — a secret-free integration /
+    regression check of the retrieval plumbing, **not** proof of semantic
+    quality.
+  - _Local live evaluation (2026-08-25)_ — the documented semantic-quality
+    metrics (Recall@5 0.921, MRR 1.000, exact-title top-1 1.000,
+    positiveZeroResultRate 0.000, negativeCleanRate 0.800, hybrid; threshold
+    check PASS), measured locally against a local stack.
+  - _Hosted database verification (2026-08-27)_ — the read-only hosted corpus /
+    provenance / compatible-corpus / security / idempotency checks above, all
+    returning their documented expected results.
+  - _Production browser verification (2026-08-27)_ — the two live `/explore`
+    queries above on the deployed app.
+- **Future re-embedding still requires the owner-controlled guarded backfill:**
 
   ```bash
   # With OPENAI_API_KEY set and the remote Supabase URL resolved:
@@ -236,9 +259,11 @@ flowchart TD
    `SEMANTIC_SEARCH_ENABLED`.
 4. Validate against the golden dataset (`npm run eval:search`) — keyword
    baseline first, then live hybrid on a local stack with `OPENAI_API_KEY`.
-5. Enable production semantic search when the owner chooses to: run the guarded
-   remote backfill (above) with the server-only secret configured out of band,
-   then re-verify. Until then production correctly serves keyword-only results.
+5. Enable production semantic search: run the guarded remote backfill (above)
+   with the server-only secret configured out of band, then re-verify —
+   **done (2026-08-27)**. Production now serves hybrid results and still falls
+   back to keyword-only on any semantic failure. Any future re-embedding must
+   repeat this owner-controlled guarded step.
 
 ## Monitoring plan
 
@@ -252,8 +277,9 @@ flowchart TD
 
 ## Next experiments
 
-- Live hybrid evaluation with a real `OPENAI_API_KEY` to produce the first
-  semantic quality numbers.
+- Hosted evaluation of production semantic search against the golden dataset
+  (the first live semantic-quality numbers were produced locally on 2026-08-25;
+  production is now activated and browser-verified as of 2026-08-27).
 - Compare `dimensions: 512` vs. 1536 on the golden dataset.
 - Weighted or learned fusion (and a possible cross-encoder re-rank) vs. RRF
   `k = 60`.

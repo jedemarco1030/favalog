@@ -278,18 +278,26 @@ favorites loop (**18th**), AI Discovery (**19th–22nd**), and the relevance
 cutoff (**23rd**) are now **applied to hosted Supabase** as well: all **23**
 migrations through `20260815120400` are recorded in the remote
 `schema_migrations` ledger, and commit `2c9ab54` is **deployed to Vercel
-production** (status Ready). One caveat applies to AI Discovery: the hosted
-embedding corpus (`public.media_search_documents`) is currently **empty** (an
-accidental hosted fake-embedding write was cleaned up; the expected state is
-zero rows, subject to a read-only count verification). Because there are no
-compatible hosted vectors, **production semantic retrieval is not yet
-enabled/verified** — production serves **keyword-only** results via the
-existing compatible-corpus fallback (`compatible_embedding_count` returns 0 →
-mode `keyword_fallback` / `keyword`), and keyword search remains fully
-available. Enabling production semantic search is an owner-controlled step
-(not done here): run the guarded remote backfill
+production** (status Ready; the current repository tip includes commits
+`77790be` and `d9453e5`). **AI Discovery v1 is production-active and verified**
+(2026-08-27): the owner-controlled guarded OpenAI backfill completed
+successfully, so the hosted embedding corpus
+(`public.media_search_documents`) now holds a complete, compatible corpus
+(provider `openai`, model `text-embedding-3-small`, `dimensions: 512`, document
+version `v1`) matching the 28-title catalog, and **production semantic
+retrieval is enabled** — hybrid search runs on the deployed `/explore` and still
+degrades to keyword-only on any semantic failure. An earlier accidental hosted
+fake-embedding write was **cleaned up before** this guarded real backfill (no
+placeholder vectors remained). The read-only hosted corpus / provenance /
+compatible-corpus / security / idempotency checks all returned their documented
+expected results, and browser verification confirmed a sci-fi intent query
+returns relevant results while an out-of-catalog query returns the controlled
+"No matches yet" state. The local live evaluation (2026-08-25) remains the
+documented evidence of **semantic quality** and stays distinct from this
+hosted-database and production-browser verification. The remote-write guard
 (`npm run embed:catalog -- --allow-remote --confirm-project-ref=<ref>` with
-`OPENAI_API_KEY` set) and re-verify.
+`OPENAI_API_KEY` set) **remains the required process** for any future production
+re-embedding.
 
 Historical note (2026-08-05): an earlier pass verified the first 8 migrations
 directly via read-only schema introspection plus disposable-account auth flows
@@ -323,22 +331,29 @@ sign-out.
   **applied to hosted Supabase**. The `favorites` table and its RLS were laid
   down earlier (`20260805150600` / `20260805150700`); this migration adds the
   atomic idempotent write RPC.
-- **AI Discovery (hosted schema; corpus empty)**: the AI Discovery migrations
-  (`20260815120000`, `20260815120100`, `20260815120200`, `20260815120300`, and
-  the semantic cutoff `20260815120400` — the 19th–23rd) are **applied to hosted
-  Supabase**. However, the hosted embedding corpus
-  (`public.media_search_documents`) is **empty** (an accidental hosted
-  fake-embedding write was cleaned up; the expected state is zero rows, subject
-  to a read-only count verification). With no compatible hosted vectors,
-  **production semantic retrieval is not yet enabled/verified** — production
-  serves **keyword-only** results via the compatible-corpus fallback
-  (`compatible_embedding_count` returns 0 → mode `keyword_fallback` /
-  `keyword`). Enabling production semantic search is an owner-controlled step
-  (not done here): run the guarded remote backfill
+- **AI Discovery (hosted schema + corpus; production-active)**: the AI Discovery
+  migrations (`20260815120000`, `20260815120100`, `20260815120200`,
+  `20260815120300`, and the semantic cutoff `20260815120400` — the 19th–23rd)
+  are **applied to hosted Supabase**, and the hosted embedding corpus
+  (`public.media_search_documents`) is now **populated** by the owner-controlled
+  guarded OpenAI backfill (2026-08-27): a complete, compatible corpus (provider
+  `openai`, model `text-embedding-3-small`, `dimensions: 512`, document version
+  `v1`) matching the 28-title catalog. An earlier accidental hosted
+  fake-embedding write was **cleaned up before** this real backfill (no
+  placeholder vectors remained). **Production semantic retrieval is enabled and
+  verified**: `compatible_embedding_count > 0` so the deployed `/explore` serves
+  hybrid results and still degrades to keyword-only on any semantic failure. The
+  read-only hosted corpus / provenance / compatible-corpus / security /
+  idempotency checks all returned their documented expected results, and browser
+  verification confirmed a sci-fi intent query returns relevant results while an
+  out-of-catalog query returns the controlled "No matches yet" state (the local
+  live evaluation, 2026-08-25, remains the distinct evidence of semantic
+  quality). Any future production re-embedding **must** repeat the
+  owner-controlled guarded backfill
   (`npm run embed:catalog -- --allow-remote --confirm-project-ref=<ref>` with
-  `OPENAI_API_KEY` set) and re-verify. The remote-write guard rejects a `--fake`
-  write to a remote target (even with `--force`) and rejects a live remote write
-  unless **both** `--allow-remote` and a matching
+  `OPENAI_API_KEY` set); the remote-write guard rejects a `--fake` write to a
+  remote target (even with `--force`) and rejects a live remote write unless
+  **both** `--allow-remote` and a matching
   `--confirm-project-ref=<exact-project-ref>` are supplied.
 
 - **Not exercised in the earliest hosted pass** (require a browser / real email
@@ -482,7 +497,8 @@ live write unless the operator passes **both** `--allow-remote` **and**
 the resolved URL. `--force` never bypasses this guard; remote dry runs stay
 write-free and clearly label the remote target, and authorization is never
 inferred from a service key being present. The owner-operated hosted backfill
-that enables production semantic search is:
+used to enable production semantic search — and required for any future
+production re-embedding — is:
 
 ```bash
 # With OPENAI_API_KEY set and the remote Supabase URL resolved:
@@ -500,15 +516,25 @@ negativeCleanRate 0.800 (hybrid). Threshold check: PASS. These numbers are
 from **local** evaluation and remain the documented evidence of semantic
 quality.
 
-**Production state (2026-08-27):** all 23 migrations (through
-`20260815120400`) are applied to hosted Supabase and commit `2c9ab54` is
-deployed to Vercel production (status Ready). The hosted embedding corpus
-(`public.media_search_documents`) is currently **empty** (an accidental hosted
-fake-embedding write was cleaned up; expected zero rows, subject to a read-only
-count verification), so **production semantic retrieval is not yet
-enabled/verified** — production serves **keyword-only** results via the
-compatible-corpus fallback. Enabling it is an owner-controlled step: run the
-guarded remote backfill and re-verify (see below).
+**Production state (2026-08-27):** AI Discovery v1 is **production-active and
+verified**. All 23 migrations (through `20260815120400`) are applied to hosted
+Supabase and commit `2c9ab54` is deployed to Vercel production (status Ready;
+the current repository tip includes commits `77790be` and `d9453e5`). The
+owner-controlled guarded OpenAI backfill (above) **completed successfully**, so
+the hosted embedding corpus (`public.media_search_documents`) now holds a
+complete, compatible corpus (provider `openai`, model `text-embedding-3-small`,
+`dimensions: 512`, document version `v1`) matching the 28-title catalog; an
+earlier accidental hosted fake-embedding write was **cleaned up before** this
+real backfill. **Production semantic retrieval is enabled and verified:**
+`compatible_embedding_count > 0` so `/explore` serves hybrid results and still
+degrades to keyword-only on any semantic failure. The read-only hosted corpus /
+provenance / compatible-corpus / security / idempotency checks all returned
+their documented expected results, and browser verification confirmed a sci-fi
+intent query returns relevant results while an out-of-catalog query returns the
+controlled "No matches yet" state — distinct from the local live evaluation
+(2026-08-25) above, which remains the evidence of semantic quality. Any future
+production re-embedding **must** repeat the owner-controlled guarded backfill
+(above); the remote-write guard is never bypassed and never automatic.
 
 ### Environment variables
 

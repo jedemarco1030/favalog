@@ -27,19 +27,26 @@
 > (favorites), the **19th–22nd** (AI Discovery retrieval), and the **23rd**
 > (semantic cutoff) — are **applied to hosted Supabase** (the hosted migration
 > ledger contains them), and commit `2c9ab54` is **deployed to Vercel
-> production** (status Ready). The AI Discovery v1 system (hybrid search over
-> the **28** curated titles) has been **evaluated locally** with a live OpenAI
-> run (2026-08-25): Recall@5 0.921, MRR 1.000, exact-title top-1 1.000,
-> positiveZeroResultRate 0.000, negativeCleanRate 0.800 (hybrid) — these are
-> **local** results and remain the documented evidence of semantic quality.
-> **Production semantic retrieval is not yet enabled/verified:** the hosted
-> embedding corpus (`public.media_search_documents`) is currently **empty** (an
-> accidental hosted fake-embedding write was cleaned up; expected zero rows,
-> subject to a read-only count verification), so `compatible_embedding_count`
-> returns 0 and production serves **keyword-only** results via the
-> compatible-corpus fallback. Enabling production semantic search is an
-> owner-controlled step (run the guarded remote backfill and re-verify; see the
-> embedding pipeline section). The
+> production** (status Ready; the current repository tip includes commits
+> `77790be` and `d9453e5`). The AI Discovery v1 system (hybrid search over the
+> **28** curated titles) has been **evaluated locally** with a live OpenAI run
+> (2026-08-25): Recall@5 0.921, MRR 1.000, exact-title top-1 1.000,
+> positiveZeroResultRate 0.000, negativeCleanRate 0.800 (hybrid) — these
+> **local** results remain the documented evidence of semantic quality.
+> **AI Discovery v1 is production-active and verified (2026-08-27):** the
+> owner-controlled guarded OpenAI backfill completed successfully, so the hosted
+> embedding corpus (`public.media_search_documents`) now holds a complete,
+> compatible corpus (provider `openai`, model `text-embedding-3-small`,
+> `dimensions: 512`, document version `v1`) matching the 28-title catalog — an
+> earlier accidental hosted fake-embedding write was **cleaned up before** the
+> real backfill — so `compatible_embedding_count > 0` and production serves
+> hybrid results, still degrading to keyword-only on any semantic failure. The
+> read-only hosted corpus / provenance / compatible-corpus / security /
+> idempotency checks all returned their documented expected results, and browser
+> verification passed on the deployed `/explore` (a sci-fi intent query returned
+> relevant results; an out-of-catalog query returned the controlled
+> "No matches yet" state). The remote-write guard remains the required process
+> for any future production re-embedding (see ADR 0003). The
 > remaining product surfaces (catalog browsing, community reviews) still run on
 > the typed mock-data layer (`@/lib/data`), and **reordering, curator notes, list
 > likes, follower-aware visibility, direct favorite-removal from the profile, and

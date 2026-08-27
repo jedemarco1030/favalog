@@ -382,14 +382,15 @@ Recall@5 (0.947 → 0.921).
   positiveZero ≤ 0.3, negativeClean ≥ 0.8).
 
 **Deployment Status:**
-Superseded by the
+These are **local** numbers (live OpenAI against a local Supabase stack) and
+remain the documented evidence of semantic quality. Production activation
+followed on 2026-08-27 — see the
 [2026-08-27 production-state reconciliation](#amendment-2026-08-27-production-state-reconciliation--remote-write-safety):
-all 23 migrations (through `20260815120400`) are now **hosted** and commit
-`2c9ab54` is deployed to production, but the **hosted embedding corpus is empty**
-so **production semantic search is not yet enabled/verified** (production serves
-keyword-only via the compatible-corpus fallback). The small-catalog limitation
-still applies: the cutoff should be recalibrated if the catalog or model
-changes.
+all 23 migrations (through `20260815120400`) are **hosted**, commit `2c9ab54` is
+deployed to production, the hosted embedding corpus has been **backfilled with
+compatible OpenAI embeddings**, and **production semantic search is enabled and
+browser-verified**. The small-catalog limitation still applies: the cutoff
+should be recalibrated if the catalog or model changes.
 
 ## Amendment (2026-08-27): production-state reconciliation & remote-write safety
 
@@ -397,7 +398,7 @@ This amendment reconciles the documented state with the verified external state
 and records an operational-safety hardening. Nothing in the original decision or
 the 2026-08-25 amendment is reversed.
 
-**Corrected production state (verified read-only, 2026-08-27):**
+**Corrected production state (verified, 2026-08-27):**
 
 - **Schema is hosted.** All 23 migrations through `20260815120400` are present in
   the linked Supabase migration ledger — including the favorites RPC
@@ -405,18 +406,29 @@ the 2026-08-25 amendment is reversed.
   (`20260815120000`–`20260815120400`). Earlier notes calling migrations 18–23
   "local-only / not yet hosted" were inaccurate and are corrected here.
 - **Application is deployed.** Commit `2c9ab54` is the production commit on
-  Vercel (status Ready) and is the tip of `origin/main`.
-- **Hosted embedding corpus is empty.** An accidental hosted **fake**-embedding
-  write occurred and was cleaned up; the expected state (subject to the
-  read-only count verification) is **zero** rows in
-  `public.media_search_documents` across every category (total, fake-provider,
-  OpenAI-provider, incomplete-provenance).
-- **Production semantic retrieval is therefore not yet active/verified.** With no
-  compatible hosted vectors, `compatible_embedding_count` returns 0 and the
-  service stays keyword-only (mode `keyword` / `keyword_fallback`). **Keyword
-  search remains fully available in production.** The local live evaluation
-  (above, 2026-08-25) remains the documented evidence of semantic quality;
-  hosted semantic quality is unproven until a real hosted backfill + re-eval.
+  Vercel (status Ready); the current repository tip includes commits `77790be`
+  and `d9453e5`.
+- **Hosted embedding corpus is populated.** The earlier accidental hosted
+  **fake**-embedding write was **cleaned up before** the guarded real backfill
+  (so no placeholder vectors remained), and the owner-controlled guarded OpenAI
+  backfill then **completed successfully**. `public.media_search_documents` now
+  holds a complete, compatible embedding corpus (provider `openai`, model
+  `text-embedding-3-small`, `dimensions: 512`, document version `v1`). The
+  read-only hosted corpus, provenance, compatible-corpus, security, and
+  idempotency checks all returned their documented expected results, with
+  `compatible_embedding_count` for that provenance matching the 28-title
+  catalog.
+- **Production semantic retrieval is active and verified.** With a compatible
+  hosted corpus, `compatible_embedding_count > 0` and production serves hybrid
+  results, still degrading to keyword-only (mode `keyword` / `keyword_fallback`)
+  on any semantic failure. Browser verification on the deployed `/explore`
+  (2026-08-27) confirmed the intent query
+  `a thoughtful sci-fi story about memory and grief` returns relevant results
+  while the out-of-catalog query `how to file my income taxes online this year`
+  returns zero results with the controlled "No matches yet" state. The local
+  live evaluation (above, 2026-08-25) remains the documented evidence of
+  **semantic quality** and stays distinct from this hosted-database and
+  production-browser verification.
 
 **Incident: accidental hosted fake-embedding write — why remote-target
 confirmation was added.**
@@ -454,10 +466,12 @@ rejected; a fully confirmed remote live run reaching the pipeline in a mocked
 test; and a dry run performing no writes — none of which touch a real network or
 hosted database.
 
-**Owner-controlled production enablement (not performed here).** Turning on
-production semantic search is a deliberate, owner-operated step: run the guarded
-remote backfill with a real key —
+**Owner-controlled production enablement (completed 2026-08-27).** Turning on
+production semantic search was a deliberate, owner-operated step: the guarded
+remote backfill was run with a real key —
 `npm run embed:catalog -- --allow-remote --confirm-project-ref=<ref>` (with
-`OPENAI_API_KEY` set) — then re-verify hosted counts and, ideally, a hosted
-evaluation. This task intentionally does **not** run it, push, deploy, or change
-any Vercel environment variables.
+`OPENAI_API_KEY` set) — and the hosted counts plus production browser behavior
+were re-verified (above). The remote-write guard **remains the required
+process** for any future production re-embedding; it is never bypassed and never
+automatic. This documentation update performs no backfill, remote write, push,
+deploy, or Vercel environment change.

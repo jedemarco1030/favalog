@@ -453,18 +453,30 @@ exists (schema, RLS, clients) and the following are wired to it:
   MRR 1.000, exact-title top-1 1.000, positiveZeroResultRate 0.000,
   negativeCleanRate 0.800 (hybrid). Keyword baseline: Recall@5 0.658, MRR 0.737,
   exact-title top-1 1.000, positiveZeroResultRate 0.263, negativeCleanRate 1.000.
-  Threshold check: PASS. **Production state (2026-08-27):** all 23 migrations
-  through `20260815120400` are hosted, and commit `2c9ab54` is deployed to
-  Vercel production. However, the **hosted embedding corpus is empty** — an
-  accidental hosted fake-embedding write was cleaned up, and the expected state
-  (subject to read-only count verification) is zero rows in
-  `media_search_documents`. Because there are no compatible hosted vectors,
-  **production semantic retrieval is not yet enabled/verified**; production
-  serves keyword-only results via the compatible-corpus fallback. Local live
-  evaluation (above) remains the documented evidence of semantic quality.
-  Enabling production semantic search is an owner-controlled step: run the
-  guarded remote backfill (`npm run embed:catalog -- --allow-remote
---confirm-project-ref=<ref>` with `OPENAI_API_KEY` set) and re-verify. See
+  Threshold check: PASS. **Production state (2026-08-27): AI Discovery v1 is
+  production-active and verified.** All 23 migrations through `20260815120400`
+  are hosted, commit `2c9ab54` is deployed to Vercel production, and the current
+  repository tip includes commits `77790be` and `d9453e5`. The owner-controlled
+  guarded OpenAI backfill completed successfully, so the hosted embedding corpus
+  (`media_search_documents`) now holds a complete, compatible corpus (provider
+  `openai`, model `text-embedding-3-small`, `dimensions: 512`, document version
+  `v1`) matching the 28-title catalog; an earlier accidental hosted
+  fake-embedding write was **cleaned up before** this real backfill (no
+  placeholder vectors remained). With a compatible corpus,
+  `compatible_embedding_count > 0`, so **production semantic retrieval is enabled
+  and verified** — the deployed `/explore` serves hybrid results and still
+  degrades to keyword-only on any semantic failure. Keep the four verification
+  layers distinct: the local deterministic (fake) eval is a secret-free plumbing
+  check; the **local live evaluation (2026-08-25, above)** remains the evidence
+  of semantic quality; the **hosted database verification (2026-08-27)**
+  (read-only corpus / provenance / compatible-corpus / security / idempotency
+  checks) all returned their documented expected results; and the **production
+  browser verification (2026-08-27)** confirmed a sci-fi intent query returns
+  relevant results while an out-of-catalog query returns the controlled
+  "No matches yet" state. Any future production re-embedding **must** repeat the
+  owner-controlled guarded remote backfill (`npm run embed:catalog
+-- --allow-remote --confirm-project-ref=<ref>` with `OPENAI_API_KEY` set) —
+  the remote-write guard is never bypassed and never automatic. See
   [ADR 0003](docs/adr/0003-ai-discovery-hybrid-catalog-retrieval.md) and
   [`docs/ai-discovery-system-card.md`](docs/ai-discovery-system-card.md).
 
