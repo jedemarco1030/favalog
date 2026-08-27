@@ -55,6 +55,15 @@ jobs:
         with:
           name: next-build
           path: .next
+          # `.next` is a DOTFILE directory. actions/upload-artifact@v4 excludes
+          # hidden files by default, so without this the artifact would be
+          # created empty (or skipped) and the downstream `e2e` job would fail
+          # trying to download a `next-build` that never contained the build.
+          include-hidden-files: true
+          # Fail loudly at the PRODUCER if the build output is ever missing,
+          # instead of the default warn-and-continue that hides the problem
+          # until the consumer's download step breaks.
+          if-no-files-found: error
           retention-days: 1
 
   # Database schema + RLS tests against a throwaway local Supabase stack.
@@ -195,13 +204,42 @@ jobs:
       # involved — these credentials belong to the throwaway local stack only.
       - name: Export local Supabase config
         run: |
-          npx supabase status -o env \
+          set -euo pipefail
+          # `supabase status -o env` prints SHELL-QUOTED assignments, e.g.
+          #   NEXT_PUBLIC_SUPABASE_URL="http://127.0.0.1:54321"
+          # Appending that verbatim to $GITHUB_ENV keeps the literal quote
+          # characters (GitHub does NOT strip them), so the embedding CLI would
+          # receive a quoted URL like `"http://127.0.0.1:54321"`, fail to parse
+          # it, and conservatively classify the target as unknown/remote
+          # (breaking the secret-free fake run with `remote_fake_forbidden`).
+          # Instead: SOURCE the trusted first-party assignments into this shell
+          # and re-emit the RESOLVED, UNQUOTED values with printf.
+          status_public="$(npx supabase status -o env \
             --override-name api.url=NEXT_PUBLIC_SUPABASE_URL \
-            --override-name auth.anon_key=NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY \
-            >> "$GITHUB_ENV"
-          npx supabase status -o env \
+            --override-name auth.anon_key=NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)"
+          status_service="$(npx supabase status -o env \
             --override-name api.url=SUPABASE_URL \
-            --override-name auth.service_role_key=SUPABASE_SECRET_KEY \
+            --override-name auth.service_role_key=SUPABASE_SECRET_KEY)"
+          eval "$status_public"
+          eval "$status_service"
+          # Fail closed unless the resolved URL is an unambiguously LOCAL
+          # loopback Supabase endpoint. This guarantees we never publish remote
+          # config into $GITHUB_ENV and keeps the remote-write guard in the
+          # embedding CLI (classifyTarget / authorizeEmbeddingWrite) untouched.
+          case "$SUPABASE_URL" in
+            http://127.0.0.1:* | http://localhost:* | http://0.0.0.0:* | "http://[::1]:"*) ;;
+            *)
+              echo "::error::Refusing to export non-local Supabase URL: ${SUPABASE_URL}"
+              exit 1
+              ;;
+          esac
+          # Export exactly the variables the build + embedding pipeline needs,
+          # unquoted, so the CLI classifies the target as `local`.
+          printf '%s=%s\n' \
+            NEXT_PUBLIC_SUPABASE_URL "$NEXT_PUBLIC_SUPABASE_URL" \
+            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY "$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
+            SUPABASE_URL "$SUPABASE_URL" \
+            SUPABASE_SECRET_KEY "$SUPABASE_SECRET_KEY" \
             >> "$GITHUB_ENV"
 
       # Exercise the embedding plumbing with deterministic FAKE vectors (never
