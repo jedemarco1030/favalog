@@ -388,7 +388,8 @@ exists (schema, RLS, clients) and the following are wired to it:
   `20260815120100` private `media_search_documents` + pgvector,
   `20260815120200` search functions, `20260815120300` provenance-guarded
   search, and `20260815120400` semantic similarity cutoff — the **23rd**
-  migration, **local-only** / not yet hosted). **Security
+  migration). All 23 migrations through `20260815120400` are **applied to
+  hosted Supabase** (the migration ledger contains them). **Security
   model:** the private embedding
   table has RLS enabled with **no** policies and `anon`/`authenticated` revoked
   (raw vectors never leave the server; only `service_role` writes it);
@@ -417,7 +418,13 @@ exists (schema, RLS, clients) and the following are wired to it:
   content hash, document version, provider, model, dimensions, and a complete
   embedding all match the current run — so a later real OpenAI run auto-re-embeds
   rows left by the fake provider; `--force` on `npm run embed:catalog` is a
-  recovery escape hatch, not a substitute. `OPENAI_API_KEY` is
+  recovery escape hatch, not a substitute. Writing embeddings to a **hosted**
+  Supabase project is guarded: `scripts/embed-catalog.mjs` classifies the
+  resolved Supabase URL as local vs remote and, for a remote target, always
+  rejects a `--fake` write (even with `--force`) and rejects a live write unless
+  the operator explicitly passes **both** `--allow-remote` and
+  `--confirm-project-ref=<exact-ref>` matching the resolved URL; `--force` never
+  bypasses this and remote dry runs stay write-free. `OPENAI_API_KEY` is
   server-only (never `NEXT_PUBLIC_`, never logged), and a server-only
   `SEMANTIC_SEARCH_ENABLED` **kill switch** disables semantic while keyword keeps
   working. **Fallback:** `lib/supabase/search.ts` calls
@@ -446,8 +453,18 @@ exists (schema, RLS, clients) and the following are wired to it:
   MRR 1.000, exact-title top-1 1.000, positiveZeroResultRate 0.000,
   negativeCleanRate 0.800 (hybrid). Keyword baseline: Recall@5 0.658, MRR 0.737,
   exact-title top-1 1.000, positiveZeroResultRate 0.263, negativeCleanRate 1.000.
-  Threshold check: PASS. Hosted migrations, hosted embeddings, and production
-  semantic search remain **undeployed and unverified**. See
+  Threshold check: PASS. **Production state (2026-08-27):** all 23 migrations
+  through `20260815120400` are hosted, and commit `2c9ab54` is deployed to
+  Vercel production. However, the **hosted embedding corpus is empty** — an
+  accidental hosted fake-embedding write was cleaned up, and the expected state
+  (subject to read-only count verification) is zero rows in
+  `media_search_documents`. Because there are no compatible hosted vectors,
+  **production semantic retrieval is not yet enabled/verified**; production
+  serves keyword-only results via the compatible-corpus fallback. Local live
+  evaluation (above) remains the documented evidence of semantic quality.
+  Enabling production semantic search is an owner-controlled step: run the
+  guarded remote backfill (`npm run embed:catalog -- --allow-remote
+--confirm-project-ref=<ref>` with `OPENAI_API_KEY` set) and re-verify. See
   [ADR 0003](docs/adr/0003-ai-discovery-hybrid-catalog-retrieval.md) and
   [`docs/ai-discovery-system-card.md`](docs/ai-discovery-system-card.md).
 

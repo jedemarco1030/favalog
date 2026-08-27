@@ -72,9 +72,11 @@ Supabase catalog:
 6. **Forward-only migrations** (after `20260814160300`): catalog enrichment +
    a STORED `search_tsv` with a GIN index (lexical on the public catalog),
    the private embedding table + pgvector, search functions, provenance-guarded
-   retrieval, and a **semantic relevance cutoff**. Migrations `20260815120300`
-   (provenance) and `20260815120400` (cutoff) are **local-only** / not yet hosted
-   — see the [amendment](#amendment-2026-08-25-embedding-provenance-correctness).
+   retrieval, and a **semantic relevance cutoff**. All of these — through
+   `20260815120400` (the 23rd migration overall) — are **applied to hosted
+   Supabase** — see the
+   [amendment](#amendment-2026-08-25-embedding-provenance-correctness) and the
+   [production-state / incident note](#amendment-2026-08-27-production-state-reconciliation--remote-write-safety).
 7. **A server-only query service with keyword fallback.** Validate the query,
    always run keyword; when semantic is enabled and configured, request **one**
    query embedding with a 2500 ms timeout, then run hybrid; on timeout/failure,
@@ -306,7 +308,7 @@ this tightens points 3, 5, 6, and 7 above.
   recovery escape hatch only, not a substitute for the automatic detection.
 - **Semantic retrieval is provenance-guarded at the database.** A new
   forward-only migration `20260815120300_provenance_guarded_search.sql` (the
-  **22nd** migration, **local-only** / not yet hosted) drops the old unguarded
+  **22nd** migration, now **hosted**) drops the old unguarded
   `semantic_search(vector, media_kind, integer)` /
   `hybrid_search(text, vector, media_kind, integer)` overloads and recreates
   them taking the **server-supplied** expected provenance
@@ -363,7 +365,7 @@ stack over the curated 28-title catalog on **2026-08-25**.
 - **Corpus:** 28/28 compatible rows
 
 **Relevance Cutoff:**
-The 23rd migration `20260815120400_semantic_similarity_cutoff.sql` (local-only)
+The 23rd migration `20260815120400_semantic_similarity_cutoff.sql` (now hosted)
 adds an optional `p_max_distance` parameter to `semantic_search` and
 `hybrid_search`. The value is server-supplied from `lib/search/config.ts`
 (`SEMANTIC_MAX_COSINE_DISTANCE = 0.72`, min similarity ≈ 0.28). This precision/
@@ -380,7 +382,82 @@ Recall@5 (0.947 → 0.921).
   positiveZero ≤ 0.3, negativeClean ≥ 0.8).
 
 **Deployment Status:**
-Hosted migrations (`20260815120300` and `20260815120400`), hosted embeddings,
-and production semantic search remain **undeployed and unverified**. The
-small-catalog limitation applies: the cutoff should be recalibrated if the
-catalog or model changes.
+Superseded by the
+[2026-08-27 production-state reconciliation](#amendment-2026-08-27-production-state-reconciliation--remote-write-safety):
+all 23 migrations (through `20260815120400`) are now **hosted** and commit
+`2c9ab54` is deployed to production, but the **hosted embedding corpus is empty**
+so **production semantic search is not yet enabled/verified** (production serves
+keyword-only via the compatible-corpus fallback). The small-catalog limitation
+still applies: the cutoff should be recalibrated if the catalog or model
+changes.
+
+## Amendment (2026-08-27): production-state reconciliation & remote-write safety
+
+This amendment reconciles the documented state with the verified external state
+and records an operational-safety hardening. Nothing in the original decision or
+the 2026-08-25 amendment is reversed.
+
+**Corrected production state (verified read-only, 2026-08-27):**
+
+- **Schema is hosted.** All 23 migrations through `20260815120400` are present in
+  the linked Supabase migration ledger — including the favorites RPC
+  (`20260814160300`) and the five AI Discovery migrations
+  (`20260815120000`–`20260815120400`). Earlier notes calling migrations 18–23
+  "local-only / not yet hosted" were inaccurate and are corrected here.
+- **Application is deployed.** Commit `2c9ab54` is the production commit on
+  Vercel (status Ready) and is the tip of `origin/main`.
+- **Hosted embedding corpus is empty.** An accidental hosted **fake**-embedding
+  write occurred and was cleaned up; the expected state (subject to the
+  read-only count verification) is **zero** rows in
+  `public.media_search_documents` across every category (total, fake-provider,
+  OpenAI-provider, incomplete-provenance).
+- **Production semantic retrieval is therefore not yet active/verified.** With no
+  compatible hosted vectors, `compatible_embedding_count` returns 0 and the
+  service stays keyword-only (mode `keyword` / `keyword_fallback`). **Keyword
+  search remains fully available in production.** The local live evaluation
+  (above, 2026-08-25) remains the documented evidence of semantic quality;
+  hosted semantic quality is unproven until a real hosted backfill + re-eval.
+
+**Incident: accidental hosted fake-embedding write — why remote-target
+confirmation was added.**
+
+The embedding CLI (`scripts/embed-catalog.mjs`) resolved its Supabase target
+purely from environment configuration and wrote wherever that pointed. During
+operation it was pointed at the **hosted** project (a service key was present)
+and a `--fake` run wrote deterministic placeholder vectors into the hosted
+`media_search_documents`. Fake vectors are not a valid semantic space, so a
+silent contamination like this would make hosted "hybrid" results meaningless
+while appearing to work; the rows were removed, but the near-miss showed the
+tool trusted an ambient service key as authorization to mutate production.
+
+To prevent recurrence, the CLI was refactored so its safety- and drift-critical
+logic lives in a tested module (`scripts/embed-catalog-core.ts`) that
+**classifies the resolved Supabase URL** as local (`localhost` / `127.0.0.1` /
+the documented local endpoint) vs remote/hosted and applies an explicit
+write-authorization guard, with no interactive prompt (deterministic for
+automation):
+
+- A **remote `--fake`** write **always** fails nonzero — even with `--force`.
+- A **remote live** write fails nonzero **unless** the operator supplies **both**
+  `--allow-remote` and `--confirm-project-ref=<ref>` whose value **matches** the
+  project reference resolved from the Supabase URL.
+- `--force` never bypasses remote protection; **remote dry runs stay write-free**
+  and clearly label the remote target; local writes keep their prior behavior.
+- Authorization is **never** inferred from the mere presence of a service key,
+  and key redaction / safe structured logging (only a target classification +
+  hostname/project ref, never keys or vectors) is preserved.
+
+The guard is covered by unit/CLI tests (`scripts/embed-catalog-core.test.ts`)
+that prove local fake/live allowed; remote fake (and remote fake `+ --force`)
+rejected; remote live without confirmation, and with a wrong project ref,
+rejected; a fully confirmed remote live run reaching the pipeline in a mocked
+test; and a dry run performing no writes — none of which touch a real network or
+hosted database.
+
+**Owner-controlled production enablement (not performed here).** Turning on
+production semantic search is a deliberate, owner-operated step: run the guarded
+remote backfill with a real key —
+`npm run embed:catalog -- --allow-remote --confirm-project-ref=<ref>` (with
+`OPENAI_API_KEY` set) — then re-verify hosted counts and, ideally, a hosted
+evaluation. This task intentionally does **not** run it, push, deploy, or change
+any Vercel environment variables.

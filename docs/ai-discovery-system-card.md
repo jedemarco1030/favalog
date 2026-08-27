@@ -28,8 +28,12 @@
   feature as "AI-generated".
 - **No client-side embedding** and **no** client-supplied vectors, weights,
   model, dimensions, or SQL — the app generates the trusted query embedding.
-- **No automatic remote embedding jobs, hosted Supabase mutations, or
-  deployment** in this phase.
+- **No automatic remote embedding jobs.** Schema migrations are applied to
+  hosted Supabase and the app is deployed to production, but writing the
+  embedding corpus to a remote project is never automatic — it is an
+  owner-controlled step gated behind explicit guards (see **Production state**
+  below). The hosted embedding corpus is currently empty, so production runs
+  keyword-only.
 
 ## Architecture / data flow
 
@@ -176,12 +180,55 @@ flowchart TD
   key, search runs keyword-only. The key is never `NEXT_PUBLIC_`, never logged,
   never sent to the browser.
 
+## Production state (2026-08-27)
+
+- **Schema/functions:** all 23 migrations through `20260815120400` — including
+  the forward-only AI Discovery migrations (catalog enrichment +
+  `search_tsv`/GIN `20260815120000`, the private embedding table + pgvector
+  `20260815120100`, the search functions `20260815120200`, the
+  provenance-guarded search migration `20260815120300`, and the semantic
+  relevance cutoff `20260815120400`) — are **applied to hosted Supabase** (the
+  hosted migration ledger contains them). Commit `2c9ab54` is **deployed to
+  Vercel production** (status Ready).
+- **Hosted embedding corpus is empty.** An accidental hosted fake-embedding
+  write occurred and was cleaned up; the expected state of
+  `public.media_search_documents` is **zero rows** in every category (total,
+  fake-provider, openai-provider, incomplete-provenance), subject to a
+  read-only count verification.
+- **Production semantic retrieval is NOT yet enabled/verified.** Because there
+  are no compatible hosted vectors, `compatible_embedding_count` returns 0 and
+  production serves **keyword-only** results via the existing compatible-corpus
+  fallback (mode `keyword_fallback` / `keyword`). Keyword search remains fully
+  available in production.
+- **Evidence of semantic quality is local.** The live OpenAI evaluation
+  (2026-08-25, above) remains the documented evidence of semantic quality; it
+  was measured locally, not in production.
+- **Enabling production semantic search is an owner-controlled step** (not done
+  in this phase). It requires running the guarded remote backfill and
+  re-verifying:
+
+  ```bash
+  # With OPENAI_API_KEY set and the remote Supabase URL resolved:
+  npm run embed:catalog -- --allow-remote --confirm-project-ref=<ref>
+  ```
+
+  The embedding CLI classifies the resolved Supabase URL as local vs. remote
+  and hardens remote writes: a remote `--fake` write always fails (even with
+  `--force`), and a remote **live** write fails unless the operator passes
+  **both** `--allow-remote` **and** `--confirm-project-ref=<exact-project-ref>`
+  matching the project reference in the resolved URL. `--force` never bypasses
+  the remote guard; remote dry runs stay write-free and clearly label the
+  remote target; local writes keep their current behavior; authorization is
+  never inferred from a service key being present; keys and vectors are never
+  logged.
+
 ## Rollout plan
 
 1. Land the forward-only migrations (catalog enrichment + `search_tsv`/GIN, the
    private embedding table + pgvector, the search functions, and the
-   provenance-guarded search migration `20260815120300` — **local-only** / not
-   yet hosted) locally.
+   provenance-guarded search migration `20260815120300`) locally, then apply
+   them to hosted Supabase — **done**: all 23 migrations through
+   `20260815120400` are hosted.
 2. Ship keyword search on `/explore` first — it needs **zero** embeddings and
    works with no OpenAI key.
 3. Generate catalog embeddings locally with `npm run embed:catalog` (service
@@ -189,8 +236,9 @@ flowchart TD
    `SEMANTIC_SEARCH_ENABLED`.
 4. Validate against the golden dataset (`npm run eval:search`) — keyword
    baseline first, then live hybrid on a local stack with `OPENAI_API_KEY`.
-5. Deploy migrations to hosted Supabase and configure the server-only secret out
-   of band only when the owner chooses to (out of scope for this phase).
+5. Enable production semantic search when the owner chooses to: run the guarded
+   remote backfill (above) with the server-only secret configured out of band,
+   then re-verify. Until then production correctly serves keyword-only results.
 
 ## Monitoring plan
 

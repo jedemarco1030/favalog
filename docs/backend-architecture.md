@@ -22,15 +22,24 @@
 > `/title/[slug]`, real "Your lists" + "Community lists" and a "Create list"
 > launcher on `/lists`, real `/list/[slug]` detail with owner-only per-item
 > removal and owner-only edit/delete list controls, and a real **Lists** section
-> on `/profile/[username]`). All **17** migrations through
-> `20260814160200_edit_delete_list_rpcs.sql` are **deployed and verified on
-> hosted Supabase**. The **18th** (favorites), **19th–22nd** (AI Discovery
-> retrieval), and **23rd** (semantic cutoff) migrations are **local-only / not
-> yet hosted**. The AI Discovery v1 system (hybrid search over the **28**
-> curated titles) has been **evaluated locally** with a live OpenAI run
-> (2026-08-25): Recall@5 0.921, MRR 1.000, exact-title top-1 1.000,
-> positiveZeroResultRate 0.000, negativeCleanRate 0.800 (hybrid).
-> Hosted search remains undeployed and unverified. The
+> on `/profile/[username]`). All **23** migrations through
+> `20260815120400` — including the **17th** (edit/delete lists), the **18th**
+> (favorites), the **19th–22nd** (AI Discovery retrieval), and the **23rd**
+> (semantic cutoff) — are **applied to hosted Supabase** (the hosted migration
+> ledger contains them), and commit `2c9ab54` is **deployed to Vercel
+> production** (status Ready). The AI Discovery v1 system (hybrid search over
+> the **28** curated titles) has been **evaluated locally** with a live OpenAI
+> run (2026-08-25): Recall@5 0.921, MRR 1.000, exact-title top-1 1.000,
+> positiveZeroResultRate 0.000, negativeCleanRate 0.800 (hybrid) — these are
+> **local** results and remain the documented evidence of semantic quality.
+> **Production semantic retrieval is not yet enabled/verified:** the hosted
+> embedding corpus (`public.media_search_documents`) is currently **empty** (an
+> accidental hosted fake-embedding write was cleaned up; expected zero rows,
+> subject to a read-only count verification), so `compatible_embedding_count`
+> returns 0 and production serves **keyword-only** results via the
+> compatible-corpus fallback. Enabling production semantic search is an
+> owner-controlled step (run the guarded remote backfill and re-verify; see the
+> embedding pipeline section). The
 > remaining product surfaces (catalog browsing, community reviews) still run on
 > the typed mock-data layer (`@/lib/data`), and **reordering, curator notes, list
 > likes, follower-aware visibility, direct favorite-removal from the profile, and
@@ -539,11 +548,10 @@ The favorites shelf table and its policies predate this loop, from
 
 ### The RPC (`20260814160300_set_favorite_rpc.sql`)
 
-> **Local-only / UNVERIFIED on hosted Supabase.** This is the **18th**
-> migration, added after `20260814160200`. All 17 migrations through
-> `20260814160200` are deployed and verified on hosted Supabase; apply
-> `20260814160300` with the deploy procedure below before relying on hosted
-> favorites behavior.
+> **Applied to hosted Supabase.** This is the **18th** migration, added after
+> `20260814160200`. All 23 migrations through `20260815120400` are recorded in
+> the hosted migration ledger, so the `set_favorite` RPC is live on hosted
+> Supabase; the favorites `add` / `remove` loop works in production.
 
 - **Set.** `public.set_favorite(p_media_slug text, p_is_favorite boolean)
 returns jsonb` idempotently adds or removes the caller's favorite for a
@@ -670,14 +678,14 @@ decision and the system card.
   `service_role` writes it. An **HNSW cosine** index backs semantic lookups.
 - **`20260815120200_search_functions.sql`** — the search functions (below).
 - **`20260815120300_provenance_guarded_search.sql`** — the **22nd** migration
-  overall (**local-only** / not yet hosted). It **drops** the old unguarded
+  overall (**applied to hosted Supabase**). It **drops** the old unguarded
   `semantic_search(vector, media_kind, integer)` /
   `hybrid_search(text, vector, media_kind, integer)` overloads and recreates
   them taking the **server-supplied** expected provenance
   (`provider` / `model` / `dimensions` / `document_version`), and adds
   `compatible_embedding_count(provider, model, dimensions, document_version)`.
 - **`20260815120400_semantic_similarity_cutoff.sql`** — the **23rd** migration
-  overall (**local-only** / not yet hosted). It drops the previous
+  overall (**applied to hosted Supabase**). It drops the previous
   provenance-guarded search overloads and recreates them with a trailing
   `p_max_distance real default null` parameter. This optional server-supplied
   cosine distance cutoff filters out low-quality semantic candidates before RRF
@@ -764,15 +772,31 @@ stale document is detectable and re-embeddable.
   is server-clamped and the media-kind filter is allow-listed; the app (not the
   browser) generates the trusted query embedding and the expected provenance, and
   no client-supplied vectors / weights / model / dimensions / SQL are accepted.
-- **Bulk embedding (`npm run embed:catalog`).** A local, service-role,
-  **manual** job embeds the catalog, re-embedding only when the **complete
-  embedding identity** (content hash / document version / provider / model /
-  dimensions / complete vector) changes; `embed-catalog.mjs` loads
+- **Bulk embedding (`npm run embed:catalog`).** A service-role, **manual** job
+  embeds the catalog (local target by default), re-embedding only when the
+  **complete embedding identity** (content hash / document version / provider /
+  model / dimensions / complete vector) changes; `embed-catalog.mjs` loads
   `embedding_provider` / `embedding_model` / `embedding_dimensions` /
   `document_version` alongside content/embedding state to make that
   determination. A `--force` flag is a recovery escape hatch that re-embeds
-  everything (not a substitute for the automatic detection). No automatic remote
-  embedding jobs and no hosted mutations exist this phase.
+  everything (not a substitute for the automatic detection). Embedding writes
+  are **never** automatic on a remote/hosted project.
+- **Guarded remote backfill (owner-operated).** `embed-catalog.mjs` classifies
+  the resolved Supabase URL as **local** vs. **remote** and hardens remote
+  writes. A remote `--fake` write **always** fails nonzero (even with
+  `--force`). A remote **live** write fails nonzero unless the operator passes
+  **both** `--allow-remote` **and** `--confirm-project-ref=<exact-project-ref>`
+  whose value matches the project reference in the resolved URL. `--force` never
+  bypasses this protection; remote dry runs stay write-free and clearly label
+  the remote target; local writes keep their current behavior; authorization is
+  never inferred from a service key being present; keys and vectors are never
+  logged. The owner-operated hosted backfill that enables production semantic
+  search is:
+
+  ```bash
+  # With OPENAI_API_KEY set and the remote Supabase URL resolved:
+  npm run embed:catalog -- --allow-remote --confirm-project-ref=<ref>
+  ```
 
 ### Privacy & logging
 
@@ -783,15 +807,23 @@ fallback reason — **never** the query itself, tokens/session, user identity, A
 responses, or vectors.
 
 > The five AI Discovery migrations through `20260815120400` (the **23rd**
-> migration) are **local-only / not yet hosted**. A genuine live OpenAI
-> evaluation was performed locally (2026-08-25) against a local Supabase stack:
+> migration) are **applied to hosted Supabase**, and commit `2c9ab54` is
+> deployed to Vercel production (status Ready). A genuine live OpenAI evaluation
+> was performed **locally** (2026-08-25) against a local Supabase stack:
 > Recall@5 0.921, MRR 1.000, exact-title top-1 1.000, positiveZeroResultRate 0.000,
 > negativeCleanRate 0.800 (hybrid). Threshold check: PASS.
 > `npm run eval:search` **fails closed** in `--live` mode (it exits nonzero
 > before evaluating unless every catalog title has a provenance-matched
 > embedding), so only a genuine `--live` OpenAI run is evidence of semantic
-> quality. Deploy the migrations and configure the server-only secret out of band
-> only when the owner chooses to (out of scope for this phase).
+> quality — and this evidence is **local**. **Production semantic retrieval is
+> not yet enabled/verified:** the hosted embedding corpus
+> (`public.media_search_documents`) is currently **empty** (an accidental hosted
+> fake-embedding write was cleaned up; expected zero rows, subject to a
+> read-only count verification), so `compatible_embedding_count` returns 0 and
+> production serves **keyword-only** results via the compatible-corpus fallback.
+> Enabling production semantic search is an owner-controlled step: run the
+> guarded remote backfill (see the embedding pipeline section) with the
+> server-only secret configured out of band, then re-verify.
 
 ## Supabase clients
 
@@ -962,7 +994,7 @@ account; clean up test rows afterward):
 
 The persistent-list foundation added **two** forward-only migrations, taking
 the total to **16** (before `20260814160200`, now also hosted, and the later
-local-only favorites migration `20260814160300`):
+favorites migration `20260814160300`, also hosted):
 
 - `20260814160000_list_slug_global_unique.sql` — the global-unique slug index
   (with the fail-loud duplicate guard).
@@ -1164,13 +1196,15 @@ overall, added after `20260814160200`:
 - `20260814160300_set_favorite_rpc.sql` — `public.set_favorite` and its
   `authenticated`-only grant.
 
-> **Local-only / UNVERIFIED on hosted Supabase** until the owner performs the
-> deploy + checks below. Existing migrations are immutable; this migration is
+> **Applied to hosted Supabase.** This migration **has been deployed** to the
+> hosted project (recorded in the remote ledger as part of all 23 migrations
+> through `20260815120400`). Existing migrations are immutable; this migration is
 > additive (one new function + grants — the `favorites` table and its RLS were
-> laid down earlier in `20260805150600` / `20260805150700`). Apply it the same
-> way as prior forward-only pushes — **never** `db reset --linked`, **never**
-> remote seed — so only the not-yet-applied `20260814160300` lands (no wipe of
-> hosted data):
+> laid down earlier in `20260805150600` / `20260805150700`). It was applied the
+> same way as prior forward-only pushes — **never** `db reset --linked`,
+> **never** remote seed — so only the not-yet-applied `20260814160300` landed (no
+> wipe of hosted data). The procedure and checklist below are retained as the
+> historical apply path:
 
 ```bash
 supabase link --project-ref <hosted-dev-ref>   # confirm the exact project
@@ -1237,10 +1271,11 @@ afterward):
    personalized "Favorited", no toggle) routing through the safe `returnTo`.
 7. Confirm the browser never receives the service-role key.
 
-> **Hosted status for favorites:** migration `20260814160300` has **not** been
-> applied to, or verified against, the hosted project. It was developed and
-> verified **locally only**. Apply and verify it with the procedure and checklist
-> above before relying on the hosted favorites loop.
+> **Hosted status for favorites:** migration `20260814160300` **has been
+> applied** to the hosted project (part of all 23 migrations through
+> `20260815120400`), and the favorites `add` / `remove` loop works in
+> production. It was also developed and verified locally. The procedure and
+> checklist above are retained as the historical apply path.
 
 ## Seed assumptions
 
@@ -1271,7 +1306,7 @@ of the full mock catalog):
 - **Favorite reordering and a direct favorite-removal control on the profile.**
   (The persistent favorites **add / remove** loop from the title page now exists
   — see "Persistent favorites loop" above; its migration `20260814160300` is
-  local-only until deployed.)
+  applied to hosted Supabase.)
 - Follows UI, and real likes persistence for reviews **and** lists (and any
   dedicated activity/event table).
 - Migrating the remaining product surfaces (catalog browsing, community

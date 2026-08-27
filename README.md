@@ -275,7 +275,21 @@ non-disclosure, immutable-slug edits, and the authoritative post-delete redirect
 to `/lists` (the former list URL correctly becomes not-found; commit `53eac02`
 fixed the client-navigation race) have been confirmed. Migrations for the
 favorites loop (**18th**), AI Discovery (**19th–22nd**), and the relevance
-cutoff (**23rd**) are **local-only** and unverified on hosted Supabase.
+cutoff (**23rd**) are now **applied to hosted Supabase** as well: all **23**
+migrations through `20260815120400` are recorded in the remote
+`schema_migrations` ledger, and commit `2c9ab54` is **deployed to Vercel
+production** (status Ready). One caveat applies to AI Discovery: the hosted
+embedding corpus (`public.media_search_documents`) is currently **empty** (an
+accidental hosted fake-embedding write was cleaned up; the expected state is
+zero rows, subject to a read-only count verification). Because there are no
+compatible hosted vectors, **production semantic retrieval is not yet
+enabled/verified** — production serves **keyword-only** results via the
+existing compatible-corpus fallback (`compatible_embedding_count` returns 0 →
+mode `keyword_fallback` / `keyword`), and keyword search remains fully
+available. Enabling production semantic search is an owner-controlled step
+(not done here): run the guarded remote backfill
+(`npm run embed:catalog -- --allow-remote --confirm-project-ref=<ref>` with
+`OPENAI_API_KEY` set) and re-verify.
 
 Historical note (2026-08-05): an earlier pass verified the first 8 migrations
 directly via read-only schema introspection plus disposable-account auth flows
@@ -290,11 +304,12 @@ trigger, sign-in, wrong-password rejection, owner onboarding update,
 case-insensitive duplicate-username rejection, RLS cross-user-update block, and
 sign-out.
 
-- **Schema & migrations (current)**: all **17** migrations through
-  `20260814160200` are on hosted Supabase — tables, both enums (`media_kind`,
+- **Schema & migrations (current)**: all **23** migrations through
+  `20260815120400` are on hosted Supabase — tables, both enums (`media_kind`,
   `list_visibility`), triggers/functions, constraints, indexes, RLS on every
-  table, diary RPCs, and the full list create/add/remove **and** edit/delete
-  RPCs match the intended owner-write / public-read model.
+  table, diary RPCs, the full list create/add/remove **and** edit/delete RPCs,
+  the favorites RPC, and the AI Discovery search schema/functions match the
+  intended owner-write / public-read (and private-embedding) model.
 - **Database types (current)**: `lib/database.types.ts` is **genuinely
   generated** via `npm run supabase:types` and drift-checked; do not hand-edit
   it. Regenerate only when a migration changes the schema.
@@ -303,26 +318,28 @@ sign-out.
   `public.delete_list`) is **deployed and verified** on hosted Supabase; list
   metadata editing (immutable slug), whole-list deletion, and the post-delete
   redirect to `/lists` are live.
-- **Favorites (local only)**: migration
+- **Favorites (hosted)**: migration
   `20260814160300_set_favorite_rpc.sql` (the 18th — `public.set_favorite`) is
-  **applied and verified locally only** and is **not yet** on hosted Supabase.
-  The `favorites` table and its RLS were laid down earlier (`20260805150600` /
-  `20260805150700`); this migration only adds the atomic idempotent write RPC.
-  Deploy later with a forward-only push (never `db reset --linked`, never remote
-  seed):
-
-  ```bash
-  supabase link --project-ref <hosted-dev-ref>   # confirm the exact project
-  supabase migration list --linked               # inspect the remote ledger
-  supabase db push --dry-run                      # expect ONLY 20260814160300
-  supabase db push                                # apply pending migrations
-                                                  # (or: supabase migration up --linked)
-  npm run supabase:types                          # regenerate types; second run
-                                                  # must be byte-identical
-  ```
-
-  Full post-deploy SQL checks and the manual production checklist live in
-  [`docs/backend-architecture.md`](docs/backend-architecture.md#deploying-the-favorites-migration-20260814160300).
+  **applied to hosted Supabase**. The `favorites` table and its RLS were laid
+  down earlier (`20260805150600` / `20260805150700`); this migration adds the
+  atomic idempotent write RPC.
+- **AI Discovery (hosted schema; corpus empty)**: the AI Discovery migrations
+  (`20260815120000`, `20260815120100`, `20260815120200`, `20260815120300`, and
+  the semantic cutoff `20260815120400` — the 19th–23rd) are **applied to hosted
+  Supabase**. However, the hosted embedding corpus
+  (`public.media_search_documents`) is **empty** (an accidental hosted
+  fake-embedding write was cleaned up; the expected state is zero rows, subject
+  to a read-only count verification). With no compatible hosted vectors,
+  **production semantic retrieval is not yet enabled/verified** — production
+  serves **keyword-only** results via the compatible-corpus fallback
+  (`compatible_embedding_count` returns 0 → mode `keyword_fallback` /
+  `keyword`). Enabling production semantic search is an owner-controlled step
+  (not done here): run the guarded remote backfill
+  (`npm run embed:catalog -- --allow-remote --confirm-project-ref=<ref>` with
+  `OPENAI_API_KEY` set) and re-verify. The remote-write guard rejects a `--fake`
+  write to a remote target (even with `--force`) and rejects a live remote write
+  unless **both** `--allow-remote` and a matching
+  `--confirm-project-ref=<exact-project-ref>` are supplied.
 
 - **Not exercised in the earliest hosted pass** (require a browser / real email
   inbox / dashboard): the sign-up UI + email-confirmation link, browser
@@ -450,19 +467,48 @@ npm run eval:search        # Run the offline search evaluation harness
                            # rate, negative clean rate, per-category; nonzero exit)
 ```
 
-`embed:catalog` requires a local Supabase stack and `OPENAI_API_KEY`. A stored
-row is treated as unchanged only when the provider, model, dimensions, document
-version, **and** content hash all match what the current run would produce (so a
-later real OpenAI run automatically re-embeds rows left by the deterministic
-fake provider); `--force` is a recovery escape hatch, not a substitute for that
-automatic detection. `eval:search` runs a deterministic **secret-free** mode
+`embed:catalog` targets a **local** Supabase stack by default and needs
+`OPENAI_API_KEY`. A stored row is treated as unchanged only when the provider,
+model, dimensions, document version, **and** content hash all match what the
+current run would produce (so a later real OpenAI run automatically re-embeds
+rows left by the deterministic fake provider); `--force` is a recovery escape
+hatch, not a substitute for that automatic detection.
+
+Writing embeddings to a **hosted** (remote) Supabase project is guarded. The
+CLI classifies the resolved Supabase URL as local vs. remote and, for a remote
+target, always rejects a `--fake` write (even with `--force`) and rejects a
+live write unless the operator passes **both** `--allow-remote` **and**
+`--confirm-project-ref=<exact-project-ref>` matching the project reference in
+the resolved URL. `--force` never bypasses this guard; remote dry runs stay
+write-free and clearly label the remote target, and authorization is never
+inferred from a service key being present. The owner-operated hosted backfill
+that enables production semantic search is:
+
+```bash
+# With OPENAI_API_KEY set and the remote Supabase URL resolved:
+npm run embed:catalog -- --allow-remote --confirm-project-ref=<ref>
+```
+
+`eval:search` runs a deterministic **secret-free** mode
 (fixtures) and a **keyword baseline**; its **live hybrid** mode is gated on a local
 Supabase + `OPENAI_API_KEY`. It enforces quality gates: `minRecallAt5 = 0.55`,
 `minMrr = 0.6`, `minExactTitleTop1Accuracy = 1.0`, `maxPositiveZeroResultRate = 0.3`,
 and `minNegativeCleanRate = 0.8`. In `--live` mode it **fails closed** if any
 stale vector remains. **Live metrics (local, 28-title catalog, 2026-08-25):**
 Recall@5 0.921, MRR 1.000, exact-title top-1 1.000, positiveZeroResultRate 0.000,
-negativeCleanRate 0.800 (hybrid). Threshold check: PASS.
+negativeCleanRate 0.800 (hybrid). Threshold check: PASS. These numbers are
+from **local** evaluation and remain the documented evidence of semantic
+quality.
+
+**Production state (2026-08-27):** all 23 migrations (through
+`20260815120400`) are applied to hosted Supabase and commit `2c9ab54` is
+deployed to Vercel production (status Ready). The hosted embedding corpus
+(`public.media_search_documents`) is currently **empty** (an accidental hosted
+fake-embedding write was cleaned up; expected zero rows, subject to a read-only
+count verification), so **production semantic retrieval is not yet
+enabled/verified** — production serves **keyword-only** results via the
+compatible-corpus fallback. Enabling it is an owner-controlled step: run the
+guarded remote backfill and re-verify (see below).
 
 ### Environment variables
 
