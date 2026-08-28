@@ -822,15 +822,21 @@ responses, or vectors.
 > `npm run eval:search` **fails closed** in `--live` mode (it exits nonzero
 > before evaluating unless every catalog title has a provenance-matched
 > embedding), so only a genuine `--live` OpenAI run is evidence of semantic
-> quality — and this evidence is **local**. **Production semantic retrieval is
-> not yet enabled/verified:** the hosted embedding corpus
-> (`public.media_search_documents`) is currently **empty** (an accidental hosted
-> fake-embedding write was cleaned up; expected zero rows, subject to a
-> read-only count verification), so `compatible_embedding_count` returns 0 and
-> production serves **keyword-only** results via the compatible-corpus fallback.
-> Enabling production semantic search is an owner-controlled step: run the
-> guarded remote backfill (see the embedding pipeline section) with the
-> server-only secret configured out of band, then re-verify.
+> quality — and this evidence is **local**. **AI Discovery v1 is
+> production-active and verified (2026-08-27):** the owner-controlled guarded
+> OpenAI backfill completed successfully, so the hosted embedding corpus
+> (`public.media_search_documents`) now holds a complete, provenance-compatible
+> corpus matching the 28-title catalog — an earlier accidental hosted
+> fake-embedding write was **cleaned up before** the real backfill — so
+> `compatible_embedding_count > 0` and production serves hybrid results, still
+> degrading to keyword-only on any semantic failure. The read-only hosted
+> corpus / provenance / compatible-corpus / security / idempotency checks all
+> returned their documented expected results, and browser verification passed on
+> the deployed `/explore`. These hosted operational and browser verifications
+> remain distinct from the **local** live-evaluation metrics above. Any future
+> production re-embedding remains an owner-controlled step: run the guarded
+> remote backfill (see the embedding pipeline section) with the server-only
+> secret configured out of band, then re-verify.
 
 ## Supabase clients
 
