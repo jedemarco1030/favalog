@@ -249,6 +249,36 @@ jobs:
       - name: Populate fake catalog embeddings
         run: npm run embed:catalog -- --fake
 
+      # DETERMINISTIC retrieval evaluation — INTEGRATION/REGRESSION evidence ONLY.
+      #
+      # This runs the SAME harness + threshold gate as local dev, over the fake
+      # embeddings seeded above, and writes the machine-readable JSON report.
+      # It is a SECRET-FREE check of the retrieval PLUMBING (schema, functions,
+      # fusion, fallback) — NOT proof of semantic relevance; only a genuine
+      # `--live` OpenAI run (never in ordinary CI) is evidence of that.
+      #
+      # `pipefail` is set so a failed evaluation piped through `tee` cannot look
+      # successful, the harness's threshold-based NONZERO exit is preserved, and
+      # a missing/empty report fails the step clearly.
+      - name: Retrieval evaluation (deterministic; NOT semantic-quality evidence)
+        run: |
+          set -euo pipefail
+          mkdir -p eval-reports
+          npm run --silent eval:search -- --json | tee eval-reports/search-eval.json
+          test -s eval-reports/search-eval.json \
+            || { echo "::error::Retrieval evaluation produced no JSON report."; exit 1; }
+
+      - name: Upload deterministic retrieval evaluation report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          # Honestly labelled: deterministic integration/regression evidence,
+          # NOT live semantic-quality evidence.
+          name: search-eval-deterministic-integration
+          path: eval-reports/search-eval.json
+          if-no-files-found: error
+          retention-days: 7
+
       # Build with the local stack's public config now present in the
       # environment, so Next inlines a Supabase-CONFIGURED build for the strict
       # `configured` suite.

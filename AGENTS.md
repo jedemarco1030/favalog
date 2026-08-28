@@ -438,8 +438,12 @@ exists (schema, RLS, clients) and the following are wired to it:
   semantic corpus was actually used, and with Supabase entirely unconfigured the
   no-env
   public browsing is preserved. No LLM-generated text, no raw similarity scores
-  shown, no client-supplied vectors/weights/model/dimensions/SQL, and raw query
-  text is never persisted (logs carry length/mode/latency/category only). An
+  shown, no client-supplied vectors/weights/model/dimensions/SQL, and Favalog
+  does **not intentionally write raw query text** to its database, structured
+  `catalog_search` event, or custom product-event properties (logs carry
+  length/mode/latency/category only) — though the shareable `?q=` URL still
+  places the query in browser history and hosting request logs may retain URL
+  search parameters per platform configuration. An
   offline eval harness (`npm run eval:search`, plus `npm run embed:catalog`)
   measures Recall@5 / MRR / exact-title top-1 / positiveZeroResultRate /
   negativeCleanRate with a nonzero exit on regression and **fails closed** in
@@ -479,6 +483,41 @@ exists (schema, RLS, clients) and the following are wired to it:
   the remote-write guard is never bypassed and never automatic. See
   [ADR 0003](docs/adr/0003-ai-discovery-hybrid-catalog-retrieval.md) and
   [`docs/ai-discovery-system-card.md`](docs/ai-discovery-system-card.md).
+- **AI Discovery Operations v1 — observability, CI evaluation, aggregate
+  signals (operational hardening; not a new feature).** Server telemetry is a
+  **versioned, closed** event (`event: "catalog_search"`, `schemaVersion`) built
+  by the single choke point `lib/search/log.ts`: it adds `zeroResult`,
+  `semanticAttempted`, and `compatibleCorpus`, and **splits** the old ambiguous
+  `dbMs` into a distinct compatibility-check latency (`compatMs`) and
+  hybrid-database latency (`hybridDbMs`) so one DB duration never overwrites the
+  other. It carries only safe fields and never the query text, media title/slug,
+  vectors, provider responses, user identity, or credentials; the emit seam stays
+  dependency-injected (tests need no Vercel/OpenAI/Supabase), an empty query
+  emits nothing, and no-env stays silent. Explore also emits two **coarse**
+  Vercel Web Analytics events via `lib/analytics/search-analytics.ts`
+  (`explore_search`, `explore_result_selected`) with only mode / filter / result
+  kind / zero-result / **bucketed** result-count / **bucketed** rank — never the
+  query, title/slug, request id, or user identity — and analytics failure never
+  affects navigation or search (`components/media/media-card.tsx` gained an
+  optional keyboard-safe `onSelect`). The root `<Analytics>` integration is
+  wrapped (`components/analytics/analytics.tsx`) so its `beforeSend` hook strips
+  the `?q=` parameter from every analytics event URL via the pure, tested
+  `redactAnalyticsUrl` (`lib/analytics/redact-analytics-url.ts`), failing closed
+  on an unparseable URL; this governs only Favalog's analytics telemetry, not
+  Vercel Runtime Logs or request-log retention. `semanticAttempted` is `true`
+  only when a successful keyword path actually enters the semantic upgrade, so a
+  keyword-retrieval failure keeps it `false`. CI's secret-free seeded Explore integration
+  job now runs the **deterministic** eval harness in JSON mode (with `pipefail`,
+  the threshold nonzero-exit preserved, missing-report failure) and uploads the
+  report as an artifact **honestly labelled deterministic
+  integration/regression evidence — not live semantic-quality evidence**; no
+  OpenAI/hosted-Supabase secrets are added and CI never touches production. The
+  operational contract (metric formulas, SLOs/guardrails, firm-alert vs baseline,
+  investigation playbooks, `SEMANTIC_SEARCH_ENABLED` rollback, guarded
+  re-embedding, privacy/retention) is in the
+  [operations runbook](docs/ai-discovery-operations.md). This phase only **emits**
+  events; Vercel dashboards/alerts/retention are an explicit **owner task** and
+  are **not** configured here.
 
 Everything else is still mock-data. Do **not** introduce any of the following
 without an explicit task: migrating the remaining product pages off mock data,

@@ -14,6 +14,13 @@ interface MediaCardProps {
   variant?: "poster" | "wide";
   className?: string;
   priority?: boolean;
+  /**
+   * Optional selection callback fired on the card's link activation (click or
+   * keyboard). Used by client surfaces (e.g. Explore search) for best-effort
+   * aggregate analytics; navigation proceeds regardless. Only provide this from
+   * within a Client Component.
+   */
+  onSelect?: () => void;
 }
 
 /**
@@ -29,6 +36,7 @@ export function MediaCard({
   variant = "poster",
   className,
   priority = false,
+  onSelect,
 }: MediaCardProps) {
   const href = `/title/${item.slug}`;
 
@@ -42,6 +50,7 @@ export function MediaCard({
       >
         <Link
           href={href}
+          onClick={onSelect}
           className="flex gap-5 rounded-xl p-4 outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           <MediaPoster
@@ -74,6 +83,7 @@ export function MediaCard({
     <article className={cn("group", className)}>
       <Link
         href={href}
+        onClick={onSelect}
         className="flex flex-col gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-accent"
         aria-label={`${item.title} (${mediaKindLabel(item.kind)}, ${item.year})`}
       >

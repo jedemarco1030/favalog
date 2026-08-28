@@ -101,10 +101,11 @@ describe("searchCatalog", () => {
   it("returns empty for a whitespace-only query without touching the client or provider", async () => {
     const client = makeClient();
     const createProvider = vi.fn();
+    const log = vi.fn();
     const deps: SearchDeps = {
       getClient: async () => client,
       createProvider,
-      log: vi.fn(),
+      log,
       now: makeClock(),
     };
 
@@ -113,6 +114,8 @@ describe("searchCatalog", () => {
     expect(outcome.status).toBe("empty");
     expect(client.rpc).not.toHaveBeenCalled();
     expect(createProvider).not.toHaveBeenCalled();
+    // No provider call AND no misleading completed-search event is emitted.
+    expect(log).not.toHaveBeenCalled();
   });
 
   it("returns unavailable when Supabase is not configured", async () => {
@@ -120,13 +123,16 @@ describe("searchCatalog", () => {
     delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
     const client = makeClient();
+    const log = vi.fn();
     const outcome = await searchCatalog(
       { query: "afterglow" },
-      { getClient: async () => client, log: vi.fn(), now: makeClock() },
+      { getClient: async () => client, log, now: makeClock() },
     );
 
     expect(outcome.status).toBe("unavailable");
     expect(client.rpc).not.toHaveBeenCalled();
+    // No-env behaviour stays safe: nothing is emitted.
+    expect(log).not.toHaveBeenCalled();
   });
 
   it("runs keyword-only when semantic is not attempted", async () => {
@@ -152,10 +158,17 @@ describe("searchCatalog", () => {
     expect(logged.mode).toBe("keyword");
     expect(logged.queryLength).toBe("afterglow".length);
     expect(logged).not.toHaveProperty("query");
+    // Semantic was intentionally not attempted; no compatibility check ran.
+    expect(logged.semanticAttempted).toBe(false);
+    expect(logged.compatibleCorpus).toBe(false);
+    expect(logged.compatMs).toBeUndefined();
+    expect(logged.hybridDbMs).toBeUndefined();
+    expect(logged.zeroResult).toBe(false);
   });
 
   it("upgrades to hybrid when semantic is attempted and the provider succeeds", async () => {
     const client = makeClient();
+    const log = vi.fn();
     const outcome = await searchCatalog(
       { query: "afterglow" },
       {
@@ -165,7 +178,7 @@ describe("searchCatalog", () => {
           ok: true,
           provider: new FakeEmbeddingProvider(),
         }),
-        log: vi.fn(),
+        log,
         now: makeClock(),
       },
     );
@@ -174,6 +187,18 @@ describe("searchCatalog", () => {
     if (outcome.status !== "ok") throw new Error("expected ok");
     expect(outcome.mode).toBe("hybrid");
     expect(outcome.items.map((i) => i.slug)).toEqual(["hybrid-hit"]);
+
+    // The hybrid event reports semantic-attempted + compatible-corpus and keeps
+    // the compatibility-check and hybrid-database timings DISTINCT (neither one
+    // overwrites the other), plus the embedding cost signals.
+    const logged = log.mock.calls[0][0];
+    expect(logged.mode).toBe("hybrid");
+    expect(logged.semanticAttempted).toBe(true);
+    expect(logged.compatibleCorpus).toBe(true);
+    expect(logged.compatMs).toBeTypeOf("number");
+    expect(logged.hybridDbMs).toBeTypeOf("number");
+    expect(logged.embeddingModel).toBeTypeOf("string");
+    expect(logged).not.toHaveProperty("dbMs");
 
     // The hybrid RPC was called with a serialized string embedding AND the
     // server-supplied expected provenance (never client input).
@@ -195,13 +220,14 @@ describe("searchCatalog", () => {
   it("stays keyword-only (no embedding) when no compatible corpus exists", async () => {
     const client = makeClient({ compatibleCount: { data: 0, error: null } });
     const createProvider = vi.fn();
+    const log = vi.fn();
     const outcome = await searchCatalog(
       { query: "afterglow" },
       {
         getClient: async () => client,
         attemptSemantic: () => true,
         createProvider,
-        log: vi.fn(),
+        log,
         now: makeClock(),
       },
     );
@@ -217,6 +243,13 @@ describe("searchCatalog", () => {
     expect(client.rpc.mock.calls.some(([fn]) => fn === "hybrid_search")).toBe(
       false,
     );
+    // The event reports the compatibility check ran (compatMs) but found no
+    // compatible corpus, and no hybrid-database timing exists.
+    const logged = log.mock.calls[0][0];
+    expect(logged.semanticAttempted).toBe(true);
+    expect(logged.compatibleCorpus).toBe(false);
+    expect(logged.compatMs).toBeTypeOf("number");
+    expect(logged.hybridDbMs).toBeUndefined();
   });
 
   it("falls back to keyword when the compatible-corpus count errors", async () => {
@@ -331,12 +364,13 @@ describe("searchCatalog", () => {
     const client = makeClient({
       keyword: { data: null, error: { message: "kaput" } },
     });
+    const log = vi.fn();
     const outcome = await searchCatalog(
       { query: "afterglow" },
       {
         getClient: async () => client,
         attemptSemantic: () => false,
-        log: vi.fn(),
+        log,
         now: makeClock(),
       },
     );
@@ -344,6 +378,83 @@ describe("searchCatalog", () => {
     expect(outcome.status).toBe("error");
     if (outcome.status !== "error") throw new Error("expected error");
     expect(outcome.category).toBe("database");
+
+    // The database-error path still emits exactly one event with a safe error
+    // category and a zero-result flag, and no query text.
+    expect(log).toHaveBeenCalledTimes(1);
+    const logged = log.mock.calls[0][0];
+    expect(logged.errorCategory).toBe("database");
+    expect(logged.zeroResult).toBe(true);
+    expect(logged.resultCount).toBe(0);
+    expect(logged).not.toHaveProperty("query");
+  });
+
+  it("reports semanticAttempted:false on a keyword database failure even when semantic is enabled", async () => {
+    // Regression: the semantic upgrade begins only AFTER keyword retrieval
+    // succeeds. When the keyword RPC fails, the attempt never started — so even
+    // with the configuration gate ON, the event must NOT claim an attempt, must
+    // report no compatible corpus, and must carry no compatibility / embedding /
+    // hybrid-database timing (none of those steps ran).
+    const client = makeClient({
+      keyword: { data: null, error: { message: "kaput" } },
+    });
+    const createProvider = vi.fn();
+    const log = vi.fn();
+    const outcome = await searchCatalog(
+      { query: "afterglow" },
+      {
+        getClient: async () => client,
+        attemptSemantic: () => true,
+        createProvider,
+        log,
+        now: makeClock(),
+      },
+    );
+
+    expect(outcome.status).toBe("error");
+    if (outcome.status !== "error") throw new Error("expected error");
+    expect(outcome.category).toBe("database");
+
+    // The semantic arm never ran: no compatibility check, no provider, no
+    // hybrid RPC.
+    expect(createProvider).not.toHaveBeenCalled();
+    expect(
+      client.rpc.mock.calls.some(
+        ([fn]) => fn === "compatible_embedding_count" || fn === "hybrid_search",
+      ),
+    ).toBe(false);
+
+    expect(log).toHaveBeenCalledTimes(1);
+    const logged = log.mock.calls[0][0];
+    expect(logged.errorCategory).toBe("database");
+    expect(logged.semanticAttempted).toBe(false);
+    expect(logged.compatibleCorpus).toBe(false);
+    expect(logged.compatMs).toBeUndefined();
+    expect(logged.embeddingMs).toBeUndefined();
+    expect(logged.hybridDbMs).toBeUndefined();
+  });
+
+  it("emits a zero-result event when a keyword search returns no rows", async () => {
+    const client = makeClient({ keyword: { data: [], error: null } });
+    const log = vi.fn();
+    const outcome = await searchCatalog(
+      { query: "zxqv nonexistent" },
+      {
+        getClient: async () => client,
+        attemptSemantic: () => false,
+        log,
+        now: makeClock(),
+      },
+    );
+
+    expect(outcome.status).toBe("ok");
+    if (outcome.status !== "ok") throw new Error("expected ok");
+    expect(outcome.count).toBe(0);
+
+    const logged = log.mock.calls[0][0];
+    expect(logged.zeroResult).toBe(true);
+    expect(logged.resultCount).toBe(0);
+    expect(logged.mode).toBe("keyword");
   });
 
   it("clamps an oversized limit to the server ceiling", async () => {

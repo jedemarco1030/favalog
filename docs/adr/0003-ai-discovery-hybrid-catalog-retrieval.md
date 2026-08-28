@@ -186,11 +186,24 @@ allow-listed and the result limit is server-clamped.
 
 ### Privacy & logging policy
 
-Raw user query text is **never persisted**. Structured logs may carry a
-correlation id, search mode, query **length**, embedding model, token count,
-keyword/embedding/db/total latency, result count, a safe error category, and a
-fallback reason — **never** the query itself, tokens/session, user identity,
-API responses, or vectors.
+Favalog does **not intentionally write raw query text** to its database, its
+structured `catalog_search` event, or any custom product-event properties.
+Explore does, however, intentionally use a **shareable `?q=` URL**, so the query
+appears in the address bar: it is placed in browser history, and hosting
+infrastructure may process or retain request search parameters according to its
+own configuration and retention policy. That platform request metadata is
+distinct from Favalog's application-owned telemetry, which stays query-free.
+Structured logs carry a versioned,
+closed event (`event: "catalog_search"`, `schemaVersion`) with only a
+correlation id, search mode, query **length**, allow-listed kind, result count,
+a zero-result flag, semantic-attempted and compatible-corpus indicators,
+embedding model, token count, the **separate** keyword / compatibility-check /
+embedding / hybrid-database / total latencies, a safe error category, and a
+fallback reason — **never** the query itself, media title/slug, tokens/session,
+user identity, API responses, or vectors. The observability, evaluation, and
+aggregate-analytics operational hardening is specified in the
+[Operations v1 amendment](#amendment-2026-08-28-ai-discovery-operations-v1) and
+the [operations runbook](../ai-discovery-operations.md).
 
 ### Cost & latency considerations
 
@@ -475,3 +488,68 @@ were re-verified (above). The remote-write guard **remains the required
 process** for any future production re-embedding; it is never bypassed and never
 automatic. This documentation update performs no backfill, remote write, push,
 deploy, or Vercel environment change.
+
+## Amendment (2026-08-28): AI Discovery Operations v1
+
+This amendment adds **privacy-preserving observability, continuous evaluation,
+and aggregate online-quality signals** for the existing retrieval system. It is
+**operational hardening only** — no new recommendation or generative-AI feature.
+Nothing in the original decision or the earlier amendments is reversed. The full
+operational contract lives in the
+[operations runbook](../ai-discovery-operations.md).
+
+- **Versioned, closed server telemetry.** The `catalog_search` structured log is
+  now an explicitly versioned (`schemaVersion`), fixed-name, closed event built
+  by a single audited choke point (`lib/search/log.ts`). It adds
+  `zeroResult`, `semanticAttempted`, and `compatibleCorpus` indicators, and — to
+  fix a genuine ambiguity — **splits the single `dbMs` field** into a distinct
+  compatibility-check latency and hybrid-database latency (detailed just below).
+  `semanticAttempted` is `true` **only** when a successful keyword path actually
+  enters the semantic upgrade (beginning with the compatible-corpus check); it
+  stays `false` when validation fails, Supabase is unavailable, semantic is
+  disabled/unconfigured, or **keyword retrieval fails** — so a keyword database
+  failure never misreports an attempt that never began. An incompatible corpus
+  is a real attempt, correctly reported as `semanticAttempted: true` with
+  `compatibleCorpus: false`. The split fields are a distinct
+  compatibility-check latency (`compatMs`) and hybrid-database latency
+  (`hybridDbMs`) so one database duration never overwrites the other. It still
+  carries only safe fields (correlation id, mode, kind, query **length**, result
+  count, embedding model, token count, latencies, safe error category, fallback
+  reason) and **never** the query text, media title/slug, vectors, provider
+  responses, user identity, or credentials. The telemetry seam stays
+  dependency-injected so tests never require Vercel, OpenAI, or Supabase; an
+  empty query emits nothing (no OpenAI call, no misleading completed-search
+  event) and no-env stays silent.
+- **Aggregate product analytics.** Explore emits two coarse Vercel Web Analytics
+  events via a small tested adapter (`lib/analytics/search-analytics.ts`):
+  `explore_search` (a rendered outcome) and `explore_result_selected` (a user
+  selecting a result). Only low-cardinality properties are sent — retrieval
+  mode, filter kind, result kind, zero-result flag, and **bucketed**
+  result-count / rank — never the query, title, slug, request id, or any user
+  identity. Analytics is best-effort: a failing or blocked transport can never
+  affect navigation or search. As a second layer, the root `<Analytics>`
+  integration is wrapped (`components/analytics/analytics.tsx`) so its
+  `beforeSend` hook strips the shareable `?q=` parameter from **every** analytics
+  event URL (page views and custom events) via the pure, tested
+  `redactAnalyticsUrl` (`lib/analytics/redact-analytics-url.ts`); a URL that
+  cannot be parsed **fails closed** (the event is dropped rather than sent
+  unsanitized). This governs only Favalog's own analytics telemetry — it does
+  **not** control Vercel Runtime Logs or any request-log search-parameter
+  handling and retention, which stay platform/owner concerns.
+- **Continuous evaluation in CI.** The secret-free seeded Explore integration job
+  now runs the **deterministic** evaluation harness in JSON mode over the fake
+  embeddings, preserves its threshold-based nonzero-exit gate (with shell
+  `pipefail` so a piped failure can't look successful), fails clearly on a
+  missing report, and uploads the JSON as a named artifact **honestly labelled
+  deterministic integration/regression evidence — not live semantic-quality
+  evidence**. No OpenAI or hosted-Supabase secrets are added, and CI never
+  contacts or mutates production.
+- **Operational contract.** Metric names/formulas, initial SLOs/guardrails
+  (availability, error rate, fallback rate, p95 latency, zero-result rate,
+  compatible-corpus health, token volume), firm-alert-vs-baseline classification,
+  investigation playbooks, safe rollback via `SEMANTIC_SEARCH_ENABLED`, and the
+  guarded re-embedding procedure are in the
+  [operations runbook](../ai-discovery-operations.md).
+- **Not configured here.** This change only **emits** events. Vercel dashboards,
+  alerts, log drains, and retention policies are **not** configured by it and
+  remain an explicit owner task; no production/Vercel settings were changed.

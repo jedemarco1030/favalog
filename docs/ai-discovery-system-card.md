@@ -85,7 +85,12 @@ flowchart TD
   embedding document.
 - **Query input** is the user's search text (string, normalized, non-empty,
   ≤ 200 chars). It is embedded once, server-side, only when semantic is enabled
-  and configured; it is **never persisted**.
+  and configured. Favalog does **not intentionally write it** to its database,
+  its structured `catalog_search` event, or any custom product-event
+  properties. (Because Explore uses a shareable `?q=` URL, the query does appear
+  in the address bar / browser history and may be processed or retained by
+  hosting request logs per the platform's configuration — see
+  [Privacy considerations](#privacy-considerations).)
 
 ## Offline evaluation dataset
 
@@ -162,12 +167,37 @@ flowchart TD
 
 ## Privacy considerations
 
-- Raw user query text is **never persisted**.
-- Structured logs may include: correlation id, search mode, query **length**,
-  embedding model, token count, keyword/embedding/db/total latency, result
-  count, a safe error category, and a fallback reason.
-- Logs **never** include: the query text itself, tokens/session, user identity,
+- **Application-owned telemetry stays query-free.** Favalog does **not
+  intentionally write raw query text** to its database, its structured
+  `catalog_search` event, or any custom product-event properties.
+- **Shareable URL vs. platform request metadata.** Explore intentionally uses a
+  shareable `?q=` URL, so the query is placed in the browser's address bar and
+  history, and hosting infrastructure may process or retain request search
+  parameters according to its configuration and retention policy. That platform
+  request metadata is distinct from Favalog's application-owned telemetry, and
+  request-log search-parameter handling / retention remain platform/owner
+  concerns.
+- **Analytics URL redaction.** The root Vercel `<Analytics>` integration is
+  wrapped (`components/analytics/analytics.tsx`) so its `beforeSend` hook strips
+  the `?q=` parameter from every analytics event URL (page views and custom
+  events) via the pure, tested `redactAnalyticsUrl`; an unparseable URL **fails
+  closed** (the event is dropped). This controls only Favalog's analytics
+  telemetry, **not** Vercel Runtime Logs or request-log retention.
+- Server telemetry is a **versioned, closed event** (`event: "catalog_search"`,
+  `schemaVersion`) that may include: correlation id, search mode, allow-listed
+  kind, query **length**, result count, a zero-result flag, semantic-attempted
+  and compatible-corpus indicators, embedding model, token count, the
+  **separate** keyword / compatibility-check / embedding / hybrid-database /
+  total latencies, a safe error category, and a fallback reason.
+- Logs **never** include: the query text itself, media title/slug,
+  tokens/session, user identity (id / username / email / IP / user agent),
   API responses, or vectors.
+- Aggregate product analytics (Vercel Web Analytics: `explore_search`,
+  `explore_result_selected`) carry only **coarse** properties — mode, filter
+  kind, result kind, zero-result flag, and **bucketed** result-count / rank —
+  never the query, title/slug, request id, or user identity; a failing/blocked
+  transport never affects navigation or search. See the
+  [operations runbook](ai-discovery-operations.md).
 - Raw embedding vectors are never exposed to any client: the embedding table has
   RLS enabled with **no** policies and `anon`/`authenticated` revoked; only the
   `SECURITY DEFINER` search functions read it, returning only safe catalog
@@ -267,13 +297,25 @@ taxes online this year` returned zero results with the controlled
 
 ## Monitoring plan
 
-- Emit the structured (privacy-safe) log fields above per search, keyed by
-  correlation id, to observe search mode mix (`hybrid` / `keyword` /
-  `keyword_fallback`), fallback rate, zero-result rate, and latency percentiles.
-- Alert on a rising `keyword_fallback` rate (OpenAI degradation) or a rising
-  zero-result rate (corpus/enrichment gaps).
-- Re-run `npm run eval:search` on catalog or ranking changes; a threshold
-  regression fails the build.
+The full operational contract — metric formulas, initial SLOs/guardrails,
+firm-alert-vs-baseline classification, investigation playbooks, rollback, and
+the guarded re-embedding procedure — lives in the
+[operations runbook](ai-discovery-operations.md). In brief:
+
+- The versioned, closed `catalog_search` event above lets operators observe
+  availability, error rate, search-mode mix (`hybrid` / `keyword` /
+  `keyword_fallback`), fallback rate, zero-result rate, compatible-corpus
+  health, token volume, and the component + total latency percentiles.
+- Firm alerts (owner-configured): availability, error rate, p95 latency,
+  compatible-corpus health, and sustained `keyword_fallback` rate. Zero-result
+  rate and token volume are baseline observations.
+- The deterministic evaluation now also runs in CI (secret-free) over the
+  seeded Explore integration job and uploads its JSON report as an artifact
+  **honestly labelled deterministic integration/regression evidence — not live
+  semantic-quality evidence**. Re-run `npm run eval:search` on catalog or
+  ranking changes; a threshold regression fails the build.
+- **Not configured here:** this phase only **emits** the events. Vercel
+  dashboards, alerts, log drains, and retention are an explicit **owner task**.
 
 ## Next experiments
 

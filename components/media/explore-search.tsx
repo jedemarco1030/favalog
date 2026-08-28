@@ -2,11 +2,23 @@
 
 import { Search } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useTransition, type FormEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useState,
+  useTransition,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { MediaCard } from "@/components/media/media-card";
 import { EmptyState } from "@/components/ui/empty-state";
+import {
+  trackResultSelected,
+  trackSearchOutcome,
+  type TrackFn,
+} from "@/lib/analytics/search-analytics";
 import { cn } from "@/lib/cn";
 import type { SearchKindFilter } from "@/lib/search/config";
+import type { MediaKind } from "@/lib/types";
 import type { SearchOutcome } from "@/lib/supabase/search-view-model";
 
 interface FilterOption {
@@ -33,6 +45,11 @@ interface ExploreSearchProps {
   outcome: SearchOutcome | null;
   /** Editorial (example) shelves shown when no query is active. */
   defaultSections: ReactNode;
+  /**
+   * Injectable analytics transport (tests/stories). Defaults to the real
+   * `@vercel/analytics` `track` inside the adapter when omitted.
+   */
+  analyticsTrack?: TrackFn;
 }
 
 /**
@@ -52,6 +69,7 @@ export function ExploreSearch({
   initialFilter,
   outcome,
   defaultSections,
+  analyticsTrack,
 }: ExploreSearchProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -61,6 +79,25 @@ export function ExploreSearch({
 
   const inputId = "explore-search";
   const resultsHeadingId = "explore-results-heading";
+
+  // Emit exactly one coarse, aggregate "search outcome rendered" product event
+  // per committed search. The `outcome` prop reference only changes when the
+  // server produces a new result (a navigation commit), so typing in the input
+  // or toggling pending state never re-emits. Only successful outcomes carry a
+  // mode/count; error/unavailable/empty states are not reported here.
+  useEffect(() => {
+    if (outcome && outcome.status === "ok") {
+      trackSearchOutcome(
+        {
+          mode: outcome.mode,
+          filter: outcome.kind,
+          zeroResult: outcome.count === 0,
+          resultCount: outcome.count,
+        },
+        analyticsTrack,
+      );
+    }
+  }, [outcome, analyticsTrack]);
 
   function navigate(nextQuery: string, nextFilter: SearchKindFilter) {
     const params = new URLSearchParams();
@@ -145,7 +182,11 @@ export function ExploreSearch({
 
       {hasActiveQuery ? (
         <section aria-labelledby={resultsHeadingId} aria-busy={isPending}>
-          <ExploreResults outcome={outcome} isPending={isPending} />
+          <ExploreResults
+            outcome={outcome}
+            isPending={isPending}
+            analyticsTrack={analyticsTrack}
+          />
         </section>
       ) : (
         <div className="flex flex-col gap-8">
@@ -163,9 +204,11 @@ export function ExploreSearch({
 function ExploreResults({
   outcome,
   isPending,
+  analyticsTrack,
 }: {
   outcome: SearchOutcome;
   isPending: boolean;
+  analyticsTrack?: TrackFn;
 }) {
   if (outcome.status === "unavailable") {
     return (
@@ -197,7 +240,18 @@ function ExploreResults({
     );
   }
 
-  const { query, items, count } = outcome;
+  const { query, items, count, mode, kind } = outcome;
+
+  // Report a coarse, aggregate "result selected" event on click. It fires
+  // before navigation but is fully best-effort (never throws), so a blocked or
+  // failing analytics transport can never prevent opening the title page. Only
+  // the retrieval mode, filter, result kind, and a BUCKETED rank are sent.
+  function onSelectResult(index: number, resultKind: MediaKind) {
+    trackResultSelected(
+      { mode, filter: kind, resultKind, index },
+      analyticsTrack,
+    );
+  }
 
   return (
     <>
@@ -227,9 +281,12 @@ function ExploreResults({
             isPending && "opacity-60",
           )}
         >
-          {items.map((item) => (
+          {items.map((item, index) => (
             <li key={item.id}>
-              <MediaCard item={item} />
+              <MediaCard
+                item={item}
+                onSelect={() => onSelectResult(index, item.kind)}
+              />
             </li>
           ))}
         </ul>

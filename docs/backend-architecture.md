@@ -807,11 +807,34 @@ stale document is detectable and re-embeddable.
 
 ### Privacy & logging
 
-Raw user query text is **never persisted**. Structured logs may include a
-correlation id, search mode, query **length**, embedding model, token count,
-keyword/embedding/db/total latency, result count, a safe error category, and a
-fallback reason — **never** the query itself, tokens/session, user identity, API
-responses, or vectors.
+Favalog does **not intentionally write raw query text** to its database, its
+structured `catalog_search` event, or any custom product-event properties.
+Explore does intentionally use a **shareable `?q=` URL**, so the query appears in
+the browser address bar / history, and hosting infrastructure may process or
+retain request search parameters per its configuration and retention policy;
+that platform request metadata is distinct from Favalog's application-owned
+telemetry and remains a platform/owner concern. Server telemetry is a
+**versioned,
+closed event** (`event: "catalog_search"`, `schemaVersion`, built by
+`lib/search/log.ts`) that may include a correlation id, search mode, allow-listed
+kind, query **length**, result count, a zero-result flag, semantic-attempted and
+compatible-corpus indicators, embedding model, token count, the **separate**
+keyword / compatibility-check / embedding / hybrid-database / total latencies, a
+safe error category, and a fallback reason — **never** the query itself, media
+title/slug, tokens/session, user identity, API responses, or vectors.
+`semanticAttempted` is `true` only when a successful keyword path actually enters
+the semantic upgrade (a keyword-retrieval failure keeps it `false`). Aggregate
+Explore analytics (`explore_search` / `explore_result_selected` via
+`lib/analytics/search-analytics.ts`) carry only coarse mode / filter / result
+kind / zero-result / bucketed count / bucketed rank; the root `<Analytics>`
+integration is wrapped (`components/analytics/analytics.tsx`) so its `beforeSend`
+hook strips the `?q=` parameter from every analytics event URL via the pure,
+tested `redactAnalyticsUrl` (failing closed \u2014 dropping the event \u2014 on an
+unparseable URL). This governs only Favalog's analytics telemetry, **not** Vercel
+Runtime Logs or request-log retention. The full operational
+contract (metrics, SLOs, investigation, rollback, re-embedding) is in the
+[operations runbook](ai-discovery-operations.md); dashboards/alerts/retention in
+Vercel remain an owner task.
 
 > The five AI Discovery migrations through `20260815120400` (the **23rd**
 > migration) are **applied to hosted Supabase**, and commit `2c9ab54` is

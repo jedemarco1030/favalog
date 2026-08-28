@@ -80,6 +80,11 @@ export default defineConfig({
         "lib/search/eval/metrics.ts",
         "lib/supabase/search.ts",
         "lib/supabase/search-view-model.ts",
+        // Aggregate product-analytics adapter (pure builders + coarse buckets +
+        // never-throw emit) and the pure analytics-URL redactor, both directly
+        // unit-tested.
+        "lib/analytics/search-analytics.ts",
+        "lib/analytics/redact-analytics-url.ts",
         // Interactive / conditional auth UI under test.
         "components/auth/auth-message.tsx",
         "components/auth/auth-field.tsx",

@@ -547,6 +547,43 @@ Neither is required to build or run. With no `OPENAI_API_KEY` (or the kill
 switch off), catalog search runs **keyword-only**. `OPENAI_API_KEY` is never
 `NEXT_PUBLIC_`, never logged, and never sent to the browser.
 
+### Operations & observability
+
+AI Discovery emits privacy-preserving signals for operators and product:
+
+- **Server telemetry** — a versioned, closed `catalog_search` event per executed
+  search (mode, allow-listed kind, query **length**, result count, zero-result,
+  semantic-attempted / compatible-corpus indicators, embedding model + token
+  count, and the **separate** keyword / compatibility-check / embedding /
+  hybrid-database / total latencies, plus a safe error category and fallback
+  reason). Never the query text, title/slug, vectors, or user identity.
+  `semanticAttempted` is `true` only when a successful keyword path actually
+  enters the semantic upgrade, so a keyword-retrieval failure keeps it `false`.
+- **Aggregate product analytics** — two coarse Vercel Web Analytics events
+  (`explore_search`, `explore_result_selected`) carrying only mode, filter,
+  result kind, zero-result, and **bucketed** result-count / rank; analytics
+  failure never affects navigation or search. The root `<Analytics>` integration
+  is wrapped so its `beforeSend` hook strips the `?q=` parameter from every
+  analytics event URL (failing closed on an unparseable URL).
+- **Query privacy** — Favalog does **not intentionally write raw query text** to
+  its database, the `catalog_search` event, or custom product-event properties.
+  Because Explore uses a **shareable `?q=` URL**, the query still appears in the
+  browser address bar / history, and hosting infrastructure may process or
+  retain request search parameters per its configuration and retention policy;
+  that platform request metadata (including Vercel Runtime Logs) is distinct from
+  Favalog's application-owned telemetry and remains an owner/platform concern.
+- **Continuous evaluation in CI** — the secret-free seeded Explore integration
+  job runs the deterministic evaluation harness in JSON mode and uploads the
+  report as an artifact, honestly labelled deterministic integration/regression
+  evidence (not live semantic-quality evidence).
+- **Rollback** — set `SEMANTIC_SEARCH_ENABLED` to a falsey token to disable the
+  paid semantic path immediately; keyword search keeps working.
+
+Metric formulas, initial SLOs/guardrails, investigation playbooks, and the
+guarded re-embedding procedure are in the
+[operations runbook](docs/ai-discovery-operations.md). Vercel dashboards,
+alerts, and retention are an **owner task** — this repo only emits the events.
+
 ---
 
 ## Commands

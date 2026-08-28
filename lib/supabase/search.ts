@@ -146,6 +146,16 @@ export async function searchCatalog(
     return { status: "unavailable" };
   }
 
+  // The configuration gate is a pure decision (kill switch + provider
+  // configured); resolve it once. It only says the semantic upgrade is
+  // ELIGIBLE — it does not mean the upgrade was attempted. `semanticAttempted`
+  // stays false until the successful keyword path actually enters the semantic
+  // upgrade (beginning with the compatible-corpus check), so a keyword failure
+  // never misreports an attempt that never began.
+  const attemptSemantic = deps.attemptSemantic ?? shouldAttemptSemanticSearch;
+  const semanticEnabled = attemptSemantic();
+  let semanticAttempted = false;
+
   const client = await (deps.getClient ?? defaultGetClient)();
 
   // --- Keyword arm (always) -------------------------------------------------
@@ -165,6 +175,10 @@ export async function searchCatalog(
         queryLength: query.length,
         kind,
         resultCount: 0,
+        // Keyword retrieval failed before the semantic upgrade could begin, so
+        // the attempt never started and no compatible corpus was observed.
+        semanticAttempted: false,
+        compatibleCorpus: false,
         keywordMs,
         totalMs: now() - startedAt,
         errorCategory: "database",
@@ -176,14 +190,18 @@ export async function searchCatalog(
   let rows: SearchRpcRow[] = (keyword.data as SearchRpcRow[] | null) ?? [];
   let mode: SearchMode = "keyword";
   let fallbackReason: FallbackReason | undefined;
+  let compatibleCorpus = false;
   let embeddingModel: string | undefined;
   let embeddingTokens: number | undefined;
+  let compatMs: number | undefined;
   let embeddingMs: number | undefined;
-  let dbMs: number | undefined;
+  let hybridDbMs: number | undefined;
 
   // --- Semantic upgrade (best-effort) --------------------------------------
-  const attemptSemantic = deps.attemptSemantic ?? shouldAttemptSemanticSearch;
-  if (attemptSemantic()) {
+  if (semanticEnabled) {
+    // The keyword arm succeeded and the semantic upgrade is eligible, so the
+    // attempt genuinely begins here — starting with the compatibility check.
+    semanticAttempted = true;
     // Cheap corpus-compatibility check FIRST: if no stored vector matches the
     // server's expected embedding identity, there is nothing compatible to
     // search — stay keyword-only and never pay for a query embedding. This also
@@ -193,7 +211,9 @@ export async function searchCatalog(
       "compatible_embedding_count",
       EXPECTED_PROVENANCE,
     );
-    dbMs = now() - compatStart;
+    // Distinct from the hybrid-database timing below: this is the
+    // compatibility-check latency and must never be overwritten by it.
+    compatMs = now() - compatStart;
     const compatibleCount =
       typeof compat.data === "number" ? compat.data : Number(compat.data ?? 0);
 
@@ -205,6 +225,7 @@ export async function searchCatalog(
       mode = "keyword_fallback";
       fallbackReason = "incompatible_corpus";
     } else {
+      compatibleCorpus = true;
       const providerResult = (
         deps.createProvider ?? createOpenAIEmbeddingProvider
       )();
@@ -239,7 +260,9 @@ export async function searchCatalog(
             // out-of-domain query cannot surface a confident-but-wrong hit.
             p_max_distance: SEMANTIC_MAX_COSINE_DISTANCE,
           });
-          dbMs = now() - hyStart;
+          // Hybrid-search database latency: recorded separately from the
+          // compatibility-check latency so neither clobbers the other.
+          hybridDbMs = now() - hyStart;
 
           if (hybrid.error) {
             // DB failure on the hybrid arm: keep keyword results.
@@ -270,11 +293,14 @@ export async function searchCatalog(
       queryLength: query.length,
       kind,
       resultCount: items.length,
+      semanticAttempted,
+      compatibleCorpus,
       embeddingModel,
       embeddingTokens,
       keywordMs,
+      compatMs,
       embeddingMs,
-      dbMs,
+      hybridDbMs,
       totalMs: now() - startedAt,
       fallbackReason,
     }),
