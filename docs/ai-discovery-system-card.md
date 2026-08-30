@@ -9,10 +9,10 @@
 
 ## Intended use
 
-- Help a person **find** curated movies, TV, and books on `/explore` using
-  natural-language intent ("cozy space movies", "books about grief") **and**
-  keywords/exact titles, over the real Supabase catalog (all **28** curated
-  titles).
+- Help a person **find** media items on `/explore` using natural-language
+  intent ("cozy space movies", "books about grief") **and** keywords/exact
+  titles, over the real Supabase catalog (including the curated foundation and
+  trusted external imports).
 - Provide a shareable `?q=` search URL with movie / TV / book filters, backed by
   hybrid retrieval (lexical + semantic) with **exact-title protection**.
 - Degrade to keyword-only search whenever semantic retrieval is disabled,
@@ -22,8 +22,10 @@
 
 - **No generative AI / LLM-written text.** No summaries, explanations, chat, or
   agents. This is retrieval only.
-- **No external catalog ingestion** (TMDB / Open Library / Google Books) and
-  **no unbounded corpus** — the corpus is the 28 curated titles.
+- **Catalog growth via trusted external ingestion** (foundation only). Newly
+  materialized titles are keyword-searchable immediately; they remain
+  embedding-missing until a subsequent guarded re-embed. No user-facing external
+  results or generative AI are added in this phase.
 - **No personalization**: no user taste embeddings, no personalized
   recommendations, no follows/feeds signals.
 - **No raw similarity scores shown** to users and **no** presentation of the

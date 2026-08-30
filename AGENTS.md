@@ -130,6 +130,14 @@ it to Supabase without an explicit task. The following rules are permanent:
   are the DB representation only. They do not replace the framework-agnostic
   domain types in `lib/types.ts`; map between them at a boundary
   (`lib/supabase/mappers.ts`).
+- Every external catalog call must be authenticated and authorized
+  independently — re-validate the current user via the server-only auth DAL and
+  rely on the provider-neutral contract in `lib/catalog/`. TMDB requires bearer
+  auth via `TMDB_API_READ_TOKEN` and mandatory attribution; Open Library
+  requires a User-Agent identifying contact via `OPEN_LIBRARY_CONTACT_EMAIL`
+  and is for low-volume discovery only. Catalog writes are strictly restricted
+  to the `materialize_media_item(...)` RPC, which is `service_role`-only and
+  identity-only (the server re-fetches and normalizes all data).
 - Database changes require the relevant migration plus meaningful database tests
   (pgTAP under `supabase/tests/`) covering constraints and RLS.
 - Use the current `@supabase/ssr` patterns (browser client, per-request server
@@ -518,6 +526,25 @@ exists (schema, RLS, clients) and the following are wired to it:
   [operations runbook](docs/ai-discovery-operations.md). This phase only **emits**
   events; Vercel dashboards/alerts/retention are an explicit **owner task** and
   are **not** configured here.
+- **Catalog Platform v1A — external-provider ingestion foundation (wired).** The
+  backend can now search and import movies/TV from **TMDB** and books from
+  **Open Library** into the `public.media_items` catalog. It uses a
+  provider-neutral contract (`lib/catalog/`), server-only adapters, and the
+  existing `media_items (source, external_id)` identity: TMDB uses
+  kind-qualified IDs (e.g., `movie:123`, `tv:123`); Open Library uses stable
+  Work IDs. **Trusted materialization** re-fetches upstream detail and writes
+  via the `materialize_media_item` RPC (EXECUTE restricted to `service_role`).
+  Provenance columns (`content_hash`, `normalization_version`, `synced_at`)
+  track metadata lifecycle; materialized items are **keyword-immediate** while
+  their semantic embedding is **eventual** (auto-detected as missing/stale by the
+  guarded `embed:catalog` CLI). A fail-closed `catalog` operator CLI
+  (`npm run catalog`) handles `search`, `inspect`, and `import` with the same
+  local/remote target guards as the embedding pipeline. Requires server-only
+  `TMDB_API_READ_TOKEN` and `OPEN_LIBRARY_CONTACT_EMAIL` for live requests (never
+  `NEXT_PUBLIC_`, never logged). **TMDB attribution**
+  (notice + logo) is required before user-facing results. External search
+  results in `/explore`, import buttons in the production UI, and generative AI
+  remain **deferred**.
 
 Everything else is still mock-data. Do **not** introduce any of the following
 without an explicit task: migrating the remaining product pages off mock data,

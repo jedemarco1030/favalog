@@ -33,6 +33,7 @@
     "db:test": "supabase test db",
     "embed:catalog": "node scripts/embed-catalog.mjs",
     "eval:search": "node scripts/eval-search.mjs",
+    "catalog": "node scripts/catalog-import.mjs",
     "prepare": "husky"
   },
   "dependencies": {

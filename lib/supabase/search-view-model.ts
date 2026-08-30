@@ -81,6 +81,10 @@ export function mapSearchRowToMediaItem(row: SearchRpcRow): MediaItem {
     details: row.details,
     created_at: "",
     updated_at: "",
+    // External-provenance columns are not part of the search projection.
+    content_hash: null,
+    normalization_version: null,
+    synced_at: null,
     // The generated tsvector is not part of the projection; the mapper ignores it.
     search_tsv: null as unknown as MediaItemRow["search_tsv"],
   };

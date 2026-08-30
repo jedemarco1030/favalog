@@ -85,6 +85,29 @@ export default defineConfig({
         // unit-tested.
         "lib/analytics/search-analytics.ts",
         "lib/analytics/redact-analytics-url.ts",
+        // Catalog Platform v1A: the provider-neutral contract + adapters +
+        // reliability + trusted materialization, all directly unit-tested
+        // (provider network is injected/faked). The Supabase service-role admin
+        // client and the server materializer wiring are runtime integration
+        // surfaces and are intentionally excluded, like the Supabase clients.
+        "lib/catalog/config.ts",
+        "lib/catalog/errors.ts",
+        "lib/catalog/normalize-helpers.ts",
+        "lib/catalog/reliability.ts",
+        "lib/catalog/log.ts",
+        "lib/catalog/provenance.ts",
+        "lib/catalog/validation.ts",
+        "lib/catalog/http.ts",
+        "lib/catalog/materialize.ts",
+        "lib/catalog/provider-registry.ts",
+        "lib/catalog/fake-provider.ts",
+        "lib/catalog/tmdb/config.ts",
+        "lib/catalog/tmdb/normalize.ts",
+        "lib/catalog/tmdb/client.ts",
+        "lib/catalog/openlibrary/config.ts",
+        "lib/catalog/openlibrary/normalize.ts",
+        "lib/catalog/openlibrary/client.ts",
+        "scripts/catalog-import-core.ts",
         // Interactive / conditional auth UI under test.
         "components/auth/auth-message.tsx",
         "components/auth/auth-field.tsx",

@@ -16,12 +16,14 @@ a list, add/remove titles, edit list metadata, delete a whole list, view the
 real list, and see it on the owner's profile), and the **persistent favorites
 loop** (favorite/unfavorite a title, and see the ordered shelf on the owner's
 profile) are wired to it, and an authenticated user's **Diary**, **Lists**,
-**Favorites**, and **Profile** now render real Supabase data. The remaining
-surfaces (catalog browsing, follows, community reviews) still render from a
-typed mock-data layer, and there is no external media API or AI yet. The app
-still builds and runs with **no** Supabase environment variables set. The
-architecture is designed so the remaining pieces can drop in without rewriting
-the UI.
+**Favorites**, and **Profile** now render real Supabase data. A
+**Catalog Platform foundation** is also in place: the backend can now search
+and import (materialize) movies/TV from **TMDB** and books from **Open Library**
+into the real catalog. This ingestion layer is server-only and not yet wired to
+the user-facing search; the existing 28-title curated catalog remains the primary
+discovery source. The app still builds and runs with **no** Supabase or
+provider environment variables set. The architecture is designed so the
+remaining pieces can drop in without rewriting the UI.
 
 ---
 
@@ -449,6 +451,28 @@ first and low-quality matches are rejected.
 Full detail: [`docs/ai-discovery-system-card.md`](docs/ai-discovery-system-card.md)
 and [ADR 0003](docs/adr/0003-ai-discovery-hybrid-catalog-retrieval.md).
 
+## Catalog Platform (external-provider ingestion)
+
+**Catalog Platform v1A** is a server-only foundation (`lib/catalog/`) for
+trusted ingestion from external providers. It allows searching and importing
+movies/TV from **TMDB** and books from **Open Library** into the Favalog
+catalog.
+
+- **Trusted Materialization**: The server re-fetches and normalizes data from the
+  source; caller-supplied metadata is never trusted.
+- **Operator CLI**: Fail-closed `npm run catalog` (`search`, `inspect`, `import`)
+  with the same remote-write guards as the embedding pipeline.
+- **Identity**: Reuses stable `media_items (source, external_id)` identity;
+  TMDB uses kind-qualified IDs (e.g. `movie:603`) and Open Library uses stable
+  Work IDs.
+- **Rules**: TMDB attribution notice/logo required before user-facing results;
+  Open Library requires identifying contact email.
+- **Environment**: Requires server-only `TMDB_API_READ_TOKEN` and
+  `OPEN_LIBRARY_CONTACT_EMAIL` for live requests.
+
+This foundation is not yet wired to the production UI; the existing 28-title
+curated catalog remains the discovery source.
+
 ### Features
 
 - Natural-language + keyword catalog search with a shareable `?q=` URL and
@@ -480,23 +504,24 @@ npm run embed:catalog      # Generate/refresh catalog embeddings (local; service
 npm run eval:search        # Run the offline search evaluation harness
                            # (Recall@5, MRR, exact-title top-1, positive zero-result
                            # rate, negative clean rate, per-category; nonzero exit)
+npm run catalog            # Search and import items from external providers
+                           # (TMDB, Open Library) into the local/remote catalog.
+                           # Subcommands: search, inspect, import.
 ```
 
-`embed:catalog` targets a **local** Supabase stack by default and needs
-`OPENAI_API_KEY`. A stored row is treated as unchanged only when the provider,
-model, dimensions, document version, **and** content hash all match what the
-current run would produce (so a later real OpenAI run automatically re-embeds
-rows left by the deterministic fake provider); `--force` is a recovery escape
-hatch, not a substitute for that automatic detection.
+`embed:catalog` and `catalog` target a **local** Supabase stack by default.
+`embed:catalog` needs `OPENAI_API_KEY`. A stored row is treated as unchanged only
+when the provider, model, dimensions, document version, **and** content hash all
+match what the current run would produce; `--force` is a recovery escape hatch.
 
-Writing embeddings to a **hosted** (remote) Supabase project is guarded. The
-CLI classifies the resolved Supabase URL as local vs. remote and, for a remote
-target, always rejects a `--fake` write (even with `--force`) and rejects a
-live write unless the operator passes **both** `--allow-remote` **and**
-`--confirm-project-ref=<exact-project-ref>` matching the project reference in
-the resolved URL. `--force` never bypasses this guard; remote dry runs stay
-write-free and clearly label the remote target, and authorization is never
-inferred from a service key being present. The owner-operated hosted backfill
+Writing to a **hosted** (remote) Supabase project is guarded. Both the
+embedding and catalog CLIs classify the resolved Supabase URL as local vs.
+remote and, for a remote target, always reject a `--fake` write (even with
+`--force`) and reject a live write unless the operator passes **both**
+`--allow-remote` **and** `--confirm-project-ref=<exact-project-ref>` matching
+the project reference in the resolved URL. `--force` never bypasses this
+guard; remote dry runs stay write-free and clearly label the remote target.
+The owner-operated hosted backfill
 used to enable production semantic search — and required for any future
 production re-embedding — is:
 
@@ -538,10 +563,12 @@ production re-embedding **must** repeat the owner-controlled guarded backfill
 
 ### Environment variables
 
-| Variable                  | Exposure        | Notes                                                          |
-| ------------------------- | --------------- | -------------------------------------------------------------- |
-| `OPENAI_API_KEY`          | **server only** | Secret; embeds the query for semantic search. Optional.        |
-| `SEMANTIC_SEARCH_ENABLED` | **server only** | Kill switch; default enabled. Falsey disables semantic search. |
+| Variable                     | Exposure        | Notes                                                           |
+| ---------------------------- | --------------- | --------------------------------------------------------------- |
+| `OPENAI_API_KEY`             | **server only** | Secret; embeds the query for semantic search. Optional.         |
+| `SEMANTIC_SEARCH_ENABLED`    | **server only** | Kill switch; default enabled. Falsey disables semantic search.  |
+| `TMDB_API_READ_TOKEN`        | **server only** | Secret; used for movie/TV ingestion. TMDB attribution required. |
+| `OPEN_LIBRARY_CONTACT_EMAIL` | **server only** | Identifying contact for book ingestion (User-Agent).            |
 
 Neither is required to build or run. With no `OPENAI_API_KEY` (or the kill
 switch off), catalog search runs **keyword-only**. `OPENAI_API_KEY` is never

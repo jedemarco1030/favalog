@@ -1,0 +1,25 @@
+{
+  "page": 1,
+  "total_pages": 3,
+  "total_results": 42,
+  "results": [
+    {
+      "id": 603,
+      "title": "The Matrix",
+      "original_title": "The Matrix",
+      "release_date": "1999-03-31",
+      "poster_path": "/poster603.jpg"
+    },
+    {
+      "id": 604,
+      "title": "The Matrix Reloaded",
+      "original_title": "The Matrix Reloaded",
+      "release_date": "2003-05-15",
+      "poster_path": null
+    },
+    {
+      "title": "Missing Id Movie",
+      "release_date": "2010-01-01"
+    }
+  ]
+}

@@ -219,17 +219,20 @@ export type Database = {
         Row: {
           average_rating: number | null
           backdrop_url: string | null
+          content_hash: string | null
           created_at: string
           details: Json
           external_id: string
           genres: string[]
           id: string
           kind: Database["public"]["Enums"]["media_kind"]
+          normalization_version: string | null
           poster_url: string | null
           search_tsv: unknown
           slug: string
           source: string
           subtitle: string | null
+          synced_at: string | null
           synopsis: string
           title: string
           updated_at: string
@@ -238,17 +241,20 @@ export type Database = {
         Insert: {
           average_rating?: number | null
           backdrop_url?: string | null
+          content_hash?: string | null
           created_at?: string
           details?: Json
           external_id: string
           genres?: string[]
           id?: string
           kind: Database["public"]["Enums"]["media_kind"]
+          normalization_version?: string | null
           poster_url?: string | null
           search_tsv?: unknown
           slug: string
           source?: string
           subtitle?: string | null
+          synced_at?: string | null
           synopsis?: string
           title: string
           updated_at?: string
@@ -257,17 +263,20 @@ export type Database = {
         Update: {
           average_rating?: number | null
           backdrop_url?: string | null
+          content_hash?: string | null
           created_at?: string
           details?: Json
           external_id?: string
           genres?: string[]
           id?: string
           kind?: Database["public"]["Enums"]["media_kind"]
+          normalization_version?: string | null
           poster_url?: string | null
           search_tsv?: unknown
           slug?: string
           source?: string
           subtitle?: string | null
+          synced_at?: string | null
           synopsis?: string
           title?: string
           updated_at?: string
@@ -509,6 +518,25 @@ export type Database = {
           p_rating?: number
           p_review_body?: string
           p_review_title?: string
+        }
+        Returns: Json
+      }
+      materialize_media_item: {
+        Args: {
+          p_average_rating: number
+          p_backdrop_url: string
+          p_content_hash: string
+          p_details: Json
+          p_external_id: string
+          p_genres: string[]
+          p_kind: Database["public"]["Enums"]["media_kind"]
+          p_normalization_version: string
+          p_poster_url: string
+          p_source: string
+          p_subtitle: string
+          p_synopsis: string
+          p_title: string
+          p_year: number
         }
         Returns: Json
       }

@@ -861,6 +861,43 @@ Vercel remain an owner task.
 > remote backfill (see the embedding pipeline section) with the server-only
 > secret configured out of band, then re-verify.
 
+## Catalog Platforms v1A — External Ingestion
+
+A foundation for growing the catalog from trusted external sources: **TMDB**
+(movies and TV) and **Open Library** (books). This ingestion layer is
+server-only and not yet surfaced in the UI.
+
+- **lib/catalog/** — the provider-neutral ingestion core.
+  - `types.ts` / `errors.ts` — shared normalized shapes and failure modes.
+  - `config.ts` — provider settings and retry policy.
+  - `normalize-helpers.ts` — pure functions for mapping raw data to `MediaItem`.
+  - `reliability.ts` / `http.ts` / `log.ts` — 5000ms timeouts, 429/5xx retries
+    (max 3, capped jittered backoff), and redaction-safe structured logs.
+  - `provenance.ts` / `validation.ts` — provenance tracking and schema guards.
+  - `provider-registry.ts` / `materialize.ts` — the materialization loop.
+  - `admin-client.ts` — server-only client for operator tools.
+  - `tmdb/**` — server-only adapter for TMDB; uses kind-qualified external IDs.
+  - `openlibrary/**` — server-only adapter for Open Library; uses Work IDs.
+- **Identity & Provenance.** Uses `media_items (source, external_id)` for
+  deduplication. Migration `20260815120500` adds `content_hash`,
+  `normalization_version`, and `synced_at` columns to track staleness and
+  data source.
+- **Trusted Materialization.** Writing to the catalog is restricted to the
+  `public.materialize_media_item(...)` RPC. It is `SECURITY INVOKER` with a
+  pinned `search_path = ''` and EXECUTE is revoked from all browser-based roles
+  (`public`, `anon`, `authenticated`) and granted strictly to `service_role`.
+  It re-fetches trusted upstream data based on a provided identity; it never
+  accepts arbitrary user-supplied metadata.
+- **Search & Embedding.** Newly materialized items are **keyword-searchable**
+  immediately via the stored `search_tsv` column. Semantic embeddings are
+  **eventual**: the guarded `embed:catalog` CLI auto-detects missing/stale rows
+  and re-embeds them asynchronously. No synchronous OpenAI calls occur during
+  ingestion.
+- **Operator Tooling.** Driven by `npm run catalog` (`scripts/catalog-import.mjs`).
+  It reuses the repository's **remote-write protection** (both `--allow-remote`
+  and `--confirm-project-ref=<ref>` required for remote targets). Subcommands:
+  `search`, `inspect`, `import`.
+
 ## Supabase clients
 
 Per current `@supabase/ssr` guidance (the deprecated `@supabase/auth-helpers-*`
@@ -882,7 +919,9 @@ Only public configuration uses the `NEXT_PUBLIC_` prefix:
 | -------------------------------------- | --------------- | ------------------------ |
 | `NEXT_PUBLIC_SUPABASE_URL`             | browser+server  | No (mock-data phase)     |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | browser+server  | No (mock-data phase)     |
-| `SUPABASE_SECRET_KEY`                  | **server only** | No — future admin only   |
+| `SUPABASE_SECRET_KEY`                  | **server only** | No — administrative only |
+| `TMDB_API_READ_TOKEN`                  | **server only** | No — catalog import only |
+| `OPEN_LIBRARY_CONTACT_EMAIL`           | **server only** | No — catalog import only |
 
 `lib/supabase/env.ts` never throws at import time, so the app keeps building and
 rendering on Vercel with none of these set. `.env.example` documents the names
@@ -1093,7 +1132,7 @@ where n.nspname = 'public' and c.relname in ('lists', 'list_items');
 ```
 
 **Manual production verification checklist** (with a disposable account; clean up
-test rows afterward):
+test rs) and wrward):
 
 1. Sign in and **create** a public list from `/lists`; confirm it appears under
    your real "Your lists" and its `/list/[slug]` renders your identity with an
@@ -1347,5 +1386,6 @@ of the full mock catalog):
   dedicated activity/event table).
 - Migrating the remaining product surfaces (catalog browsing, community
   reviews) off mock data to Supabase-backed fetchers.
-- Real media-catalog provider integration.
+- Real media-catalog provider integration.** (Foundation exists — see
+  "Catalog Platforms v1A" above).
 - Full followers-only list visibility enforcement.

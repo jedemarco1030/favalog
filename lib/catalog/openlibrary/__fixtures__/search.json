@@ -1,0 +1,25 @@
+{
+  "numFound": 30,
+  "start": 0,
+  "docs": [
+    {
+      "key": "/works/OL27448W",
+      "title": "The Lord of the Rings",
+      "author_name": ["J.R.R. Tolkien"],
+      "first_publish_year": 1954,
+      "cover_i": 258027,
+      "subject": ["Fantasy", "Fiction", "Adventure"]
+    },
+    {
+      "key": "/works/OL45804W",
+      "title": "Fantastic Mr Fox",
+      "author_name": ["Roald Dahl"],
+      "first_publish_year": 1970,
+      "cover_i": 8739161
+    },
+    {
+      "title": "No Key Work",
+      "author_name": ["Nobody"]
+    }
+  ]
+}
