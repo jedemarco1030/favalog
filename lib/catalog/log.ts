@@ -94,3 +94,80 @@ export function logCatalogOperation(
   };
   sink(event);
 }
+
+// ---------------------------------------------------------------------------
+// Materialization event (Catalog Platform v1B)
+// ---------------------------------------------------------------------------
+
+/**
+ * The canonical-resolution outcome recorded for a materialization attempt. The
+ * three success outcomes mirror `MaterializeResult["resolution"]`; `ambiguous`
+ * records a deterministic candidate that failed safely (no write performed).
+ */
+export type MaterializeResolutionOutcome =
+  "created" | "linked" | "existing" | "ambiguous";
+
+/**
+ * The closed, safe shape of a materialization log event. It carries ONLY the
+ * provider, the fixed `materialize` operation, the outcome, the canonical
+ * resolution, a coarse latency bucket, a retry count, and (on failure) a safe
+ * error category. It NEVER carries the external id, title, slug, media UUID,
+ * user identity, query text, provider payload, or any free text.
+ */
+export interface CatalogMaterializeLogEvent {
+  event: "catalog_materialize";
+  schemaVersion: typeof CATALOG_LOG_SCHEMA_VERSION;
+  provider: ExternalProvider;
+  operation: "materialize";
+  outcome: CatalogOperationOutcome;
+  /** How the provider identity resolved; absent when the attempt failed early. */
+  resolution?: MaterializeResolutionOutcome;
+  latencyBucket: LatencyBucket;
+  retries: number;
+  /** Safe error category, present only when `outcome === "error"`. */
+  errorCategory?: ProviderErrorCategory;
+}
+
+/** The sink that receives a fully-formed materialization event. */
+export type CatalogMaterializeLogSink = (
+  event: CatalogMaterializeLogEvent,
+) => void;
+
+/** Default sink: one structured JSON line (safe fields only). */
+export const consoleMaterializeLogSink: CatalogMaterializeLogSink = (event) => {
+  console.log(JSON.stringify(event));
+};
+
+/** Fields the caller supplies; the choke point fills the invariant shape. */
+export interface CatalogMaterializeLogInput {
+  provider: ExternalProvider;
+  outcome: CatalogOperationOutcome;
+  resolution?: MaterializeResolutionOutcome;
+  latencyMs: number;
+  retries: number;
+  errorCategory?: ProviderErrorCategory;
+}
+
+/**
+ * Build and emit a safe materialization event through `sink`. Like
+ * {@link logCatalogOperation}, it buckets the raw latency and can only ever emit
+ * the closed, redaction-safe field set — never an id, title, slug, payload, or
+ * any free text.
+ */
+export function logCatalogMaterialization(
+  input: CatalogMaterializeLogInput,
+  sink: CatalogMaterializeLogSink = consoleMaterializeLogSink,
+): void {
+  const event: CatalogMaterializeLogEvent = {
+    event: "catalog_materialize",
+    schemaVersion: CATALOG_LOG_SCHEMA_VERSION,
+    provider: input.provider,
+    operation: "materialize",
+    outcome: input.outcome,
+    ...(input.resolution ? { resolution: input.resolution } : {}),
+    latencyBucket: bucketLatency(input.latencyMs),
+    retries: input.retries,
+    ...(input.errorCategory ? { errorCategory: input.errorCategory } : {}),
+  };
+  sink(event);
+}

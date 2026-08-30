@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { Suspense, type ReactNode } from "react";
 import { Container } from "@/components/ui/container";
 import { HorizontalMediaRow } from "@/components/media/horizontal-media-row";
 import { ExploreSearch } from "@/components/media/explore-search";
+import { ExternalResultsSection } from "@/components/media/external-results-section";
 import {
   getCriticallyAcclaimed,
   getHiddenGems,
@@ -13,8 +15,12 @@ import {
 } from "@/lib/data";
 import type { MediaItem } from "@/lib/types";
 import { parseKindFilter } from "@/lib/search/query";
+import type { SearchKindFilter } from "@/lib/search/config";
 import { searchCatalog } from "@/lib/supabase/search";
 import type { SearchOutcome } from "@/lib/supabase/search-view-model";
+import { availableExternalProviders } from "@/lib/catalog/feature-flag";
+import { isAuthAvailable } from "@/lib/auth/capability";
+import { getCurrentUser } from "@/lib/auth/data";
 
 export const metadata: Metadata = {
   title: "Explore",
@@ -44,6 +50,35 @@ export default async function ExplorePage({
     rawQuery.length > 0
       ? await searchCatalog({ query: rawQuery, kind: initialFilter })
       : null;
+
+  // Federated external discovery (Catalog Platform v1B) is strictly opt-in: it
+  // runs ONLY for an active query and ONLY when the server-side feature flag is
+  // on AND a provider is configured. When it is off/unconfigured, `providers` is
+  // empty and the page renders exactly the local-only experience as before.
+  const providers = rawQuery.length > 0 ? availableExternalProviders() : [];
+  const localSlugs =
+    outcome && outcome.status === "ok"
+      ? outcome.items.map((item) => item.slug)
+      : [];
+  const viewer = isAuthAvailable() ? await getCurrentUser() : null;
+  const isAuthenticated = viewer !== null;
+  const exploreReturnTo = buildExploreReturnTo(rawQuery, initialFilter);
+  const signInHref = `/auth/sign-in?returnTo=${encodeURIComponent(
+    exploreReturnTo,
+  )}`;
+
+  const externalSections =
+    providers.length > 0 ? (
+      <ExternalSections
+        providers={providers}
+        query={rawQuery}
+        filter={initialFilter}
+        localSlugs={localSlugs}
+        isAuthenticated={isAuthenticated}
+        signInHref={signInHref}
+        returnTo={exploreReturnTo}
+      />
+    ) : null;
 
   const shelves: Array<{
     key: string;
@@ -129,7 +164,102 @@ export default async function ExplorePage({
         initialFilter={initialFilter}
         outcome={outcome}
         defaultSections={defaultSections}
+        externalSections={externalSections}
       />
     </Container>
+  );
+}
+
+/** Build a safe, shareable Explore return path preserving the query + filter. */
+function buildExploreReturnTo(query: string, filter: SearchKindFilter): string {
+  const params = new URLSearchParams();
+  if (query) params.set("q", query);
+  if (filter !== "all") params.set("type", filter);
+  const search = params.toString();
+  return search ? `/explore?${search}` : "/explore";
+}
+
+/**
+ * The streamed federated sections for an active query. TMDB serves movies + TV;
+ * Open Library serves books. Each section is INDEPENDENTLY Suspense-wrapped so a
+ * slow provider streams in on its own and never blocks the local results or the
+ * other provider. The active filter decides which sections apply.
+ */
+function ExternalSections({
+  providers,
+  query,
+  filter,
+  localSlugs,
+  isAuthenticated,
+  signInHref,
+  returnTo,
+}: {
+  providers: readonly ("tmdb" | "openlibrary")[];
+  query: string;
+  filter: SearchKindFilter;
+  localSlugs: string[];
+  isAuthenticated: boolean;
+  signInHref: string;
+  returnTo: string;
+}): ReactNode {
+  const hasTmdb = providers.includes("tmdb");
+  const hasOpenLibrary = providers.includes("openlibrary");
+  const showMoviesTv = hasTmdb && filter !== "book";
+  const showBooks = hasOpenLibrary && (filter === "all" || filter === "book");
+
+  const tmdbHeading =
+    filter === "movie"
+      ? "More movies"
+      : filter === "tv"
+        ? "More TV"
+        : "More movies & TV";
+
+  return (
+    <div className="flex flex-col gap-16">
+      {showMoviesTv && (
+        <Suspense fallback={<SectionSkeleton heading={tmdbHeading} />}>
+          <ExternalResultsSection
+            provider="tmdb"
+            heading={tmdbHeading}
+            query={query}
+            kind={filter === "movie" || filter === "tv" ? filter : "all"}
+            localSlugs={localSlugs}
+            isAuthenticated={isAuthenticated}
+            signInHref={signInHref}
+            returnTo={returnTo}
+          />
+        </Suspense>
+      )}
+      {showBooks && (
+        <Suspense fallback={<SectionSkeleton heading="More books" />}>
+          <ExternalResultsSection
+            provider="openlibrary"
+            heading="More books"
+            query={query}
+            kind="book"
+            localSlugs={localSlugs}
+            isAuthenticated={isAuthenticated}
+            signInHref={signInHref}
+            returnTo={returnTo}
+          />
+        </Suspense>
+      )}
+    </div>
+  );
+}
+
+/** A lightweight streaming placeholder for a federated section. */
+function SectionSkeleton({ heading }: { heading: string }) {
+  return (
+    <section
+      aria-label={heading}
+      aria-busy="true"
+      className="flex flex-col gap-4"
+    >
+      <h2 className="font-display text-xl tracking-tight text-foreground">
+        {heading}
+      </h2>
+      <p className="text-sm text-foreground/50">Searching…</p>
+    </section>
   );
 }

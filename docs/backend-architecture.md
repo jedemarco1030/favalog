@@ -898,6 +898,80 @@ server-only and not yet surfaced in the UI.
   and `--confirm-project-ref=<ref>` required for remote targets). Subcommands:
   `search`, `inspect`, `import`.
 
+## Catalog Platform v1B — canonical identity & federated Explore
+
+v1A keyed catalog identity solely on `media_items (source, external_id)`. That
+is insufficient once external results are exposed to users: a curated
+`source = 'favalog'` row can represent the **same real-world work** as a provider
+result (the curated _Dune: Part Two_ is TMDB `movie:693134`), and materializing
+the provider result under a new `(source, external_id)` would create a **second**
+row, splitting diary entries, reviews, lists, and favorites across two ids. v1B
+adds a canonical-identity layer plus a read-only title fallback so a materialized
+title resolves and reuses all existing per-user features.
+
+- **Alias table — `public.media_external_ids` (migration
+  `20260815120600_media_external_ids.sql`).** A forward-only table that links a
+  canonical `media_items` row to one or more provider identities. Constraints:
+  `unique (provider, kind, external_id)` (a provider identity resolves to at most
+  one canonical row — the resolution authority) and
+  `unique (media_id, provider, kind)` (a canonical row carries at most one
+  identity per provider+kind, so a second/different id for the same
+  provider+kind surfaces as a conflict rather
+  than silently attaching). A `FK … ON DELETE CASCADE` guarantees no orphan
+  links. **RLS is enabled** with a public-read policy (identity only); browser
+  roles get **`SELECT` only**, and writes are **`service_role`-only**.
+- **Canonical-resolving RPC — `public.materialize_external_media(...)`.** Same
+  security model as `materialize_media_item` (`SECURITY INVOKER`, pinned
+  `search_path = ''`, fully schema-qualified, **`service_role`-only** EXECUTE,
+  identity-only return). It resolves a provider identity **in a fixed order**
+  before writing:
+  1. **Existing exact provider link** (`media_external_ids`) → reuse
+     (`resolution: existing`).
+  2. **Existing provider row** (`media_items.source/external_id`) → backfill the
+     alias and reuse (`existing`).
+  3. **Conservative deterministic candidate** → attach to an existing title
+     (`linked`): **exactly one** `media_items` row whose **normalized title +
+     kind + release/publication year** match. Normalization is lowercase +
+     non-alphanumerics collapsed to single spaces — **exact-normalized equality,
+     never fuzzy or semantic similarity**.
+  4. **No match** → create a new canonical row with a collision-safe **immutable**
+     slug (`created`).
+
+  It is atomic, idempotent, and concurrency-safe (a transaction-scoped advisory
+  lock on the provider identity; unique constraints remain the ultimate
+  authority). **More than one deterministic candidate — or a candidate already
+  carrying a different identity for the same provider+kind — fails safe with
+  `P0003` and attaches nothing**, so Favalog never mis-attaches a provider
+  identity to the wrong title. When an existing (especially curated) title is
+  matched, its media id, immutable slug, title, year, and **community
+  `average_rating` are preserved**; only genuinely empty provider-controlled
+  presentation fields are filled and provenance
+  (`content_hash` / `normalization_version` / `synced_at`) is recorded — user
+  data is never overwritten. The shared pure materializer (`lib/catalog/materialize.ts`)
+  targets `materialize_external_media` by default, so both the server flow and the
+  operator CLI get canonical de-duplication automatically.
+
+- **pgTAP.** `supabase/tests/database/media_external_ids.test.sql` proves that
+  importing TMDB `movie:693134` links to the existing _Dune: Part Two_ row and
+  creates **no** second row.
+- **Title fallback reader — `getRealMediaBySlug` (`lib/supabase/media.ts`).** A
+  new **server-only** reader. `app/title/[slug]/page.tsx` now falls back to it
+  when the mock catalog has no match, so a **materialized** title resolves and
+  the existing Log / Rate / Review / Favorite / Add-to-list actions work
+  unchanged.
+- **Read-only external dedup (`lib/supabase/external-resolution.ts`).** During
+  federated Explore, each external candidate is resolved against canonical
+  identity using **exact provider-link / provider-row lookups only** (never fuzzy
+  or semantic). Candidates that already exist in the catalog link straight to
+  `/title/[slug]` and are never offered for import; candidates already shown in
+  the local results are dropped.
+
+> **Not applied to hosted Supabase in this change.** Migration
+> `20260815120600` and its pgTAP were developed and verified **locally**; the
+> hosted project is **not** mutated here (see the operations runbook for the
+> forward-only hosted rollout procedure). No hosted import or re-embedding was
+> performed, and no Vercel variables were changed or deployed.
+
 ## Supabase clients
 
 Per current `@supabase/ssr` guidance (the deprecated `@supabase/auth-helpers-*`
@@ -915,13 +989,14 @@ packages are **not** used):
 
 Only public configuration uses the `NEXT_PUBLIC_` prefix:
 
-| Variable                               | Scope           | Required for app startup |
-| -------------------------------------- | --------------- | ------------------------ |
-| `NEXT_PUBLIC_SUPABASE_URL`             | browser+server  | No (mock-data phase)     |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | browser+server  | No (mock-data phase)     |
-| `SUPABASE_SECRET_KEY`                  | **server only** | No — administrative only |
-| `TMDB_API_READ_TOKEN`                  | **server only** | No — catalog import only |
-| `OPEN_LIBRARY_CONTACT_EMAIL`           | **server only** | No — catalog import only |
+| Variable                               | Scope           | Required for app startup               |
+| -------------------------------------- | --------------- | -------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`             | browser+server  | No (mock-data phase)                   |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | browser+server  | No (mock-data phase)                   |
+| `SUPABASE_SECRET_KEY`                  | **server only** | No — administrative only               |
+| `TMDB_API_READ_TOKEN`                  | **server only** | No — catalog import only               |
+| `OPEN_LIBRARY_CONTACT_EMAIL`           | **server only** | No — catalog import only               |
+| `EXTERNAL_CATALOG_ENABLED`             | **server only** | No — off by default; federated Explore |
 
 `lib/supabase/env.ts` never throws at import time, so the app keeps building and
 rendering on Vercel with none of these set. `.env.example` documents the names
@@ -1386,6 +1461,10 @@ of the full mock catalog):
   dedicated activity/event table).
 - Migrating the remaining product surfaces (catalog browsing, community
   reviews) off mock data to Supabase-backed fetchers.
-- Real media-catalog provider integration.** (Foundation exists — see
-  "Catalog Platforms v1A" above).
+- Real media-catalog provider integration. (Foundation exists — see
+  "Catalog Platforms v1A" above — and **federated Explore discovery + on-demand
+  materialization** are now wired behind the `EXTERNAL_CATALOG_ENABLED` flag; see
+  "Catalog Platform v1B" above. Still deferred: generative AI over external
+  results, non-Explore import surfaces, and any hosted rollout — the v1B
+  migration is **local-only** in this change.)
 - Full followers-only list visibility enforcement.

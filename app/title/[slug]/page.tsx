@@ -24,6 +24,7 @@ import {
 import { mediaKindLabel } from "@/components/media/media-type-badge";
 import { isAuthAvailable } from "@/lib/auth/capability";
 import { getCurrentUser } from "@/lib/auth/data";
+import { getRealMediaBySlug } from "@/lib/supabase/media";
 import { getMyLatestLogForSlug } from "@/lib/supabase/diary";
 import { getMyListsWithMembership } from "@/lib/supabase/lists";
 import { getMyFavoriteState } from "@/lib/supabase/favorites";
@@ -42,7 +43,7 @@ export async function generateMetadata({
   params,
 }: TitlePageProps): Promise<Metadata> {
   const { slug } = await params;
-  const item = getMediaBySlug(slug);
+  const item = getMediaBySlug(slug) ?? (await getRealMediaBySlug(slug));
   if (!item) {
     return { title: "Title not found" };
   }
@@ -81,7 +82,11 @@ export async function generateMetadata({
  */
 export default async function TitlePage({ params }: TitlePageProps) {
   const { slug } = await params;
-  const item = getMediaBySlug(slug);
+  // Resolve from the mock catalog first; fall back to a real Supabase title so a
+  // freshly MATERIALIZED external title (Catalog Platform v1B) — which exists
+  // only in `media_items` — resolves at its canonical route with the existing
+  // Log / Rate / Review / Favorite / Add-to-list actions working unchanged.
+  const item = getMediaBySlug(slug) ?? (await getRealMediaBySlug(slug));
   if (!item) notFound();
 
   const distribution = getRatingDistribution(item.id);

@@ -173,6 +173,33 @@ function parseResolution(value: unknown): CanonicalResolution | undefined {
     : undefined;
 }
 
+/**
+ * The controlled message carried by a materialization failure caused by an
+ * AMBIGUOUS conservative deterministic candidate (the DB write path's P0003
+ * fail-safe). It is intentionally generic (no id/title/slug/payload) and is the
+ * single string {@link isAmbiguousMaterializeError} keys on.
+ */
+export const AMBIGUOUS_MATERIALIZE_MESSAGE =
+  "materialize failed: ambiguous canonical match";
+
+/** Whether a raw DB error message is the canonical ambiguous-match fail-safe. */
+function isAmbiguousMatchMessage(message: string | undefined): boolean {
+  return /ambiguous external identity/i.test(message ?? "");
+}
+
+/**
+ * Whether a thrown error is the canonical AMBIGUOUS-match fail-safe, so a caller
+ * can present a controlled "couldn't be added" state and record an `ambiguous`
+ * resolution rather than a generic error. Matches on the safe, controlled
+ * message; never inspects a raw DB payload.
+ */
+export function isAmbiguousMaterializeError(error: unknown): boolean {
+  return (
+    error instanceof CatalogProviderError &&
+    error.message === AMBIGUOUS_MATERIALIZE_MESSAGE
+  );
+}
+
 /** Create a {@link CatalogMaterializer} over an injected registry + RPC client. */
 export function createCatalogMaterializer(
   deps: MaterializerDeps,
@@ -238,13 +265,21 @@ export function createCatalogMaterializer(
       );
 
       if (error) {
+        // The canonical write path fails SAFELY (P0003) when a conservative
+        // deterministic candidate is ambiguous. Preserve that distinction so the
+        // caller can present a controlled "couldn't be added" state and record
+        // an `ambiguous` resolution — without ever exposing the raw DB error.
+        // Any other write error stays a generic, retryable `unavailable`.
+        const ambiguous = isAmbiguousMatchMessage(error.message);
         throw providerError(
           {
             provider: input.provider,
             operation: "materialize",
-            category: "unavailable",
+            category: ambiguous ? "validation" : "unavailable",
           },
-          `[${input.provider}] materialize failed: database write error`,
+          ambiguous
+            ? AMBIGUOUS_MATERIALIZE_MESSAGE
+            : `[${input.provider}] materialize failed: database write error`,
         );
       }
 

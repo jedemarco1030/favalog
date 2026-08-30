@@ -470,8 +470,51 @@ catalog.
 - **Environment**: Requires server-only `TMDB_API_READ_TOKEN` and
   `OPEN_LIBRARY_CONTACT_EMAIL` for live requests.
 
-This foundation is not yet wired to the production UI; the existing 28-title
-curated catalog remains the discovery source.
+**Catalog Platform v1B** adds a canonical-identity layer and **federated Explore
+discovery with on-demand materialization** on top of that foundation.
+
+- **Canonical identity + alias.** A forward-only `public.media_external_ids`
+  alias table plus the canonically-resolving `materialize_external_media(...)`
+  RPC ensure a provider result that is the **same real-world work** as an
+  existing (especially curated) title reuses that title's id and immutable slug
+  instead of creating a duplicate. Resolution is **conservative and
+  deterministic** (existing link → existing provider row → exact-normalized
+  title + kind + year, exactly one match → create new); an ambiguous match
+  **fails safe** and attaches nothing. It never uses fuzzy/semantic matching and
+  preserves community ratings and all user data.
+- **Federated Explore (behind a flag).** `/explore` runs local hybrid search
+  first, then — **only** for a committed non-empty query and **only** when the
+  server-only `EXTERNAL_CATALOG_ENABLED` flag is on **and** a provider is
+  configured — streams two separate, attributed sections: "More movies & TV"
+  (TMDB) and "More books" (Open Library). Providers are called **server-side
+  only**; external rankings are **not** blended into the local results; one
+  provider failing never hides local results or the other provider. With the
+  flag off/unset or no provider configured, `/explore` keeps its exact local-only
+  experience.
+- **On-demand import.** A signed-in, onboarded user can import an external
+  title; the Server Action submits **only** the provider, media kind, and
+  external id (never title/artwork/rating/credits), re-authenticates, and lets
+  the trusted server materializer re-fetch and normalize the data before
+  redirecting to `/title/[slug]`. The title page resolves materialized titles via
+  a server-only reader so Log/Rate/Review/Favorite/Add-to-list work unchanged.
+- **Provider attribution.** The mandatory TMDB notice ("This product uses the
+  TMDB API but is not endorsed or certified by TMDB.") and logo, plus an Open
+  Library credit, are shown with results. The in-repo TMDB logo
+  (`public/tmdb.svg`) is a **development approximation** to be replaced with the
+  official approved mark before production.
+- **Query privacy.** When federation is enabled, the raw search query **is sent
+  to TMDB / Open Library** to fetch results — the deliberate cost of federated
+  discovery. Favalog's own structured telemetry (`catalog_materialize`) still
+  carries only safe metadata (provider, operation, outcome, resolution, coarse
+  latency, retries, error category) and **never** the query text, ids, titles,
+  user email, credentials, or provider payloads.
+- **Eventual semantic embedding.** A materialized title is **keyword-searchable
+  immediately** and remains missing/stale for semantic embedding until the
+  guarded, owner-controlled `npm run embed:catalog` re-embeds it.
+
+The v1A operator ingestion path is unchanged; the existing 28-title curated
+catalog remains the primary discovery source, and the canonical-identity
+migration is **local-only** in this change (no hosted rollout performed).
 
 ### Features
 
@@ -563,12 +606,13 @@ production re-embedding **must** repeat the owner-controlled guarded backfill
 
 ### Environment variables
 
-| Variable                     | Exposure        | Notes                                                           |
-| ---------------------------- | --------------- | --------------------------------------------------------------- |
-| `OPENAI_API_KEY`             | **server only** | Secret; embeds the query for semantic search. Optional.         |
-| `SEMANTIC_SEARCH_ENABLED`    | **server only** | Kill switch; default enabled. Falsey disables semantic search.  |
-| `TMDB_API_READ_TOKEN`        | **server only** | Secret; used for movie/TV ingestion. TMDB attribution required. |
-| `OPEN_LIBRARY_CONTACT_EMAIL` | **server only** | Identifying contact for book ingestion (User-Agent).            |
+| Variable                     | Exposure        | Notes                                                                                            |
+| ---------------------------- | --------------- | ------------------------------------------------------------------------------------------------ |
+| `OPENAI_API_KEY`             | **server only** | Secret; embeds the query for semantic search. Optional.                                          |
+| `SEMANTIC_SEARCH_ENABLED`    | **server only** | Kill switch; default enabled. Falsey disables semantic search.                                   |
+| `TMDB_API_READ_TOKEN`        | **server only** | Secret; used for movie/TV ingestion. TMDB attribution required.                                  |
+| `OPEN_LIBRARY_CONTACT_EMAIL` | **server only** | Identifying contact for book ingestion (User-Agent).                                             |
+| `EXTERNAL_CATALOG_ENABLED`   | **server only** | Kill switch for federated Explore discovery; **off** by default. Requires a provider configured. |
 
 Neither is required to build or run. With no `OPENAI_API_KEY` (or the kill
 switch off), catalog search runs **keyword-only**. `OPENAI_API_KEY` is never

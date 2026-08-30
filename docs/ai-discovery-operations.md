@@ -78,6 +78,22 @@ only:
 Analytics is best-effort and wrapped so a failure/blocked transport can **never**
 affect navigation or search.
 
+### Catalog materialization telemetry — `catalog_materialize` (v1B)
+
+Emitted server-side by `lib/catalog/log.ts` (`logCatalogMaterialization`) when a
+user imports an external title via the federated-Explore materialization flow.
+Redaction-safe, safe fields only:
+
+- `provider` (`tmdb` | `open_library`), `operation`, `outcome`,
+  `resolution` (`linked` | `existing` | `created` | `ambiguous`), a **coarse
+  latency bucket**, `retryCount`, and a safe `errorCategory`.
+
+It **never** carries raw query text, ids, title/slug, user email, credentials,
+descriptions, provider payloads, or vectors. Use `resolution` to watch canonical
+de-duplication health (a spike in `ambiguous` means the deterministic resolver is
+refusing to attach — investigate catalog data, not the code path) and `outcome` /
+`errorCategory` for import reliability.
+
 ## Metrics and precise formulas
 
 Computed over a rolling window `W` (suggested: 1h for alerting, 24h for
@@ -214,6 +230,111 @@ After a real backfill, verify `compatible_embedding_count` matches the catalog
 size and re-check production `/explore` behaviour (see ADR 0003’s production
 verification). Then confirm `compatibleCorpus = true` in telemetry.
 
+## Catalog Platform v1B — federated Explore operations
+
+Federated external discovery on `/explore` (TMDB + Open Library) plus on-demand
+materialization is wired but ships **off by default**. See
+[ADR 0004](adr/0004-external-provider-catalog-ingestion.md) and the
+[backend architecture](backend-architecture.md#catalog-platform-v1b--canonical-identity--federated-explore).
+
+> **Not performed by this change.** The current change is **documentation-only
+> and local-only**: hosted Supabase is **not** mutated, no Vercel variables are
+> changed, nothing is deployed, and no hosted import or re-embedding is done.
+> Migration `20260815120600` and its pgTAP are verified **locally** only. The
+> procedure below is the **future** owner-controlled rollout, not a record of
+> work already done.
+
+### Kill switch — `EXTERNAL_CATALOG_ENABLED`
+
+Federation has a **server-only kill switch**. It is **off by default**: external
+discovery runs **only** when `EXTERNAL_CATALOG_ENABLED` is a truthy token
+(`true` / `1` / `on` / `yes`) **and** at least one provider is configured
+(`TMDB_API_READ_TOKEN` for movies/TV, `OPEN_LIBRARY_CONTACT_EMAIL` for books).
+It is **not** `NEXT_PUBLIC_`. To **roll back** federation immediately, unset it
+(or set a falsey token) in the server environment: `/explore` reverts to its
+exact **local-only** hybrid search — no external calls, no import forms, no
+build/render impact. The materialization Server Action also re-checks the flag,
+so a disabled flag rejects imports too.
+
+### Future hosted rollout procedure (owner-controlled, forward-only)
+
+Perform in order, out of band, with least privilege:
+
+1. **Apply the migration (forward-only).** Push `20260815120600` to hosted
+   Supabase the same way as prior forward-only pushes (`supabase db push`;
+   **never** `db reset --linked`, **never** remote seed). Regenerate types
+   (`npm run supabase:types`) and confirm no drift.
+2. **Run hosted pgTAP** for the new canonical-identity assertions
+   (`supabase/tests/database/media_external_ids.test.sql`).
+3. **Set server-only variables in Vercel** (production/preview as desired):
+   `EXTERNAL_CATALOG_ENABLED=true`, plus `TMDB_API_READ_TOKEN` and/or
+   `OPEN_LIBRARY_CONTACT_EMAIL` for the providers being enabled. These are
+   server-only — never `NEXT_PUBLIC_`.
+4. **Re-embed newly materialized rows** via the guarded, owner-controlled
+   backfill so imported titles become semantically searchable (they are
+   keyword-searchable immediately regardless):
+
+   ```bash
+   OPENAI_API_KEY=… npm run embed:catalog -- \
+     --allow-remote --confirm-project-ref=<exact-project-ref>
+   ```
+
+### Read-only post-deployment SQL checks (SELECT-only, hosted DB)
+
+```sql
+-- 1) The migration is recorded in the remote ledger.
+select version from supabase_migrations.schema_migrations
+where version = '20260815120600';
+
+-- 2) Catalog row counts by source (the original curated corpus should be 28).
+select source, count(*) from public.media_items group by source order by source;
+
+-- 3) The original 28 curated rows are unchanged (never duplicated/renamed).
+select count(*) as favalog_rows from public.media_items where source = 'favalog';
+--   expect 28
+
+-- 4) Alias link counts (0 until the first import; each import adds one link).
+select provider, kind, count(*)
+from public.media_external_ids group by provider, kind order by provider, kind;
+
+-- 5) The materialization RPC is SECURITY INVOKER, pinned empty search_path,
+--    service_role-only EXECUTE.
+select p.proname, p.prosecdef as security_definer, p.proconfig
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public' and p.proname = 'materialize_external_media';
+--   expect security_definer = false and proconfig containing search_path=""
+
+-- 6) RLS is enabled on the alias table (defence-in-depth).
+select relrowsecurity from pg_class
+where oid = 'public.media_external_ids'::regclass;
+--   expect true
+```
+
+### Manual production verification (after enabling)
+
+1. With the flag **off**, confirm `/explore` shows **no** external sections and
+   behaves exactly as local-only.
+2. With the flag **on** and a provider configured, run a committed query and
+   confirm the separate, **attributed** "More movies & TV" / "More books"
+   sections appear (server-rendered), while local results are unaffected.
+3. Confirm a title that already exists in the catalog links to `/title/[slug]`
+   and is **not** offered for import.
+4. As a signed-in, onboarded user, import a new external title and confirm the
+   redirect to its `/title/[slug]`, that Log/Rate/Review/Favorite/Add-to-list
+   work, and that it is keyword-searchable immediately.
+5. Confirm the imported title is **not** yet semantically matched until the
+   guarded re-embed runs.
+6. Confirm the TMDB attribution notice + logo and the Open Library credit render
+   with external results.
+7. In telemetry, confirm `catalog_materialize` shows the expected `resolution` /
+   `outcome` and **no** query text or ids.
+
+### Rollback
+
+Unset (or set falsey) `EXTERNAL_CATALOG_ENABLED` → `/explore` reverts to
+local-only immediately; imports are rejected. The alias table and RPC remain in
+place (harmless when the flag is off). No data migration is needed to disable.
+
 ## Privacy boundaries and retention
 
 - **Never** in telemetry or analytics: raw/normalized **query text**, media
@@ -233,6 +354,12 @@ verification). Then confirm `compatibleCorpus = true` in telemetry.
   URL, failing closed on an unparseable URL. This controls only Favalog's
   analytics telemetry — **not** Vercel Runtime Logs, whose request-log
   search-parameter handling and retention remain owner/platform concerns.
+- **External federation (v1B):** when `EXTERNAL_CATALOG_ENABLED` is on and a
+  provider is configured, a committed Explore query is sent **server-side** to
+  TMDB / Open Library to fetch results — a provider-facing request, the
+  deliberate cost of federated discovery. Favalog's own `catalog_search` and
+  `catalog_materialize` events stay query-free (safe metadata only). With the
+  flag off/unset, no external request is made.
 - `requestId` correlates server log lines only; it is **not** sent to product
   analytics (which stays low-cardinality/anonymous).
 - **Retention:** server logs and Vercel Analytics follow the hosting platform’s

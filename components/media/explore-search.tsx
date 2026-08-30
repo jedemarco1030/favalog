@@ -46,6 +46,13 @@ interface ExploreSearchProps {
   /** Editorial (example) shelves shown when no query is active. */
   defaultSections: ReactNode;
   /**
+   * Streamed federated external-provider sections (Catalog Platform v1B),
+   * rendered BELOW the local results for an active query. Already Suspense-
+   * wrapped by the server page so provider latency never blocks local results;
+   * `null` when external discovery is off/unavailable or there is no query.
+   */
+  externalSections?: ReactNode;
+  /**
    * Injectable analytics transport (tests/stories). Defaults to the real
    * `@vercel/analytics` `track` inside the adapter when omitted.
    */
@@ -69,6 +76,7 @@ export function ExploreSearch({
   initialFilter,
   outcome,
   defaultSections,
+  externalSections,
   analyticsTrack,
 }: ExploreSearchProps) {
   const router = useRouter();
@@ -181,13 +189,16 @@ export function ExploreSearch({
       </div>
 
       {hasActiveQuery ? (
-        <section aria-labelledby={resultsHeadingId} aria-busy={isPending}>
-          <ExploreResults
-            outcome={outcome}
-            isPending={isPending}
-            analyticsTrack={analyticsTrack}
-          />
-        </section>
+        <div className="flex flex-col gap-16">
+          <section aria-labelledby={resultsHeadingId} aria-busy={isPending}>
+            <ExploreResults
+              outcome={outcome}
+              isPending={isPending}
+              analyticsTrack={analyticsTrack}
+            />
+          </section>
+          {externalSections}
+        </div>
       ) : (
         <div className="flex flex-col gap-8">
           <p className="text-sm text-foreground/50">

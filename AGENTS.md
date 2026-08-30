@@ -542,9 +542,73 @@ exists (schema, RLS, clients) and the following are wired to it:
   local/remote target guards as the embedding pipeline. Requires server-only
   `TMDB_API_READ_TOKEN` and `OPEN_LIBRARY_CONTACT_EMAIL` for live requests (never
   `NEXT_PUBLIC_`, never logged). **TMDB attribution**
-  (notice + logo) is required before user-facing results. External search
-  results in `/explore`, import buttons in the production UI, and generative AI
-  remain **deferred**.
+  (notice + logo) is required before user-facing results.
+- **Catalog Platform v1B — federated Explore discovery + canonical on-demand
+  materialization (wired; local-only).** v1A keyed identity solely on
+  `media_items (source, external_id)`, which would duplicate a curated title that
+  represents the **same real-world work** as a provider result (the curated
+  _Dune: Part Two_ is TMDB `movie:693134`). v1B adds a **canonical-identity**
+  layer: the forward-only alias table `public.media_external_ids` (migration
+  `20260815120600_media_external_ids.sql` — unique `(provider,kind,external_id)`
+  - `(media_id,provider,kind)`, FK `ON DELETE CASCADE`, RLS public-read /
+    browser `SELECT`-only / `service_role`-only writes) and the
+    canonically-resolving `public.materialize_external_media(...)` RPC
+    (`SECURITY INVOKER`, pinned empty `search_path`, schema-qualified,
+    `service_role`-only EXECUTE, identity-only return). **Resolution is
+    conservative and deterministic** — existing provider link → existing provider
+    row (backfills the alias) → **exact-normalized title + kind + year** (exactly
+    one match) → create new — and **fails safe with `P0003`** on ambiguity (never
+    fuzzy/semantic); it preserves media id, immutable slug, community
+    `average_rating`, and all user data. pgTAP
+    (`supabase/tests/database/media_external_ids.test.sql`) proves importing TMDB
+    `movie:693134` cannot duplicate _Dune: Part Two_. **Federated Explore**
+    (`app/explore/page.tsx`) runs local hybrid search first, then streams two
+    independent Suspense sections — "More movies & TV" (TMDB) and "More books"
+    (Open Library, via `components/media/external-results-section.tsx`) — **only**
+    for a committed non-empty query, **only** when the server-only
+    `EXTERNAL_CATALOG_ENABLED` flag (`lib/catalog/feature-flag.ts`) is on **and** a
+    provider is configured. Providers are called **server-side only** (never from
+    the browser, never for an empty query/editorial view); external rankings are
+    **not** blended into the local RRF; one provider failing never hides local
+    results or the other provider. Each candidate is resolved against canonical
+    identity (`lib/supabase/external-resolution.ts`, exact provider-link /
+    provider-row only) — already-existing titles link to `/title/[slug]` and are
+    never offered for import; local duplicates are dropped. **On-demand import**
+    uses the Server Action `materializeExternalTitleAction`
+    (`app/explore/actions.ts`, `app/explore/materialize-form.ts`): the client
+    submits **only** provider, media kind, external id, and a safe `returnTo`
+    (never title/slug/year/artwork/synopsis/rating/credits/authors); the action
+    re-checks the flag, re-authenticates via the auth DAL, requires a complete
+    onboarded profile, allow-lists the identity (`validateMaterializeInput`),
+    requires the service-role admin client, calls the trusted materializer
+    (`lib/catalog/server-materializer.ts` → `materialize_external_media`),
+    revalidates `/explore` + `/title/[slug]`, and redirects to `/title/[slug]`
+    (signed-out → sign-in `returnTo`; incomplete profile → onboarding; **no auto
+    log/favorite/list on import**). The title page falls back to the server-only
+    reader `getRealMediaBySlug` (`lib/supabase/media.ts`) so materialized titles
+    resolve and Log/Rate/Review/Favorite/Add-to-list work unchanged.
+    **Attribution:** `components/media/provider-attribution.tsx` renders the
+    mandatory TMDB notice ("This product uses the TMDB API but is not endorsed or
+    certified by TMDB.") plus a logo and an Open Library credit; the in-repo
+    `public/tmdb.svg` is a **development approximation to be replaced with the
+    official approved mark before production**; approved image hosts
+    `image.tmdb.org` (`/t/p/**`) and `covers.openlibrary.org` (`/b/**`) are added
+    to `next.config.ts`. **Eventual embedding:** materialization never
+    synchronously calls OpenAI — a materialized title is keyword-searchable
+    immediately and remains missing/stale for semantic embedding until the guarded
+    owner-controlled `npm run embed:catalog` re-embeds it. **Query privacy:** with
+    federation enabled the raw query **is sent to TMDB / Open Library**; Favalog's
+    own `catalog_materialize` telemetry (`lib/catalog/log.ts`,
+    `logCatalogMaterialization`) carries only provider, operation, outcome,
+    canonical resolution (linked/existing/created/ambiguous), a coarse latency
+    bucket, retry count, and a safe error category — **never** raw query text, ids,
+    title/slug, user email, credentials, descriptions, provider payloads, or
+    vectors. With the flag off/unset or no provider configured, `/explore` keeps
+    its exact local-only experience with no build/import crash. **This change is
+    documentation-only and local-only:** hosted Supabase is not mutated, no Vercel
+    variables are changed, nothing is deployed, and no hosted import or
+    re-embedding is performed (migration `20260815120600` is local-only). See
+    [ADR 0004](docs/adr/0004-external-provider-catalog-ingestion.md).
 
 Everything else is still mock-data. Do **not** introduce any of the following
 without an explicit task: migrating the remaining product pages off mock data,
@@ -552,7 +616,10 @@ without an explicit task: migrating the remaining product pages off mock data,
 reordering and direct favorite-removal controls on the profile — favorite
 removal is from the title page only this phase), **curator notes**, a follows
 UI, likes (reviews or lists), follower-aware list visibility, external catalog
-APIs (TMDB, Open Library, Google Books), **generative AI** (LLM-written text,
+APIs beyond the wired TMDB / Open Library federation (e.g. **Google Books**, or
+any new provider), a hosted rollout of the v1B migration / Vercel flag / hosted
+import (the federated Explore + materialization slice is wired but **local-only**
+— see "Catalog Platform v1B" above), **generative AI** (LLM-written text,
 explanations, chat, or agents — AI Discovery v1 is retrieval only) and any AI
 beyond the wired hybrid catalog search, real notifications,
 real social relationships, real recommendation algorithms, additional OAuth
