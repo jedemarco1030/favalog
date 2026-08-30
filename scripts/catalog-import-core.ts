@@ -422,11 +422,12 @@ async function runImport(
           externalId: result.externalId,
           kind: result.kind,
           inserted: result.inserted,
+          resolution: result.resolution ?? null,
         }),
       );
     } else {
       deps.logger.log(
-        `[catalog] ${result.inserted ? "created" : "refreshed"} ${result.kind} ` +
+        `[catalog] ${result.resolution ?? (result.inserted ? "created" : "refreshed")} ${result.kind} ` +
           `"${result.slug}" (media ${result.mediaId}).`,
       );
     }

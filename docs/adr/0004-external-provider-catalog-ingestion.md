@@ -70,3 +70,32 @@ Adding millions of external results to `/explore` requires careful UX work (dist
 - **Catalog Growth.** The catalog can now grow beyond the initial 28 titles through operator-driven imports.
 - **Provenance Tracking.** We can now detect when a stored item was last synced and whether our normalization logic has changed since then.
 - **RPC Restriction.** Browser-based roles can never trigger materialization; it is strictly a server/operator capability.
+
+## Amendment — Catalog Platform v1B: canonical identity & federated Explore (2026-08-30)
+
+v1A keyed catalog identity solely on `public.media_items (source, external_id)`. That is insufficient once external results are exposed to users, because a curated `source='favalog'` row can represent the **same real-world work** as a provider result (the curated _Dune: Part Two_ is TMDB movie `693134`). Materializing the provider result under a new `(source, external_id)` would create a **second** row, splitting diary entries, reviews, lists, and favorites across two ids. This amendment records the forward-only design that solves canonical identity **before** any user-controlled import is exposed.
+
+### Decisions
+
+1. **Canonical alias table (Migration 25 — `20260815120600_media_external_ids.sql`).** A forward-only `public.media_external_ids` table links a canonical `media_items` row to one or more provider identities. Constraints: `unique (provider, kind, external_id)` (a provider identity resolves to at most one canonical row — the resolution authority) and `unique (media_id, provider, kind)` (a canonical row carries at most one identity per provider+kind, so a second/different id surfaces as a conflict and is rejected rather than silently attached). `FK … ON DELETE CASCADE` guarantees no orphan links. RLS is enabled with a public-read policy (identity only), and browser roles get `SELECT` only; writes are `service_role`-only.
+
+2. **Canonical-resolving RPC — `public.materialize_external_media(...)`.** Same security model as `materialize_media_item` (`SECURITY INVOKER`, pinned `search_path=''`, fully schema-qualified, `service_role`-only EXECUTE, identity-only return). It resolves a provider identity **in a fixed order** before writing:
+   1. **Existing exact provider link** (`media_external_ids`) → reuse (`resolution: existing`).
+   2. **Existing provider row** (`media_items.source/external_id`) → backfill the alias + reuse (`existing`).
+   3. **Conservative deterministic candidate** → attach to an existing title (`linked`): **exactly one** `media_items` row whose **normalized title + kind + release/publication year** match. Normalization is lowercase + non-alphanumerics collapsed to single spaces — **exact-normalized equality, never fuzzy or semantic similarity.**
+   4. **No match** → create a new canonical row with a collision-safe immutable slug (`created`).
+      It is atomic, idempotent, and concurrency-safe (a transaction-scoped advisory lock on the provider identity; unique constraints remain the ultimate authority).
+
+3. **Fail safe on ambiguity.** More than one deterministic candidate, or a candidate already carrying a different identity for the same provider+kind, raises `P0003` and attaches nothing — Favalog never mis-attaches a provider identity to the wrong title.
+
+4. **Preservation & provider-metadata policy.** When an existing (especially curated) title is matched, its media id, immutable slug, title, year, genres, and **community `average_rating` are preserved**; only genuinely empty provider-controlled presentation fields (subtitle/synopsis/poster/backdrop) are filled, and provenance (`content_hash`/`normalization_version`/`synced_at`) is recorded. User-generated data is never overwritten.
+
+5. **No backfilled fictional mappings.** The 28 curated titles are mostly fictional works; only _Dune: Part Two_ is a real work. No provider links are seeded in the migration — the deterministic resolver links _Dune: Part Two_ on first import, which is proven by pgTAP (`supabase/tests/database/media_external_ids.test.sql`): importing TMDB `movie:693134` links to the existing row and creates **no** second _Dune: Part Two_.
+
+6. **Shared write path + CLI.** The pure materializer (`lib/catalog/materialize.ts`) now targets `materialize_external_media` by default and surfaces the `linked | existing | created` outcome; the legacy `materialize_media_item` remains selectable. Both the server wiring and the operator CLI (`npm run catalog import`) therefore get canonical de-duplication automatically, and the CLI reports the resolution outcome.
+
+7. **Opt-in federation flag.** A server-only `EXTERNAL_CATALOG_ENABLED` gate (`lib/catalog/feature-flag.ts`) defaults **off**; external discovery runs only when the flag is truthy **and** the relevant provider is configured. When unset/disabled or unconfigured, `/explore` keeps its existing local hybrid search unchanged, with no external calls and no build/import-time crash.
+
+### Status / scope in this change
+
+The canonical-identity **database foundation and server layer are implemented and verified** (migration applies on a clean `supabase db reset`; the full pgTAP suite passes — 320 tests, including 43 new canonical-identity assertions; generated types regenerated; typecheck clean; catalog unit tests green). The user-facing **federated Explore UI, external-result presentation, and the end-to-end materialization Server Action flow remain to be wired on top of this foundation** and are tracked as follow-up work. Constraints remain unchanged: hosted Supabase is not mutated, no hosted import/re-embedding is performed, existing migrations are not edited, and RLS/grants/pinned search paths/provider validation/remote-write guards/no-env behavior are not weakened.

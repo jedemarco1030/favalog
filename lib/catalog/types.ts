@@ -204,7 +204,19 @@ export interface MaterializeResult {
   inserted: boolean;
   /** ISO timestamp of the successful synchronization. */
   syncedAt: string;
+  /**
+   * How the provider identity was canonically resolved (Catalog Platform v1B):
+   *   - `created`  — a new canonical media row was inserted.
+   *   - `linked`   — attached to an existing title via a conservative
+   *                  deterministic (title + kind + year) candidate match.
+   *   - `existing` — reused via an existing provider link or provider row.
+   * Absent when the write path does not report a resolution (legacy v1A RPC).
+   */
+  resolution?: CanonicalResolution;
 }
+
+/** The canonical-resolution outcome reported by `materialize_external_media`. */
+export type CanonicalResolution = "created" | "linked" | "existing";
 
 /**
  * The trusted materialization seam. The concrete implementation re-fetches the

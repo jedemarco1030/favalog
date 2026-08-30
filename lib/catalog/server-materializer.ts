@@ -2,8 +2,10 @@
  * Server wiring for trusted materialization.
  *
  * Combines the real server-only provider registry (TMDB + Open Library) with a
- * service-role admin client's `materialize_media_item` RPC into a ready
- * {@link CatalogMaterializer}. The RPC is wrapped behind the small
+ * service-role admin client's canonically-resolving `materialize_external_media`
+ * RPC (Catalog Platform v1B) into a ready {@link CatalogMaterializer}, so a
+ * server-triggered import de-duplicates a provider identity to an existing
+ * Favalog title before creating a new row. The RPC is wrapped behind the small
  * {@link CatalogRpcClient} seam so the pure materializer in `materialize.ts`
  * stays database-agnostic and unit-testable.
  *

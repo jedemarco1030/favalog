@@ -180,6 +180,79 @@ describe("createCatalogMaterializer", () => {
   });
 });
 
+describe("createCatalogMaterializer canonical resolution (v1B)", () => {
+  /** A fake RPC that records the function name it was called with. */
+  function fnCapturingRpc(resolution?: string): {
+    client: CatalogRpcClient;
+    fns: string[];
+  } {
+    const fns: string[] = [];
+    const client: CatalogRpcClient = {
+      async rpc(fn, args) {
+        fns.push(fn);
+        return {
+          data: {
+            media_id: "00000000-0000-0000-0000-000000000001",
+            slug: "fixture-movie-one",
+            source: args.p_source,
+            external_id: args.p_external_id,
+            kind: args.p_kind,
+            inserted: resolution === "created",
+            synced_at: "2026-08-30T00:00:00.000Z",
+            ...(resolution ? { resolution } : {}),
+          },
+          error: null,
+        };
+      },
+    };
+    return { client, fns };
+  }
+
+  it("defaults to the canonically-resolving materialize_external_media RPC", async () => {
+    const { client, fns } = fnCapturingRpc("created");
+    const m = createCatalogMaterializer({
+      registry: registry(),
+      rpcClient: client,
+    });
+    await m.materialize({
+      provider: "tmdb",
+      kind: "movie",
+      externalId: "1001",
+    });
+    expect(fns[0]).toBe("materialize_external_media");
+  });
+
+  it("surfaces the canonical resolution outcome", async () => {
+    const { client } = fnCapturingRpc("linked");
+    const m = createCatalogMaterializer({
+      registry: registry(),
+      rpcClient: client,
+    });
+    const result = await m.materialize({
+      provider: "tmdb",
+      kind: "movie",
+      externalId: "1001",
+    });
+    expect(result.resolution).toBe("linked");
+  });
+
+  it("omits resolution when the write path does not report one (legacy v1A RPC)", async () => {
+    const { client, fns } = fnCapturingRpc();
+    const m = createCatalogMaterializer({
+      registry: registry(),
+      rpcClient: client,
+      rpcFunction: "materialize_media_item",
+    });
+    const result = await m.materialize({
+      provider: "tmdb",
+      kind: "movie",
+      externalId: "1001",
+    });
+    expect(fns[0]).toBe("materialize_media_item");
+    expect(result.resolution).toBeUndefined();
+  });
+});
+
 describe("buildDetails", () => {
   it("builds kind-specific detail payloads", () => {
     const [movie, tv, book] = DEFAULT_FAKE_ITEMS;

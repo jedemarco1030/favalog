@@ -215,6 +215,44 @@ export type Database = {
           },
         ]
       }
+      media_external_ids: {
+        Row: {
+          created_at: string
+          external_id: string
+          id: string
+          kind: Database["public"]["Enums"]["media_kind"]
+          media_id: string
+          provider: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          external_id: string
+          id?: string
+          kind: Database["public"]["Enums"]["media_kind"]
+          media_id: string
+          provider: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          external_id?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["media_kind"]
+          media_id?: string
+          provider?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_external_ids_media_id_fkey"
+            columns: ["media_id"]
+            isOneToOne: false
+            referencedRelation: "media_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       media_items: {
         Row: {
           average_rating: number | null
@@ -518,6 +556,25 @@ export type Database = {
           p_rating?: number
           p_review_body?: string
           p_review_title?: string
+        }
+        Returns: Json
+      }
+      materialize_external_media: {
+        Args: {
+          p_average_rating: number
+          p_backdrop_url: string
+          p_content_hash: string
+          p_details: Json
+          p_external_id: string
+          p_genres: string[]
+          p_kind: Database["public"]["Enums"]["media_kind"]
+          p_normalization_version: string
+          p_poster_url: string
+          p_source: string
+          p_subtitle: string
+          p_synopsis: string
+          p_title: string
+          p_year: number
         }
         Returns: Json
       }

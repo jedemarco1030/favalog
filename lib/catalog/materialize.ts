@@ -8,8 +8,12 @@
  *      normalize it server-side. Caller-supplied titles/images/etc. are never
  *      accepted.
  *   3. Compute provenance (content hash + normalization version) and write the
- *      normalized product through the atomic, idempotent, collision-safe
- *      `materialize_media_item` RPC.
+ *      normalized product through the atomic, idempotent, collision-safe,
+ *      canonically-resolving `materialize_external_media` RPC (Catalog Platform
+ *      v1B). That RPC de-duplicates a provider identity to an existing Favalog
+ *      title (exact link → existing provider row → conservative deterministic
+ *      title+kind+year candidate) before ever creating a new row, so importing a
+ *      provider result that Favalog already has never creates a duplicate.
  *
  * The RPC client is injected as a tiny interface, so this whole module is unit
  * testable with a fake provider + fake RPC and needs no database or generated
@@ -22,6 +26,7 @@ import { CatalogProviderError, providerError } from "./errors.ts";
 import { normalizedContentHash } from "./provenance.ts";
 import type { ProviderRegistry } from "./provider-registry";
 import type {
+  CanonicalResolution,
   CatalogMaterializer,
   MaterializeInput,
   MaterializeResult,
@@ -35,18 +40,35 @@ export interface CatalogRpcResult {
   error: { message: string } | null;
 }
 
+/** The DB write RPCs the materializer can target. */
+export type CatalogMaterializeRpc =
+  "materialize_external_media" | "materialize_media_item";
+
 /** The minimal RPC surface the materializer needs. Injected for testability. */
 export interface CatalogRpcClient {
   rpc(
-    fn: "materialize_media_item",
+    fn: CatalogMaterializeRpc,
     args: Record<string, unknown>,
   ): Promise<CatalogRpcResult>;
 }
+
+/**
+ * The default trusted write path: the canonically-resolving v1B RPC, which
+ * de-duplicates a provider identity to an existing Favalog title before writing.
+ */
+export const DEFAULT_MATERIALIZE_RPC: CatalogMaterializeRpc =
+  "materialize_external_media";
 
 /** Dependencies for {@link createCatalogMaterializer}. */
 export interface MaterializerDeps {
   registry: ProviderRegistry;
   rpcClient: CatalogRpcClient;
+  /**
+   * Which DB write path to call. Defaults to {@link DEFAULT_MATERIALIZE_RPC}
+   * (canonical resolution). The legacy v1A `materialize_media_item` may be used
+   * for a raw, non-resolving write when explicitly required.
+   */
+  rpcFunction?: CatalogMaterializeRpc;
 }
 
 /** Build the kind-specific `details` payload (mirrors lib/supabase/mappers). */
@@ -131,6 +153,7 @@ function parseResult(
       category: "unknown",
     });
   }
+  const resolution = parseResolution(row.resolution);
   return {
     mediaId,
     slug,
@@ -139,7 +162,15 @@ function parseResult(
     kind: input.kind,
     inserted: row.inserted === true,
     syncedAt,
+    ...(resolution ? { resolution } : {}),
   };
+}
+
+/** Narrow the RPC's `resolution` field to a known outcome, or `undefined`. */
+function parseResolution(value: unknown): CanonicalResolution | undefined {
+  return value === "created" || value === "linked" || value === "existing"
+    ? value
+    : undefined;
 }
 
 /** Create a {@link CatalogMaterializer} over an injected registry + RPC client. */
@@ -187,7 +218,7 @@ export function createCatalogMaterializer(
       const contentHash = normalizedContentHash(normalized);
 
       const { data, error } = await deps.rpcClient.rpc(
-        "materialize_media_item",
+        deps.rpcFunction ?? DEFAULT_MATERIALIZE_RPC,
         {
           p_source: input.provider,
           p_kind: input.kind,
