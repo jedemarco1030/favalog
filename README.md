@@ -484,7 +484,8 @@ discovery with on-demand materialization** on top of that foundation.
   preserves community ratings and all user data.
 - **Federated Explore (behind a flag).** `/explore` runs local hybrid search
   first, then — **only** for a committed non-empty query and **only** when the
-  server-only `EXTERNAL_CATALOG_ENABLED` flag is on **and** a provider is
+  server-only `EXTERNAL_CATALOG_ENABLED` flag is on, the provider's own flag
+  (`TMDB_ENABLED`, `OPEN_LIBRARY_ENABLED`) is on, **and** a provider is
   configured — streams two separate, attributed sections: "More movies & TV"
   (TMDB) and "More books" (Open Library). Providers are called **server-side
   only**; external rankings are **not** blended into the local results; one
@@ -500,8 +501,8 @@ discovery with on-demand materialization** on top of that foundation.
 - **Provider attribution.** The mandatory TMDB notice ("This product uses the
   TMDB API but is not endorsed or certified by TMDB.") and logo, plus an Open
   Library credit, are shown with results. The in-repo TMDB logo
-  (`public/tmdb.svg`) is a **development approximation** to be replaced with the
-  official approved mark before production.
+  (`public/tmdb.svg`) is the official, unmodified "blue_short" horizontal mark
+  from TMDB (retrieved 2026-08-31).
 - **Query privacy.** When federation is enabled, the raw search query **is sent
   to TMDB / Open Library** to fetch results — the deliberate cost of federated
   discovery. Favalog's own structured telemetry (`catalog_materialize`) still
@@ -606,13 +607,15 @@ production re-embedding **must** repeat the owner-controlled guarded backfill
 
 ### Environment variables
 
-| Variable                     | Exposure        | Notes                                                                                            |
-| ---------------------------- | --------------- | ------------------------------------------------------------------------------------------------ |
-| `OPENAI_API_KEY`             | **server only** | Secret; embeds the query for semantic search. Optional.                                          |
-| `SEMANTIC_SEARCH_ENABLED`    | **server only** | Kill switch; default enabled. Falsey disables semantic search.                                   |
-| `TMDB_API_READ_TOKEN`        | **server only** | Secret; used for movie/TV ingestion. TMDB attribution required.                                  |
-| `OPEN_LIBRARY_CONTACT_EMAIL` | **server only** | Identifying contact for book ingestion (User-Agent).                                             |
-| `EXTERNAL_CATALOG_ENABLED`   | **server only** | Kill switch for federated Explore discovery; **off** by default. Requires a provider configured. |
+| Variable                     | Exposure        | Notes                                                                                         |
+| ---------------------------- | --------------- | --------------------------------------------------------------------------------------------- |
+| `OPENAI_API_KEY`             | **server only** | Secret; embeds the query for semantic search. Optional.                                       |
+| `SEMANTIC_SEARCH_ENABLED`    | **server only** | Kill switch; default enabled. Falsey disables semantic search.                                |
+| `TMDB_API_READ_TOKEN`        | **server only** | Secret; used for movie/TV ingestion. TMDB attribution required.                               |
+| `OPEN_LIBRARY_CONTACT_EMAIL` | **server only** | Identifying contact for book ingestion (User-Agent).                                          |
+| `EXTERNAL_CATALOG_ENABLED`   | **server only** | Global kill switch for federated Explore discovery; **off** by default.                       |
+| `TMDB_ENABLED`               | **server only** | Per-provider TMDB control; **off** by default. Keep off pending owner licensing confirmation. |
+| `OPEN_LIBRARY_ENABLED`       | **server only** | Per-provider Open Library control; **on** by default.                                         |
 
 Neither is required to build or run. With no `OPENAI_API_KEY` (or the kill
 switch off), catalog search runs **keyword-only**. `OPENAI_API_KEY` is never

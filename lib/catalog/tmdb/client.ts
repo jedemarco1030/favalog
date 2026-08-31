@@ -56,6 +56,12 @@ import type {
 export interface TmdbProviderOptions {
   /** Overrides the server-only token (tests pass a fake). */
   token?: string;
+  /**
+   * Overrides the API base URL. Production leaves this unset (the real TMDB
+   * host); the server registry only supplies a value via the test-only,
+   * loopback-guarded transport seam (see `lib/catalog/test-transport.ts`).
+   */
+  baseUrl?: string;
   /** Injected fetch (defaults to global `fetch`). */
   fetchImpl?: FetchLike;
   /** Injected retry environment (defaults to real timers). */
@@ -71,6 +77,7 @@ export function createTmdbProvider(
   options: TmdbProviderOptions = {},
 ): CatalogProvider {
   const logSink = options.logSink ?? consoleLogSink;
+  const apiBase = options.baseUrl ?? TMDB_API_BASE;
 
   function requireToken(operation: string): string {
     const token = options.token ?? getTmdbToken();
@@ -155,7 +162,7 @@ export function createTmdbProvider(
       language: TMDB_LANGUAGE,
       page: String(page),
     });
-    return `${TMDB_API_BASE}/search/${kind}?${params.toString()}`;
+    return `${apiBase}/search/${kind}?${params.toString()}`;
   }
 
   async function searchOneKind(
@@ -285,7 +292,7 @@ export function createTmdbProvider(
         language: TMDB_LANGUAGE,
         append_to_response: "credits",
       });
-      const url = `${TMDB_API_BASE}/${path}/${encodeURIComponent(ref.externalId)}?${params.toString()}`;
+      const url = `${apiBase}/${path}/${encodeURIComponent(ref.externalId)}?${params.toString()}`;
 
       return observed("getByExternalId", async () => {
         if (ref.kind === "movie") {

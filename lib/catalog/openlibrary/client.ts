@@ -61,6 +61,12 @@ import type {
 export interface OpenLibraryProviderOptions {
   /** Overrides the server-only contact (tests pass a value). */
   contact?: string;
+  /**
+   * Overrides the API base URL. Production leaves this unset (the real Open
+   * Library host); the server registry only supplies a value via the test-only,
+   * loopback-guarded transport seam (see `lib/catalog/test-transport.ts`).
+   */
+  baseUrl?: string;
   fetchImpl?: FetchLike;
   retryEnv?: RetryEnvironment;
   logSink?: CatalogLogSink;
@@ -77,6 +83,7 @@ export function createOpenLibraryProvider(
   options: OpenLibraryProviderOptions = {},
 ): CatalogProvider {
   const logSink = options.logSink ?? consoleLogSink;
+  const apiBase = options.baseUrl ?? OPEN_LIBRARY_BASE;
 
   function requireContact(operation: string): string {
     const contact = options.contact ?? getOpenLibraryContact();
@@ -178,7 +185,7 @@ export function createOpenLibraryProvider(
         limit: String(MAX_SEARCH_RESULTS),
         page: String(page),
       });
-      const url = `${OPEN_LIBRARY_BASE}/search.json?${params.toString()}`;
+      const url = `${apiBase}/search.json?${params.toString()}`;
 
       return observed("search", async () => {
         const { data, retries } = await fetchOL<OpenLibrarySearchResponse>(
@@ -214,7 +221,7 @@ export function createOpenLibraryProvider(
         });
       }
       const contact = requireContact("getByExternalId");
-      const workUrl = `${OPEN_LIBRARY_BASE}${workIdToKey(ref.externalId)}.json`;
+      const workUrl = `${apiBase}${workIdToKey(ref.externalId)}.json`;
 
       return observed("getByExternalId", async () => {
         const { data: work, retries: workRetries } =
@@ -235,7 +242,7 @@ export function createOpenLibraryProvider(
           try {
             const { data: author, retries } = await fetchOL<OpenLibraryAuthor>(
               "getByExternalId",
-              `${OPEN_LIBRARY_BASE}${key}.json`,
+              `${apiBase}${key}.json`,
               contact,
               DETAIL_CACHE_TTL_SECONDS,
               signal,

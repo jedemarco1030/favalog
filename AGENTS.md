@@ -566,7 +566,8 @@ exists (schema, RLS, clients) and the following are wired to it:
     independent Suspense sections — "More movies & TV" (TMDB) and "More books"
     (Open Library, via `components/media/external-results-section.tsx`) — **only**
     for a committed non-empty query, **only** when the server-only
-    `EXTERNAL_CATALOG_ENABLED` flag (`lib/catalog/feature-flag.ts`) is on **and** a
+    `EXTERNAL_CATALOG_ENABLED` flag (`lib/catalog/feature-flag.ts`) is on, the
+    provider's own flag (`TMDB_ENABLED`, `OPEN_LIBRARY_ENABLED`) is on, **and** a
     provider is configured. Providers are called **server-side only** (never from
     the browser, never for an empty query/editorial view); external rankings are
     **not** blended into the local RRF; one provider failing never hides local
@@ -590,13 +591,16 @@ exists (schema, RLS, clients) and the following are wired to it:
     **Attribution:** `components/media/provider-attribution.tsx` renders the
     mandatory TMDB notice ("This product uses the TMDB API but is not endorsed or
     certified by TMDB.") plus a logo and an Open Library credit; the in-repo
-    `public/tmdb.svg` is a **development approximation to be replaced with the
-    official approved mark before production**; approved image hosts
+    `public/tmdb.svg` is the official, unmodified "blue_short" horizontal mark
+    from TMDB (retrieved 2026-08-31). Approved image hosts
     `image.tmdb.org` (`/t/p/**`) and `covers.openlibrary.org` (`/b/**`) are added
     to `next.config.ts`. **Eventual embedding:** materialization never
     synchronously calls OpenAI — a materialized title is keyword-searchable
     immediately and remains missing/stale for semantic embedding until the guarded
-    owner-controlled `npm run embed:catalog` re-embeds it. **Query privacy:** with
+    owner-controlled `npm run embed:catalog` re-embeds it. Embedding is
+    restricted to an allowlist of sources (`favalog`, `openlibrary`) via
+    `lib/search/embedding-source-policy.ts`; TMDB titles are excluded from the
+    semantic corpus. **Query privacy:** with
     federation enabled the raw query **is sent to TMDB / Open Library**; Favalog's
     own `catalog_materialize` telemetry (`lib/catalog/log.ts`,
     `logCatalogMaterialization`) carries only provider, operation, outcome,
@@ -619,7 +623,10 @@ UI, likes (reviews or lists), follower-aware list visibility, external catalog
 APIs beyond the wired TMDB / Open Library federation (e.g. **Google Books**, or
 any new provider), a hosted rollout of the v1B migration / Vercel flag / hosted
 import (the federated Explore + materialization slice is wired but **local-only**
-— see "Catalog Platform v1B" above), **generative AI** (LLM-written text,
+— see "Catalog Platform v1B" above). **TMDB Compliance Gate:** TMDB (search
+and import) is disabled by default via `TMDB_ENABLED=false` and must remain
+disabled in production until the owner confirms AI-use permission from TMDB;
+holding an API token is not proof of permission. **Generative AI** (LLM-written text,
 explanations, chat, or agents — AI Discovery v1 is retrieval only) and any AI
 beyond the wired hybrid catalog search, real notifications,
 real social relationships, real recommendation algorithms, additional OAuth

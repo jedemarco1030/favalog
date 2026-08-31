@@ -24,6 +24,7 @@ import {
 const SAMPLE_ROW: MediaRow = {
   id: "00000000-0000-0000-0000-000000000001",
   slug: "sample-movie",
+  source: "favalog",
   kind: "movie",
   title: "Sample Movie",
   subtitle: null,
@@ -91,9 +92,10 @@ function createHarness(
     env?: Record<string, string | undefined>;
     openAiOk?: boolean;
     failing?: boolean;
+    mediaRows?: MediaRow[];
   } = {},
 ): Harness {
-  const supabase = createMockSupabase();
+  const supabase = createMockSupabase(overrides.mediaRows ?? [SAMPLE_ROW]);
   const captured: Harness["captured"] = {};
   const logs: string[] = [];
   const errors: string[] = [];
@@ -607,5 +609,105 @@ describe("runEmbedCatalog", () => {
     const code = await runEmbedCatalog(["--fake"], h.deps);
     expect(code).toBe(0);
     expect(h.runPipeline).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Provider embedding policy — TMDB is NEVER embedded (AI/ML compliance gate).
+// These prove the single source-policy decision keeps TMDB out of the OpenAI
+// pipeline on every run, including a fully-confirmed hosted (remote) backfill.
+// ---------------------------------------------------------------------------
+
+/** Build a MediaRow fixture with a given id/slug/source. */
+function rowWith(id: string, slug: string, source: string | null): MediaRow {
+  return {
+    id,
+    slug,
+    source,
+    kind: "movie",
+    title: `Title ${slug}`,
+    subtitle: null,
+    synopsis: "Fixture synopsis.",
+    year: 2021,
+    poster_url: null,
+    genres: ["Drama"],
+    details: { runtimeMinutes: 90, director: "Dir", cast: ["A"] },
+  };
+}
+
+const FAVALOG_ROW = rowWith(
+  "00000000-0000-0000-0000-0000000000f1",
+  "curated-title",
+  "favalog",
+);
+const OPENLIBRARY_ROW = rowWith(
+  "00000000-0000-0000-0000-0000000000b1",
+  "ol-title",
+  "openlibrary",
+);
+const TMDB_ROW = rowWith(
+  "00000000-0000-0000-0000-0000000000d1",
+  "tmdb-title",
+  "tmdb",
+);
+const UNKNOWN_SOURCE_ROW = rowWith(
+  "00000000-0000-0000-0000-0000000000e1",
+  "mystery-title",
+  "mystery-provider",
+);
+
+describe("runEmbedCatalog — provider embedding policy", () => {
+  it("excludes source='tmdb' from the embedding records by default", async () => {
+    const h = createHarness({
+      env: { SUPABASE_URL: LOCAL_URL, SUPABASE_SECRET_KEY: SERVICE_KEY },
+      mediaRows: [FAVALOG_ROW, TMDB_ROW, OPENLIBRARY_ROW],
+    });
+    const code = await runEmbedCatalog(["--fake"], h.deps);
+    expect(code).toBe(0);
+    expect(h.runPipeline).toHaveBeenCalledTimes(1);
+    const slugs = (h.captured.records ?? []).map((r) => r.slug);
+    // Curated + Open Library retain existing behavior; TMDB is filtered out.
+    expect(slugs).toEqual(["curated-title", "ol-title"]);
+    expect(slugs).not.toContain("tmdb-title");
+  });
+
+  it("fails closed on an unknown source (a missing policy cannot silently embed)", async () => {
+    const h = createHarness({
+      env: { SUPABASE_URL: LOCAL_URL, SUPABASE_SECRET_KEY: SERVICE_KEY },
+      mediaRows: [FAVALOG_ROW, UNKNOWN_SOURCE_ROW],
+    });
+    const code = await runEmbedCatalog(["--fake"], h.deps);
+    expect(code).toBe(0);
+    const slugs = (h.captured.records ?? []).map((r) => r.slug);
+    expect(slugs).toEqual(["curated-title"]);
+    expect(slugs).not.toContain("mystery-title");
+  });
+
+  it("never embeds a TMDB row even on a fully-confirmed REMOTE live backfill", async () => {
+    const h = createHarness({
+      env: { SUPABASE_URL: REMOTE_URL, SUPABASE_SECRET_KEY: SERVICE_KEY },
+      openAiOk: true,
+      mediaRows: [FAVALOG_ROW, TMDB_ROW],
+    });
+    const code = await runEmbedCatalog(
+      ["--allow-remote", `--confirm-project-ref=${REMOTE_REF}`],
+      h.deps,
+    );
+    expect(code).toBe(0);
+    expect(h.runPipeline).toHaveBeenCalledTimes(1);
+    const slugs = (h.captured.records ?? []).map((r) => r.slug);
+    expect(slugs).toEqual(["curated-title"]);
+    expect(slugs).not.toContain("tmdb-title");
+  });
+
+  it("still embeds when ALL rows are permitted (no false exclusions)", async () => {
+    const h = createHarness({
+      env: { SUPABASE_URL: LOCAL_URL, SUPABASE_SECRET_KEY: SERVICE_KEY },
+      mediaRows: [FAVALOG_ROW, OPENLIBRARY_ROW],
+    });
+    const code = await runEmbedCatalog(["--fake"], h.deps);
+    expect(code).toBe(0);
+    const slugs = (h.captured.records ?? []).map((r) => r.slug);
+    expect(slugs).toEqual(["curated-title", "ol-title"]);
   });
 });

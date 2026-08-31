@@ -244,12 +244,12 @@ materialization is wired but ships **off by default**. See
 > procedure below is the **future** owner-controlled rollout, not a record of
 > work already done.
 
-### Kill switch — `EXTERNAL_CATALOG_ENABLED`
+### Kill switches — `EXTERNAL_CATALOG_ENABLED`, `TMDB_ENABLED`, `OPEN_LIBRARY_ENABLED`
 
-Federation has a **server-only kill switch**. It is **off by default**: external
-discovery runs **only** when `EXTERNAL_CATALOG_ENABLED` is a truthy token
-(`true` / `1` / `on` / `yes`) **and** at least one provider is configured
-(`TMDB_API_READ_TOKEN` for movies/TV, `OPEN_LIBRARY_CONTACT_EMAIL` for books).
+Federation has a global **server-only kill switch** and per-provider flags. They
+are **off by default** (except `OPEN_LIBRARY_ENABLED=true`): external discovery
+runs **only** when `EXTERNAL_CATALOG_ENABLED` is truthy, the provider's flag is
+truthy, **and** the relevant provider is configured.
 It is **not** `NEXT_PUBLIC_`. To **roll back** federation immediately, unset it
 (or set a falsey token) in the server environment: `/explore` reverts to its
 exact **local-only** hybrid search — no external calls, no import forms, no
@@ -267,10 +267,15 @@ Perform in order, out of band, with least privilege:
 2. **Run hosted pgTAP** for the new canonical-identity assertions
    (`supabase/tests/database/media_external_ids.test.sql`).
 3. **Set server-only variables in Vercel** (production/preview as desired):
-   `EXTERNAL_CATALOG_ENABLED=true`, plus `TMDB_API_READ_TOKEN` and/or
-   `OPEN_LIBRARY_CONTACT_EMAIL` for the providers being enabled. These are
-   server-only — never `NEXT_PUBLIC_`.
-4. **Re-embed newly materialized rows** via the guarded, owner-controlled
+   `EXTERNAL_CATALOG_ENABLED=true`, `OPEN_LIBRARY_ENABLED=true`, plus
+   `OPEN_LIBRARY_CONTACT_EMAIL`.
+4. **TMDB COMPLIANCE GATE:** Do **NOT** set `TMDB_ENABLED=true` in production
+   (leave it unset or explicitly `false`) and do **NOT** add the
+   `TMDB_API_READ_TOKEN` to Vercel production until you have confirmed
+   appropriate permission/licensing by contacting TMDB through its official
+   API licensing/support channel. Holding a read token is not proof of
+   permission.
+5. **Re-embed newly materialized rows** via the guarded, owner-controlled
    backfill so imported titles become semantically searchable (they are
    keyword-searchable immediately regardless):
 
@@ -354,9 +359,10 @@ place (harmless when the flag is off). No data migration is needed to disable.
   URL, failing closed on an unparseable URL. This controls only Favalog's
   analytics telemetry — **not** Vercel Runtime Logs, whose request-log
   search-parameter handling and retention remain owner/platform concerns.
-- **External federation (v1B):** when `EXTERNAL_CATALOG_ENABLED` is on and a
-  provider is configured, a committed Explore query is sent **server-side** to
-  TMDB / Open Library to fetch results — a provider-facing request, the
+- **External federation (v1B):** when `EXTERNAL_CATALOG_ENABLED` is on, the
+  provider flag is on, and a provider is configured, a committed Explore query
+  is sent **server-side** to TMDB / Open Library to fetch results — a
+  provider-facing request, the
   deliberate cost of federated discovery. Favalog's own `catalog_search` and
   `catalog_materialize` events stay query-free (safe metadata only). With the
   flag off/unset, no external request is made.
@@ -379,3 +385,8 @@ configured by this implementation:
   compatible-corpus health, sustained fallback).
 - Set explicit log/analytics **retention**.
 - Perform the guarded re-embedding when the embedding identity changes.
+  Embedding is restricted to an allowlist (`favalog`, `openlibrary`) via
+  `lib/search/embedding-source-policy.ts`; TMDB titles are excluded.
+- **Contact TMDB:** Contact TMDB's official API licensing/support channel (e.g.
+  https://www.themoviedb.org/talk) to confirm AI/ML-use permission before
+  enabling TMDB in production.

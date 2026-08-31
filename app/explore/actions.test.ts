@@ -28,8 +28,11 @@ vi.mock("@/lib/auth/data", () => ({
 }));
 
 const shouldOfferExternalCatalog = vi.fn();
+const isExternalProviderAvailable = vi.fn();
 vi.mock("@/lib/catalog/feature-flag", () => ({
   shouldOfferExternalCatalog: () => shouldOfferExternalCatalog(),
+  isExternalProviderAvailable: (provider: "tmdb" | "openlibrary") =>
+    isExternalProviderAvailable(provider),
 }));
 
 const isCatalogAdminConfigured = vi.fn();
@@ -68,9 +71,26 @@ describe("materializeExternalTitleAction", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     shouldOfferExternalCatalog.mockReturnValue(true);
+    isExternalProviderAvailable.mockReturnValue(true);
     getCurrentUser.mockResolvedValue({ id: "user-1" });
     getCurrentProfile.mockResolvedValue(COMPLETE_PROFILE);
     isCatalogAdminConfigured.mockReturnValue(true);
+  });
+
+  it("is unavailable (ordinary state, no write) when the specific provider is disabled", async () => {
+    // Global switch on, but the per-provider gate rejects TMDB (default off).
+    isExternalProviderAvailable.mockReturnValue(false);
+
+    const result = await materializeExternalTitleAction(
+      initialMaterializeFormState,
+      form(),
+    );
+
+    expect(result.status).toBe("unavailable");
+    // No internal/legal reason is leaked to the user.
+    expect(result.message).not.toMatch(/tmdb|licen[cs]|legal|ai\/ml/i);
+    expect(materialize).not.toHaveBeenCalled();
+    expect(redirect).not.toHaveBeenCalled();
   });
 
   it("redirects authoritatively to the canonical title on success", async () => {

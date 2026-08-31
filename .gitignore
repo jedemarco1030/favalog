@@ -16,6 +16,8 @@
 /test-results
 /blob-report
 /playwright/.cache
+# Playwright storage state for the fixtures E2E suite (holds a session cookie)
+/e2e/.auth
 
 # storybook
 /storybook-static

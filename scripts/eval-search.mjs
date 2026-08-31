@@ -51,6 +51,7 @@ import {
   SEMANTIC_MAX_COSINE_DISTANCE,
 } from "../lib/search/config.ts";
 import { CANONICAL_DOCUMENT_VERSION } from "../lib/search/canonical-document.ts";
+import { EMBEDDABLE_SOURCES } from "../lib/search/embedding-source-policy.ts";
 import { compareThresholds, evaluate } from "../lib/search/eval/metrics.ts";
 import {
   DEFAULT_THRESHOLDS,
@@ -198,9 +199,15 @@ async function main() {
       };
 
   // --- Fail-closed provenance gate -----------------------------------------
+  // Count only EMBEDDABLE-source titles: rows excluded by the embedding provider
+  // policy (e.g. TMDB) are intentionally never embedded, so they must not be
+  // expected in the compatible corpus or the gate would falsely fail-closed the
+  // moment a TMDB row is materialized locally. This uses the same allowlist the
+  // embedding pipeline applies.
   const { count: catalogCount, error: catalogError } = await supabase
     .from("media_items")
-    .select("*", { count: "exact", head: true });
+    .select("*", { count: "exact", head: true })
+    .in("source", [...EMBEDDABLE_SOURCES]);
   if (catalogError) {
     console.error(
       `[eval:search] Failed to count the catalog: ${catalogError.message}`,

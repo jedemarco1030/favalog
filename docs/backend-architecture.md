@@ -989,14 +989,16 @@ packages are **not** used):
 
 Only public configuration uses the `NEXT_PUBLIC_` prefix:
 
-| Variable                               | Scope           | Required for app startup               |
-| -------------------------------------- | --------------- | -------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`             | browser+server  | No (mock-data phase)                   |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | browser+server  | No (mock-data phase)                   |
-| `SUPABASE_SECRET_KEY`                  | **server only** | No — administrative only               |
-| `TMDB_API_READ_TOKEN`                  | **server only** | No — catalog import only               |
-| `OPEN_LIBRARY_CONTACT_EMAIL`           | **server only** | No — catalog import only               |
-| `EXTERNAL_CATALOG_ENABLED`             | **server only** | No — off by default; federated Explore |
+| Variable                               | Scope           | Required for app startup                             |
+| -------------------------------------- | --------------- | ---------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`             | browser+server  | No (mock-data phase)                                 |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | browser+server  | No (mock-data phase)                                 |
+| `SUPABASE_SECRET_KEY`                  | **server only** | No — administrative only                             |
+| `TMDB_API_READ_TOKEN`                  | **server only** | No — catalog import only                             |
+| `OPEN_LIBRARY_CONTACT_EMAIL`           | **server only** | No — catalog import only                             |
+| `EXTERNAL_CATALOG_ENABLED`             | **server only** | No — off by default; global federated Explore switch |
+| `TMDB_ENABLED`                         | **server only** | No — off by default; per-provider TMDB gate          |
+| `OPEN_LIBRARY_ENABLED`                 | **server only** | No — on by default; per-provider control             |
 
 `lib/supabase/env.ts` never throws at import time, so the app keeps building and
 rendering on Vercel with none of these set. `.env.example` documents the names
@@ -1463,8 +1465,10 @@ of the full mock catalog):
   reviews) off mock data to Supabase-backed fetchers.
 - Real media-catalog provider integration. (Foundation exists — see
   "Catalog Platforms v1A" above — and **federated Explore discovery + on-demand
-  materialization** are now wired behind the `EXTERNAL_CATALOG_ENABLED` flag; see
+  materialization** are now wired behind the `EXTERNAL_CATALOG_ENABLED`,
+  `TMDB_ENABLED`, and `OPEN_LIBRARY_ENABLED` flags; see
   "Catalog Platform v1B" above. Still deferred: generative AI over external
   results, non-Explore import surfaces, and any hosted rollout — the v1B
-  migration is **local-only** in this change.)
+  migration is **local-only** in this change. TMDB is disabled by default
+  in all environments pending owner licensing confirmation.)
 - Full followers-only list visibility enforcement.

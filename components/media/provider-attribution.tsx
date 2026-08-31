@@ -12,9 +12,11 @@ import { cn } from "@/lib/cn";
  * carries it in one consistent, accessible place.
  *
  * Presentational and dependency-free (no I/O, no secrets) so it renders in
- * Storybook and tests unchanged. The TMDB logo asset (`/tmdb.svg`) is an
- * in-repo APPROXIMATION for development; the approved brand asset must replace
- * it before production (see the file's own note and the system card).
+ * Storybook and tests unchanged. The TMDB logo asset (`/tmdb.svg`) is the
+ * official, unmodified TMDB brand mark obtained from TMDB's Logos &
+ * Attribution page (see ADR 0004 for the source URL and retrieval date). It is
+ * intentionally rendered small so the TMDB mark stays less prominent than
+ * Favalog branding.
  */
 
 /** The exact notice TMDB requires; must appear verbatim wherever TMDB data shows. */
@@ -41,7 +43,7 @@ export function ProviderAttribution({
         <Image
           src="/tmdb.svg"
           alt="TMDB"
-          width={52}
+          width={54}
           height={7}
           className="h-3 w-auto"
         />

@@ -10,6 +10,7 @@
 
 import { providerError } from "./errors.ts";
 import { createOpenLibraryProvider } from "./openlibrary/client.ts";
+import { resolveTestProviderBaseUrl } from "./test-transport.ts";
 import { createTmdbProvider } from "./tmdb/client.ts";
 import type { CatalogProvider, ExternalProvider } from "./types";
 
@@ -58,8 +59,14 @@ export function createProviderRegistry(
  * provider is configured (individual calls then fail closed).
  */
 export function createServerProviderRegistry(): ProviderRegistry {
+  // The base URL is overridden ONLY by the test-only, loopback-guarded transport
+  // seam (explicit opt-in, loopback http only, rejected in production, env-only).
+  // In production these resolve to `undefined`, so the adapters use their real
+  // hosts — the production code path is unchanged.
   return createProviderRegistry([
-    createTmdbProvider(),
-    createOpenLibraryProvider(),
+    createTmdbProvider({ baseUrl: resolveTestProviderBaseUrl("tmdb") }),
+    createOpenLibraryProvider({
+      baseUrl: resolveTestProviderBaseUrl("openlibrary"),
+    }),
   ]);
 }

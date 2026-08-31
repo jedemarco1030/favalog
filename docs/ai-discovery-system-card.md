@@ -24,9 +24,12 @@
   agents. This is retrieval only.
 - **Catalog growth via trusted external ingestion.** Newly materialized titles
   are keyword-searchable immediately; they remain embedding-missing until a
-  subsequent guarded re-embed. As of **Catalog Platform v1B**, `/explore` can
+  subsequent guarded re-embed. Embedding is restricted to curated and
+  Open Library titles; TMDB titles are explicitly excluded from embeddings
+  per `lib/search/embedding-source-policy.ts`. As of **Catalog Platform v1B**, `/explore` can
   optionally **federate external provider discovery** (TMDB / Open Library) —
   server-side only, behind the off-by-default `EXTERNAL_CATALOG_ENABLED` flag and
+  the provider's own flag (`TMDB_ENABLED`, `OPEN_LIBRARY_ENABLED`), and
   only for a committed non-empty query with a provider configured — surfacing
   clearly-attributed external results in **separate** sections that are **not**
   blended into the local hybrid ranking, plus an on-demand import. **No**
@@ -153,10 +156,10 @@ flowchart TD
   considers rows whose provenance matches the query's — a stale or incompatible
   corpus degrades safely to keyword-only rather than mixing embedding spaces.
 - English-oriented full-text configuration; no multilingual handling yet.
-- **Placeholder TMDB logo (v1B).** The in-repo TMDB logo asset
-  (`public/tmdb.svg`) used by the federated-Explore attribution is a
-  **development approximation** and **must be replaced with the official approved
-  TMDB mark before production**. Approved external image hosts are limited to
+- **Official TMDB logo (v1B).** The in-repo TMDB logo asset
+  (`public/tmdb.svg`) used by the federated-Explore attribution is the
+  official, unmodified "blue_short" horizontal mark retrieved 2026-08-31 from
+  https://www.themoviedb.org/about/logos. Approved external image hosts are limited to
   `image.tmdb.org` (`/t/p/**`) and `covers.openlibrary.org` (`/b/**`).
 
 ## Failure modes
@@ -181,9 +184,10 @@ flowchart TD
 ## Privacy considerations
 
 - **External federation sends the query to providers (v1B).** When
-  `EXTERNAL_CATALOG_ENABLED` is on **and** a provider is configured, a committed
-  non-empty Explore query is sent **server-side** to TMDB and/or Open Library to
-  fetch external results — the deliberate cost of federated discovery. This is a
+  `EXTERNAL_CATALOG_ENABLED` is on, the provider's flag is on, **and** a
+  provider is configured, a committed non-empty Explore query is sent
+  **server-side** to TMDB and/or Open Library to fetch external results — the
+  deliberate cost of federated discovery. This is a
   provider-facing request only; Favalog's own application telemetry stays
   query-free (the `catalog_search` and `catalog_materialize` events carry only
   safe metadata — mode/length/latency/outcome/resolution — never the query text,

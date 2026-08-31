@@ -29,6 +29,10 @@ import {
   CANONICAL_DOCUMENT_VERSION,
   canonicalDocumentFor,
 } from "../lib/search/canonical-document.ts";
+import {
+  classifyEmbeddingSource,
+  partitionEmbeddableRows,
+} from "../lib/search/embedding-source-policy.ts";
 import type { EmbeddingProvider } from "../lib/search/embedding-provider.ts";
 import type { MediaItem, TVShow } from "../lib/types.ts";
 import type {
@@ -373,6 +377,12 @@ function describeTarget(classification: TargetClassification): string {
 export interface MediaRow {
   id: string;
   slug: string;
+  /**
+   * Catalog provenance (`favalog` | `openlibrary` | `tmdb` | ...). Drives the
+   * provider embedding policy: TMDB rows are excluded by default and never
+   * enter the OpenAI pipeline (see `lib/search/embedding-source-policy.ts`).
+   */
+  source: string | null;
   kind: "movie" | "tv" | "book";
   title: string;
   subtitle: string | null;
@@ -563,7 +573,9 @@ export async function runEmbedCatalog(
   // Read the catalog.
   const queryBuilder = supabase
     .from("media_items")
-    .select("id, slug, kind, title, subtitle, synopsis, year, genres, details")
+    .select(
+      "id, slug, source, kind, title, subtitle, synopsis, year, genres, details",
+    )
     .order("slug", { ascending: true });
   const query = Number.isFinite(args.limit as number)
     ? queryBuilder.limit(args.limit as number)
@@ -577,7 +589,31 @@ export async function runEmbedCatalog(
     return 1;
   }
 
-  const records: EmbeddingRecord[] = ((rows as MediaRow[]) ?? []).map((row) => {
+  // Provider embedding policy (single decision point): only allow-listed
+  // sources may be embedded. TMDB rows are excluded by default because the
+  // current TMDB API Terms broadly restrict AI/ML use and Favalog has no
+  // permission for that use; an unknown/blank source is also excluded (fail
+  // closed). This filter is applied to EVERY run — including a guarded remote
+  // (hosted) live backfill — so no re-embedding command can accidentally embed
+  // a TMDB row.
+  const allRows = (rows as MediaRow[]) ?? [];
+  const { embeddable, excluded } = partitionEmbeddableRows(allRows);
+  if (excluded.length > 0) {
+    const byReason = new Map<string, number>();
+    for (const row of excluded) {
+      const reason = classifyEmbeddingSource(row.source);
+      byReason.set(reason, (byReason.get(reason) ?? 0) + 1);
+    }
+    const summary = Array.from(byReason.entries())
+      .map(([reason, count]) => `${reason}=${count}`)
+      .join(", ");
+    logger.log(
+      `[embed-catalog] Provider policy excluded ${excluded.length} row(s) from ` +
+        `embedding (${summary}). TMDB and unknown sources are never embedded.`,
+    );
+  }
+
+  const records: EmbeddingRecord[] = embeddable.map((row) => {
     const { document, contentHash } = canonicalDocumentFor(rowToMediaItem(row));
     return { mediaId: row.id, slug: row.slug, document, contentHash };
   });

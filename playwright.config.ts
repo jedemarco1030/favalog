@@ -36,10 +36,88 @@ import { defineConfig, devices } from "@playwright/test";
 
 const CONFIGURED_PORT = 3000;
 const NO_ENV_PORT = 3100;
+const FIXTURES_PORT = 3200;
+const FIXTURES_PROD_PORT = 3300;
+const FIXTURE_SERVER_PORT = 5599;
 const configuredBaseURL = `http://localhost:${CONFIGURED_PORT}`;
 const noEnvBaseURL = `http://localhost:${NO_ENV_PORT}`;
+const fixturesBaseURL = `http://localhost:${FIXTURES_PORT}`;
+const fixturesProdBaseURL = `http://localhost:${FIXTURES_PROD_PORT}`;
 const isCI = !!process.env.CI;
-const isNoEnvSuite = process.env.E2E_SUITE === "no-env";
+const suite = process.env.E2E_SUITE;
+const isNoEnvSuite = suite === "no-env";
+const isFixturesSuite = suite === "fixtures";
+const isFixturesProdRejectSuite = suite === "fixtures-prod-reject";
+
+// The fixture-backed suites drive the REAL provider adapters against a local
+// fixture HTTP server via the loopback-guarded transport seam, and provision an
+// authenticated user through LOCAL Supabase.
+//
+// IMPORTANT: we deliberately do NOT load `.env.local` here — in this repo it
+// points at a HOSTED Supabase project, and these suites write data. LOCAL
+// Supabase credentials are injected into the environment by
+// `scripts/run-e2e-fixtures.mjs` (loopback-verified). Run these suites ONLY via
+// `npm run test:e2e:fixtures` / `npm run test:e2e:fixtures:prod-reject`. If the
+// local creds are missing, the admin helper and the app fail closed rather than
+// touching hosted.
+
+/** Storage state produced by the fixtures auth-setup project. */
+const FIXTURES_STORAGE_STATE = "e2e/.auth/fixtures-user.json";
+
+/** Server-only env that turns on federation + the loopback transport override. */
+const fixtureTransportEnv: Record<string, string> = {
+  EXTERNAL_CATALOG_ENABLED: "true",
+  TMDB_ENABLED: "true",
+  OPEN_LIBRARY_ENABLED: "true",
+  // Any non-blank token/contact "configures" the providers; the real network is
+  // never reached because the transport seam redirects to the fixture server.
+  TMDB_API_READ_TOKEN: process.env.TMDB_API_READ_TOKEN || "fixture-tmdb-token",
+  OPEN_LIBRARY_CONTACT_EMAIL:
+    process.env.OPEN_LIBRARY_CONTACT_EMAIL || "e2e@example.com",
+  CATALOG_TEST_TRANSPORT: "1",
+  CATALOG_TEST_TMDB_BASE_URL: `http://127.0.0.1:${FIXTURE_SERVER_PORT}/tmdb`,
+  CATALOG_TEST_OPENLIBRARY_BASE_URL: `http://127.0.0.1:${FIXTURE_SERVER_PORT}/ol`,
+};
+
+/** The local fixture provider server, shared by both fixture suites. */
+const fixtureServer = {
+  command: `node e2e/fixtures/provider-fixture-server.mjs`,
+  url: `http://127.0.0.1:${FIXTURE_SERVER_PORT}/tmdb/search/tv`,
+  reuseExistingServer: !isCI,
+  timeout: 30_000,
+  env: { FIXTURE_PORT: String(FIXTURE_SERVER_PORT) },
+};
+
+const fixturesProjects = [
+  {
+    // Provisions a confirmed, onboarded user in local Supabase and saves the
+    // SSR cookie session for the authenticated fixtures specs.
+    name: "fixtures-setup",
+    testMatch: /fixtures\/auth\.setup\.ts/,
+    use: { ...devices["Desktop Chrome"], baseURL: fixturesBaseURL },
+  },
+  {
+    name: "fixtures",
+    grep: /@fixtures\b/,
+    dependencies: ["fixtures-setup"],
+    use: {
+      ...devices["Desktop Chrome"],
+      baseURL: fixturesBaseURL,
+      storageState: FIXTURES_STORAGE_STATE,
+    },
+  },
+];
+
+const fixturesProdRejectProjects = [
+  {
+    // Production runtime (VERCEL_ENV=production) MUST reject the transport
+    // override; runs signed-out (no auth needed to prove the fixture data is
+    // absent because the fixture server was never used).
+    name: "fixtures-prod-reject",
+    grep: /@prodreject\b/,
+    use: { ...devices["Desktop Chrome"], baseURL: fixturesProdBaseURL },
+  },
+];
 
 const configuredProjects = [
   {
@@ -79,7 +157,13 @@ export default defineConfig({
   use: {
     trace: "on-first-retry",
   },
-  projects: isNoEnvSuite ? noEnvProjects : configuredProjects,
+  projects: isNoEnvSuite
+    ? noEnvProjects
+    : isFixturesSuite
+      ? fixturesProjects
+      : isFixturesProdRejectSuite
+        ? fixturesProdRejectProjects
+        : configuredProjects,
   webServer: isNoEnvSuite
     ? {
         // The no-env build must already exist (produced with the public Supabase
@@ -89,10 +173,43 @@ export default defineConfig({
         reuseExistingServer: !isCI,
         timeout: 120_000,
       }
-    : {
-        command: `npm run start -- --port ${CONFIGURED_PORT}`,
-        url: configuredBaseURL,
-        reuseExistingServer: !isCI,
-        timeout: 120_000,
-      },
+    : isFixturesSuite
+      ? [
+          fixtureServer,
+          {
+            // Reuse the configured build; federation + the loopback transport are
+            // runtime, server-only env, so no rebuild is needed.
+            command: `npm run start -- --port ${FIXTURES_PORT}`,
+            url: fixturesBaseURL,
+            reuseExistingServer: !isCI,
+            timeout: 120_000,
+            env: fixtureTransportEnv,
+          },
+        ]
+      : isFixturesProdRejectSuite
+        ? [
+            fixtureServer,
+            {
+              // Same build + transport env, but a PRODUCTION runtime marker. The
+              // transport override must be refused, so the fixture server is
+              // never used. A fake token keeps the (now real-host) provider call
+              // offline/failing rather than using any real secret.
+              command: `npm run start -- --port ${FIXTURES_PROD_PORT}`,
+              url: fixturesProdBaseURL,
+              reuseExistingServer: !isCI,
+              timeout: 120_000,
+              env: {
+                ...fixtureTransportEnv,
+                VERCEL_ENV: "production",
+                TMDB_API_READ_TOKEN: "fixture-prod-reject-token",
+                OPEN_LIBRARY_CONTACT_EMAIL: "prod-reject@example.com",
+              },
+            },
+          ]
+        : {
+            command: `npm run start -- --port ${CONFIGURED_PORT}`,
+            url: configuredBaseURL,
+            reuseExistingServer: !isCI,
+            timeout: 120_000,
+          },
 });

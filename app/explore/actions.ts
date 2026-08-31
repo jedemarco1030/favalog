@@ -8,7 +8,10 @@ import { isProfileComplete } from "@/lib/auth/profile";
 import { getSafeRedirectPath } from "@/lib/auth/safe-redirect";
 import { isCatalogAdminConfigured } from "@/lib/catalog/admin-client";
 import { CatalogProviderError } from "@/lib/catalog/errors";
-import { shouldOfferExternalCatalog } from "@/lib/catalog/feature-flag";
+import {
+  isExternalProviderAvailable,
+  shouldOfferExternalCatalog,
+} from "@/lib/catalog/feature-flag";
 import {
   logCatalogMaterialization,
   type MaterializeResolutionOutcome,
@@ -99,6 +102,18 @@ export async function materializeExternalTitleAction(
     };
   }
   const input = validated.value;
+
+  // Per-provider production control (defense in depth): even with the global
+  // switch on, the SPECIFIC provider must be enabled. TMDB defaults OFF (its
+  // API Terms broadly restrict AI/ML use and Favalog has no permission for it),
+  // so a stale/forged TMDB submit is rejected with an ordinary unavailable
+  // state — never an internal/legal error — while Open Library keeps working.
+  if (!isExternalProviderAvailable(input.provider)) {
+    return {
+      status: "unavailable",
+      message: "Adding titles from this source isn't available right now.",
+    };
+  }
 
   // Trusted writes require the service-role admin client. In an environment
   // without it (e.g. a no-env build), report a controlled unavailable state
