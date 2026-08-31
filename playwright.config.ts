@@ -31,7 +31,9 @@ import { defineConfig, devices } from "@playwright/test";
  *    server on port 3000, against a normally configured build.
  *
  * Specs are routed to a project by a tag in their `describe` title
- * (`@configured` / `@no-env`); everything untagged is the `default` project.
+ * (`@configured` / `@no-env` / `@fixtures` / `@prodreject`); everything untagged
+ * is the `default` project. Tagged specs are excluded from `default` so the
+ * fixture-backed suites only ever run in their dedicated servers.
  */
 
 const CONFIGURED_PORT = 3000;
@@ -124,7 +126,7 @@ const configuredProjects = [
     // Every existing spec (auth, diary, lists, favorites, …). These are
     // written to be local-safe and run against the configured server.
     name: "default",
-    grepInvert: /@configured|@no-env/,
+    grepInvert: /@configured|@no-env|@fixtures|@prodreject/,
     use: { ...devices["Desktop Chrome"], baseURL: configuredBaseURL },
   },
   {
