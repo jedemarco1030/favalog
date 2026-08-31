@@ -501,8 +501,10 @@ discovery with on-demand materialization** on top of that foundation.
 - **Provider attribution.** The mandatory TMDB notice ("This product uses the
   TMDB API but is not endorsed or certified by TMDB.") and logo, plus an Open
   Library credit, are shown with results. The in-repo TMDB logo
-  (`public/tmdb.svg`) is the official, unmodified "blue_short" horizontal mark
-  from TMDB (retrieved 2026-08-31).
+  (`public/tmdb.svg`) is the official "blue_short" horizontal mark from TMDB
+  (retrieved 2026-08-31); the artwork is unmodified, with only non-rendering
+  Adobe Illustrator editor metadata (`data-name` layer labels) stripped so the
+  markup validates.
 - **Query privacy.** When federation is enabled, the raw search query **is sent
   to TMDB / Open Library** to fetch results — the deliberate cost of federated
   discovery. Favalog's own structured telemetry (`catalog_materialize`) still

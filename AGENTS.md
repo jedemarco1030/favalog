@@ -591,8 +591,10 @@ exists (schema, RLS, clients) and the following are wired to it:
     **Attribution:** `components/media/provider-attribution.tsx` renders the
     mandatory TMDB notice ("This product uses the TMDB API but is not endorsed or
     certified by TMDB.") plus a logo and an Open Library credit; the in-repo
-    `public/tmdb.svg` is the official, unmodified "blue_short" horizontal mark
-    from TMDB (retrieved 2026-08-31). Approved image hosts
+    `public/tmdb.svg` is the official "blue_short" horizontal mark
+    from TMDB (retrieved 2026-08-31); the artwork is unmodified, with only
+    non-rendering Adobe Illustrator editor metadata (`data-name` layer labels)
+    stripped so the markup validates. Approved image hosts
     `image.tmdb.org` (`/t/p/**`) and `covers.openlibrary.org` (`/b/**`) are added
     to `next.config.ts`. **Eventual embedding:** materialization never
     synchronously calls OpenAI — a materialized title is keyword-searchable

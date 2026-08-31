@@ -158,8 +158,10 @@ flowchart TD
 - English-oriented full-text configuration; no multilingual handling yet.
 - **Official TMDB logo (v1B).** The in-repo TMDB logo asset
   (`public/tmdb.svg`) used by the federated-Explore attribution is the
-  official, unmodified "blue_short" horizontal mark retrieved 2026-08-31 from
-  https://www.themoviedb.org/about/logos. Approved external image hosts are limited to
+  official "blue_short" horizontal mark retrieved 2026-08-31 from
+  https://www.themoviedb.org/about/logos. The artwork is unmodified; only
+  non-rendering Adobe Illustrator editor metadata (`data-name` layer labels)
+  was stripped so the markup validates. Approved external image hosts are limited to
   `image.tmdb.org` (`/t/p/**`) and `covers.openlibrary.org` (`/b/**`).
 
 ## Failure modes
