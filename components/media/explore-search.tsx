@@ -1,7 +1,7 @@
 "use client";
 
 import { Search } from "lucide-react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   useEffect,
   useState,
@@ -81,6 +81,7 @@ export function ExploreSearch({
 }: ExploreSearchProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [query, setQuery] = useState(initialQuery);
   const [filter, setFilter] = useState<SearchKindFilter>(initialFilter);
   const [isPending, startTransition] = useTransition();
@@ -108,10 +109,18 @@ export function ExploreSearch({
   }, [outcome, analyticsTrack]);
 
   function navigate(nextQuery: string, nextFilter: SearchKindFilter) {
-    const params = new URLSearchParams();
+    // Preserve any browse-mode params (sort/genre) already in the URL so that
+    // toggling the media-type filter or searching does not silently discard the
+    // visitor's chosen sort/genre. Pagination always resets on a query/filter
+    // change (the result set changes), and an incompatible genre is reconciled
+    // safely on the server.
+    const params = new URLSearchParams(searchParams?.toString() ?? "");
     const trimmed = nextQuery.trim();
     if (trimmed) params.set("q", trimmed);
+    else params.delete("q");
     if (nextFilter !== "all") params.set("type", nextFilter);
+    else params.delete("type");
+    params.delete("page");
     const search = params.toString();
     startTransition(() => {
       router.push(search ? `${pathname}?${search}` : pathname, {

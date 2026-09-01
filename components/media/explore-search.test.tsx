@@ -11,6 +11,7 @@ import type { SearchOutcome } from "@/lib/supabase/search-view-model";
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
   usePathname: () => "/explore",
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 const results: MediaItem[] = [

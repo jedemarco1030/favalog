@@ -84,6 +84,14 @@ export default defineConfig({
         "lib/search/eval/metrics.ts",
         "lib/supabase/search.ts",
         "lib/supabase/search-view-model.ts",
+        // Explore browse mode: pure URL/ordering parsing + closed telemetry +
+        // the server browse service and its result view-model, all directly
+        // unit-tested (the Supabase query-builder adapter is a runtime
+        // integration surface and is excluded, like the other Supabase clients).
+        "lib/browse/query.ts",
+        "lib/browse/log.ts",
+        "lib/supabase/browse.ts",
+        "lib/supabase/browse-view-model.ts",
         // Aggregate product-analytics adapter (pure builders + coarse buckets +
         // never-throw emit) and the pure analytics-URL redactor, both directly
         // unit-tested.
@@ -122,6 +130,7 @@ export default defineConfig({
         "components/user/profile-avatar.tsx",
         // Interactive and conditional UI under test.
         "components/media/media-card.tsx",
+        "components/media/catalog-browse.tsx",
         "components/media/media-type-badge.tsx",
         "components/media/rating-breakdown.tsx",
         "components/ui/star-rating.tsx",

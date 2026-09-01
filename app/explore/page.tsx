@@ -4,6 +4,7 @@ import { Container } from "@/components/ui/container";
 import { HorizontalMediaRow } from "@/components/media/horizontal-media-row";
 import { ExploreSearch } from "@/components/media/explore-search";
 import { ExternalResultsSection } from "@/components/media/external-results-section";
+import { CatalogBrowse } from "@/components/media/catalog-browse";
 import {
   getCriticallyAcclaimed,
   getHiddenGems,
@@ -18,6 +19,8 @@ import { parseKindFilter } from "@/lib/search/query";
 import type { SearchKindFilter } from "@/lib/search/config";
 import { searchCatalog } from "@/lib/supabase/search";
 import type { SearchOutcome } from "@/lib/supabase/search-view-model";
+import { browseCatalog } from "@/lib/supabase/browse";
+import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { availableExternalProviders } from "@/lib/catalog/feature-flag";
 import { isAuthAvailable } from "@/lib/auth/capability";
 import { getCurrentUser } from "@/lib/auth/data";
@@ -36,11 +39,33 @@ function parseQuery(raw: string | string[] | undefined): string {
 export default async function ExplorePage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string | string[]; type?: string | string[] }>;
+  searchParams: Promise<{
+    q?: string | string[];
+    type?: string | string[];
+    sort?: string | string[];
+    page?: string | string[];
+    genre?: string | string[];
+  }>;
 }) {
   const params = await searchParams;
   const rawQuery = parseQuery(params.q).trim();
   const initialFilter = parseKindFilter(params.type);
+  const supabaseConfigured = isSupabaseConfigured();
+
+  // Real, server-backed browse runs ONLY when there is no active query AND
+  // Supabase is configured. It never falls back to mock catalog data: a read
+  // failure reports an error state rather than presenting example data as live
+  // production activity. When Supabase is unconfigured, `browseOutcome` stays
+  // null and the labelled editorial example shelves are shown instead.
+  const browseOutcome =
+    rawQuery.length === 0 && supabaseConfigured
+      ? await browseCatalog({
+          kind: params.type,
+          sort: params.sort,
+          page: params.page,
+          genre: params.genre,
+        })
+      : null;
 
   // Real, server-side catalog search runs only when there is an active query, so
   // no paid embedding request happens on a bare Explore visit. When Supabase is
@@ -132,7 +157,7 @@ export default async function ExplorePage({
     },
   ];
 
-  const defaultSections = (
+  const editorialExampleSections = (
     <div key="default-sections" className="flex flex-col gap-16">
       <p className="text-xs font-medium uppercase tracking-wide text-foreground/40">
         Editorial examples — curated demonstration shelves
@@ -147,6 +172,14 @@ export default async function ExplorePage({
         />
       ))}
     </div>
+  );
+
+  // When Supabase is configured, the no-query view is the REAL catalog browser;
+  // otherwise it is the clearly-labelled example shelves (no-env development).
+  const defaultSections = browseOutcome ? (
+    <CatalogBrowse outcome={browseOutcome} />
+  ) : (
+    editorialExampleSections
   );
 
   return (

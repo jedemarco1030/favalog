@@ -91,8 +91,12 @@ stated explicitly.
 - Light/dark/system theming is implemented and verified in the repository
   (2026-09-01) but is not yet deployed to production; hosted production remains
   dark-only until the next deploy.
-- Explore has real hybrid _search_ but no real server-backed global _browse_
-  (filters, global sorts, pagination) over the production catalog.
+- Explore now has a real server-backed global _browse_ mode (media-type + genre
+  filters, five global sorts, bounded pagination, shareable validated URL state)
+  over the real `public.media_items` catalog, alongside the existing hybrid
+  _search_. It is implemented and verified in-repo (2026-09-01) but not yet
+  deployed to production, and gracefully degrades to the labelled example
+  shelves when Supabase is unconfigured.
 - Growth, monetization, and portfolio-packaging work has not started.
 
 ## Agreed phase sequence
