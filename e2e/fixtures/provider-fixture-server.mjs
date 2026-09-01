@@ -21,6 +21,10 @@
  *     FAILS (HTTP 500) for this token, exercising "one provider down while the
  *     other + local results survive".
  *   - "book":    Open Library returns one importable book; TMDB returns nothing.
+ *   - "sandworm": Open Library returns one importable book whose WORK record
+ *     OMITS first_publish_date (like the real Dune Work OL893414W); the year is
+ *     only recoverable via the adapter's bounded exact Work-key Search fallback
+ *     (`q=key:"/works/<id>"`), which this server answers with key + year only.
  *
  * Bind to 127.0.0.1 only. Port from FIXTURE_PORT (default 5599).
  */
@@ -76,6 +80,25 @@ const FIXTURE_BOOK = {
   firstPublishYear: 2021,
   subjects: ["Fixture", "Reference"],
 };
+
+// A book modelling the real Dune Work (OL893414W): its WORK record has NO
+// first_publish_date, so the year is only knowable via the exact Work-key
+// Search fallback. The DISCOVERY search doc still carries the year (Search API
+// exposes it); only the Work detail omits it.
+const FIXTURE_DATED_BOOK = {
+  workId: "OL9300001W",
+  authorId: "OL9300001A",
+  authorName: "Fixture Sand Author",
+  title: "Fixture Sandworm Saga",
+  description:
+    "A deterministic fixture book whose Work record omits its publish date, " +
+    "mirroring real Open Library Works whose year is only known via Search.",
+  firstPublishYear: 1965,
+  subjects: ["Fixture", "Science Fiction"],
+};
+
+/** All Open Library fixture books, for Work-key fallback resolution. */
+const OL_BOOKS = [FIXTURE_BOOK, FIXTURE_DATED_BOOK];
 
 // --- Shape builders (mirror the provider JSON the adapters parse) ----------
 
@@ -133,6 +156,14 @@ function olWork(book) {
     first_publish_date: String(book.firstPublishYear),
     authors: [{ author: { key: `/authors/${book.authorId}` } }],
   };
+}
+
+// Like olWork but WITHOUT first_publish_date, modelling a real Work record that
+// omits the year (the adapter must recover it via the Work-key Search fallback).
+function olWorkNoDate(book) {
+  const record = olWork(book);
+  delete record.first_publish_date;
+  return record;
 }
 
 // --- Routing ---------------------------------------------------------------
@@ -195,6 +226,23 @@ const server = createServer((req, res) => {
 
   // ---- Open Library ----
   if (path === "/ol/search.json") {
+    // Bounded exact Work-key year fallback: the adapter asks `key:"/works/<id>"`
+    // (fields key + first_publish_year, limit 1) ONLY when a Work record lacks a
+    // date. Answer with the matching book's key + year and nothing else.
+    if (query.startsWith("key:")) {
+      const found = OL_BOOKS.find((b) =>
+        query.includes(b.workId.toLowerCase()),
+      );
+      const docs = found
+        ? [
+            {
+              key: `/works/${found.workId}`,
+              first_publish_year: found.firstPublishYear,
+            },
+          ]
+        : [];
+      return sendJson(res, 200, { numFound: docs.length, start: 0, docs });
+    }
     // Simulate ONE provider down for the "dune" scenario so local + TMDB survive.
     if (query.includes("dune")) {
       res.writeHead(500, { "content-type": "text/plain" });
@@ -202,15 +250,28 @@ const server = createServer((req, res) => {
     }
     const docs = [];
     if (query.includes("book")) docs.push(olSearchDoc(FIXTURE_BOOK));
+    // "sandworm" discovers the dateless-Work book (its Search doc DOES carry the
+    // year; only its Work detail omits it).
+    if (query.includes("sandworm")) docs.push(olSearchDoc(FIXTURE_DATED_BOOK));
     return sendJson(res, 200, { numFound: docs.length, start: 0, docs });
   }
   if (path === `/ol/works/${FIXTURE_BOOK.workId}.json`) {
     return sendJson(res, 200, olWork(FIXTURE_BOOK));
   }
+  // The dateless-Work book: its Work detail intentionally OMITS first_publish_date.
+  if (path === `/ol/works/${FIXTURE_DATED_BOOK.workId}.json`) {
+    return sendJson(res, 200, olWorkNoDate(FIXTURE_DATED_BOOK));
+  }
   if (path === `/ol/authors/${FIXTURE_BOOK.authorId}.json`) {
     return sendJson(res, 200, {
       key: `/authors/${FIXTURE_BOOK.authorId}`,
       name: FIXTURE_BOOK.authorName,
+    });
+  }
+  if (path === `/ol/authors/${FIXTURE_DATED_BOOK.authorId}.json`) {
+    return sendJson(res, 200, {
+      key: `/authors/${FIXTURE_DATED_BOOK.authorId}`,
+      name: FIXTURE_DATED_BOOK.authorName,
     });
   }
 
@@ -242,5 +303,12 @@ export const FIXTURE_IDS = {
     kind: "book",
     externalId: FIXTURE_BOOK.workId,
     title: FIXTURE_BOOK.title,
+  },
+  datedBook: {
+    provider: "openlibrary",
+    kind: "book",
+    externalId: FIXTURE_DATED_BOOK.workId,
+    title: FIXTURE_DATED_BOOK.title,
+    firstPublishYear: FIXTURE_DATED_BOOK.firstPublishYear,
   },
 };

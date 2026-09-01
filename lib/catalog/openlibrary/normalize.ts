@@ -40,13 +40,17 @@ export function descriptionText(description: OpenLibraryDescription): string {
 /**
  * Normalize a Work record (plus its already-resolved author names) into a
  * {@link NormalizedMediaItem}. Year is taken from the Work's
- * `first_publish_date`; when the Work lacks one, `year` is 0 and the
+ * `first_publish_date`; when the Work lacks a usable one, an OPTIONAL trusted
+ * `fallbackYear` (resolved by the adapter from an exact Work-key Search lookup)
+ * is used instead. When neither yields a plausible year, `year` is 0 and the
  * materialization boundary rejects it with a clear validation error rather than
- * inventing a date.
+ * inventing a date. The fallback is only ever a server-resolved, bounds-checked
+ * year — never client-supplied search-card metadata.
  */
 export function normalizeOpenLibraryWork(
   work: OpenLibraryWork,
   authorNames: readonly string[],
+  fallbackYear?: number,
 ): NormalizedMediaItem {
   const workId = workKeyToId(work.key) ?? "";
   const title = capText(work.title, MAX_TITLE_LENGTH);
@@ -59,7 +63,7 @@ export function normalizeOpenLibraryWork(
     title,
     subtitle,
     synopsis: descriptionText(work.description),
-    year: coerceYear(work.first_publish_date) ?? 0,
+    year: coerceYear(work.first_publish_date) ?? coerceYear(fallbackYear) ?? 0,
     genres: capGenres(work.subjects),
     posterUrl: openLibraryCoverUrl(coverId),
     authors: capList([...authorNames], MAX_AUTHORS),

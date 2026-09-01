@@ -87,6 +87,33 @@ describe("normalizeOpenLibraryWork", () => {
     expect(item.year).toBe(0);
   });
 
+  it("uses a trusted fallback year when the Work lacks a date", () => {
+    const item = normalizeOpenLibraryWork(
+      work({ first_publish_date: undefined }),
+      [],
+      1965,
+    );
+    expect(item.year).toBe(1965);
+  });
+
+  it("prefers the Work's own date over any fallback year", () => {
+    const item = normalizeOpenLibraryWork(
+      work({ first_publish_date: "1954" }),
+      [],
+      1965,
+    );
+    expect(item.year).toBe(1954);
+  });
+
+  it("rejects an out-of-bounds fallback year (stays 0)", () => {
+    const item = normalizeOpenLibraryWork(
+      work({ first_publish_date: undefined }),
+      [],
+      1400,
+    );
+    expect(item.year).toBe(0);
+  });
+
   it("always reports pageCount 0 for a Work", () => {
     const item = normalizeOpenLibraryWork(work(), []);
     if (item.kind !== "book") throw new Error("expected a book");

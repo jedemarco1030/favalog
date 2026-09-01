@@ -17,6 +17,9 @@ import { countMediaByExternalId, countMediaBySlug } from "./fixtures/admin";
  *   - "dune":    TMDB returns Dune: Part Two (693134, same work as the seeded
  *                curated `dune-part-two`); Open Library FAILS (one provider down).
  *   - "voyager": TMDB returns a brand-new importable movie (movie:999001).
+ *   - "sandworm": Open Library returns an importable book whose Work record
+ *                OMITS first_publish_date; the year is only recoverable via the
+ *                adapter's exact Work-key Search fallback (real Dune shape).
  *
  * Assertions are DEFINITE — never "accept success OR failure". The suite is
  * serial because the scenarios share catalog state (import once, then re-resolve).
@@ -26,8 +29,16 @@ const VOYAGER_TITLE = "Fixture Voyager Chronicles";
 const VOYAGER_EXTERNAL_ID = "movie:999001";
 const DUNE_SLUG = "dune-part-two";
 
+// The dateless-Work book: its Open Library Work record OMITS first_publish_date,
+// so its year (1965) is only recoverable via the adapter's bounded exact
+// Work-key Search fallback. Materializing it at all proves the fallback year
+// passed validation (a year-0 record would be rejected before any write).
+const SANDWORM_TITLE = "Fixture Sandworm Saga";
+const SANDWORM_EXTERNAL_ID = "OL9300001W";
+
 // Captured after the new title is materialized, reused by later scenarios.
 let voyagerSlug = "";
+let sandwormSlug = "";
 
 test.describe.serial("@fixtures federated Explore + materialization", () => {
   test("local results survive when one provider fails", async ({ page }) => {
@@ -171,5 +182,70 @@ test.describe.serial("@fixtures federated Explore + materialization", () => {
 
     // Still exactly one row — repeating does not duplicate.
     expect(await countMediaByExternalId("tmdb", VOYAGER_EXTERNAL_ID)).toBe(1);
+  });
+
+  test("a dateless-Work book materializes via the Work-key year fallback", async ({
+    page,
+  }) => {
+    expect(
+      await countMediaByExternalId("openlibrary", SANDWORM_EXTERNAL_ID),
+    ).toBe(0);
+
+    await page.goto("/explore?q=sandworm");
+
+    // The Open Library federated section streams in; the book's Work record
+    // omits its publish date, so materialization only succeeds because the
+    // adapter recovers the year (1965) via the exact Work-key Search fallback.
+    // A year-0 record would be rejected before any write, so a successful
+    // redirect is itself proof the fallback year passed validation.
+    const importSandworm = page.getByRole("button", {
+      name: `Add ${SANDWORM_TITLE} to Favalog`,
+    });
+    await expect(importSandworm).toBeVisible({ timeout: 25_000 });
+    await importSandworm.click();
+
+    await page.waitForURL(/\/title\/[^/]+$/, { timeout: 30_000 });
+    sandwormSlug = new URL(page.url()).pathname.split("/").pop() ?? "";
+    expect(sandwormSlug).not.toBe("");
+
+    await expect(
+      page.getByRole("heading", { level: 1, name: SANDWORM_TITLE }),
+    ).toBeVisible();
+
+    // Materialized exactly once.
+    expect(
+      await countMediaByExternalId("openlibrary", SANDWORM_EXTERNAL_ID),
+    ).toBe(1);
+  });
+
+  test("refresh preserves the fallback-year book", async ({ page }) => {
+    expect(sandwormSlug).not.toBe("");
+    await page.goto(`/title/${sandwormSlug}`);
+    await page.reload();
+    await expect(
+      page.getByRole("heading", { level: 1, name: SANDWORM_TITLE }),
+    ).toBeVisible();
+  });
+
+  test("repeating the fallback-year book import is idempotent (no duplicate row)", async ({
+    page,
+  }) => {
+    expect(sandwormSlug).not.toBe("");
+
+    await page.goto("/explore?q=sandworm");
+
+    // Now keyword-searchable locally, so the external candidate is dropped as a
+    // duplicate and never offered for a second import.
+    await expect(
+      page.getByRole("link", { name: /Fixture Sandworm Saga \(Book, 1965\)/ }),
+    ).toBeVisible({ timeout: 25_000 });
+    await expect(
+      page.getByRole("button", { name: `Add ${SANDWORM_TITLE} to Favalog` }),
+    ).toHaveCount(0);
+
+    // Still exactly one row — repeating does not duplicate.
+    expect(
+      await countMediaByExternalId("openlibrary", SANDWORM_EXTERNAL_ID),
+    ).toBe(1);
   });
 });

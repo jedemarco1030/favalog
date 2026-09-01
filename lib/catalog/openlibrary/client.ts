@@ -37,7 +37,7 @@ import type {
   NormalizedMediaItem,
   ProviderPage,
 } from "../types";
-import { capText } from "../normalize-helpers.ts";
+import { capText, coerceYear } from "../normalize-helpers.ts";
 import { MAX_PERSON_NAME_LENGTH } from "../config.ts";
 import { clampPage, normalizeQuery } from "../validation.ts";
 import {
@@ -77,6 +77,34 @@ const PROVIDER = "openlibrary" as const;
 /** Only the Search API fields we actually use are requested. */
 const SEARCH_FIELDS =
   "key,title,author_name,first_publish_year,cover_i,subject";
+
+/**
+ * Fields for the bounded Work-key year fallback. Only the identifying key (to
+ * prove the row is the one we asked for) and the publish year are requested.
+ */
+const WORK_YEAR_FALLBACK_FIELDS = "key,first_publish_year";
+
+/**
+ * Resolve a TRUSTED publish year from an exact Work-key Search response, or
+ * `undefined` when it is not safe to trust. It is accepted ONLY when the
+ * response carries exactly one result, that result's `key` exactly equals the
+ * requested `/works/<WORK_ID>` key, and its `first_publish_year` passes the
+ * shared year bounds ({@link coerceYear}). Anything else — empty, multiple,
+ * mismatched key, or missing/implausible year — yields `undefined` so the
+ * caller continues to fail safely. Pure (no I/O); never reads client input.
+ */
+export function fallbackYearFromWorkKeySearch(
+  response: OpenLibrarySearchResponse,
+  expectedKey: string,
+): number | undefined {
+  const docs = response.docs ?? [];
+  if (docs.length !== 1) return undefined;
+  const doc = docs[0];
+  if (typeof doc.key !== "string" || doc.key.trim() !== expectedKey) {
+    return undefined;
+  }
+  return coerceYear(doc.first_publish_year);
+}
 
 /** Create an Open Library {@link CatalogProvider}. */
 export function createOpenLibraryProvider(
@@ -221,7 +249,8 @@ export function createOpenLibraryProvider(
         });
       }
       const contact = requireContact("getByExternalId");
-      const workUrl = `${apiBase}${workIdToKey(ref.externalId)}.json`;
+      const workKey = workIdToKey(ref.externalId);
+      const workUrl = `${apiBase}${workKey}.json`;
 
       return observed("getByExternalId", async () => {
         const { data: work, retries: workRetries } =
@@ -232,11 +261,37 @@ export function createOpenLibraryProvider(
             DETAIL_CACHE_TTL_SECONDS,
             signal,
           );
+        let totalRetries = workRetries;
+
+        // The trusted Work record is authoritative for the year when it carries
+        // a plausible `first_publish_date`. Some real Works (e.g. Dune,
+        // OL893414W) omit it even though the Search API knows the year, which
+        // would otherwise fail materialization. In that case ONLY — and never
+        // by trusting client-supplied search-card metadata — make one bounded
+        // exact Work-key Search lookup for the year.
+        let fallbackYear: number | undefined;
+        if (coerceYear(work.first_publish_date) === undefined) {
+          const params = new URLSearchParams({
+            q: `key:"${workKey}"`,
+            fields: WORK_YEAR_FALLBACK_FIELDS,
+            limit: "1",
+          });
+          const fallbackUrl = `${apiBase}/search.json?${params.toString()}`;
+          const { data: fallback, retries: fallbackRetries } =
+            await fetchOL<OpenLibrarySearchResponse>(
+              "getByExternalId",
+              fallbackUrl,
+              contact,
+              SEARCH_CACHE_TTL_SECONDS,
+              signal,
+            );
+          totalRetries += fallbackRetries;
+          fallbackYear = fallbackYearFromWorkKeySearch(fallback, workKey);
+        }
 
         // Resolve author names (bounded). A failed author lookup must not fail
         // the whole import — a missing author name degrades to omission.
         const authorKeys = authorKeysFromWork(work);
-        let totalRetries = workRetries;
         const authorNames: string[] = [];
         for (const key of authorKeys) {
           try {
@@ -265,7 +320,7 @@ export function createOpenLibraryProvider(
         }
 
         return {
-          value: normalizeOpenLibraryWork(work, authorNames),
+          value: normalizeOpenLibraryWork(work, authorNames, fallbackYear),
           retries: totalRetries,
         };
       });

@@ -1,0 +1,10 @@
+{
+  "key": "/works/OL893414W",
+  "title": "Dune",
+  "description": {
+    "value": "Set on the desert planet Arrakis, the story of Paul Atreides and the struggle for the spice melange."
+  },
+  "subjects": ["Science Fiction", "Fiction"],
+  "covers": [8100921],
+  "authors": [{ "author": { "key": "/authors/OL79034A" } }]
+}
