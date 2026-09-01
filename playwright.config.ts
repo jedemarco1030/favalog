@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+import { assertConfiguredSupabaseIsLocal } from "./scripts/lib/local-supabase-target.mjs";
+
 /**
  * Playwright configuration for Favalog end-to-end tests.
  *
@@ -56,12 +58,24 @@ const isFixturesProdRejectSuite = suite === "fixtures-prod-reject";
 // authenticated user through LOCAL Supabase.
 //
 // IMPORTANT: we deliberately do NOT load `.env.local` here — in this repo it
-// points at a HOSTED Supabase project, and these suites write data. LOCAL
-// Supabase credentials are injected into the environment by
-// `scripts/run-e2e-fixtures.mjs` (loopback-verified). Run these suites ONLY via
-// `npm run test:e2e:fixtures` / `npm run test:e2e:fixtures:prod-reject`. If the
-// local creds are missing, the admin helper and the app fail closed rather than
-// touching hosted.
+// points at a HOSTED Supabase project, and the mutation-capable suites write
+// data. LOCAL Supabase credentials are injected into the environment by
+// `scripts/run-e2e-local.mjs` (loopback-verified). Run these suites ONLY via
+// `npm run test:e2e:configured` / `npm run test:e2e:fixtures` /
+// `npm run test:e2e:fixtures:prod-reject`. If the local creds are missing, the
+// admin helper and the app fail closed rather than touching hosted.
+//
+// BEFORE-TESTS GATE: for every suite except the credential-free `no-env` one,
+// refuse to configure Playwright (and therefore to start Next.js or execute
+// tests) if a Supabase URL is present but is not an unambiguous local loopback
+// target. When run through `scripts/run-e2e-local.mjs` the injected values are
+// local and this passes; a stray hosted `.env.local` value in the environment
+// is rejected here, before any server starts. An entirely absent Supabase URL
+// (the intentional unconfigured/no-env build, incl. CI's `default` project) is
+// allowed because no client — and therefore no write — can be created.
+if (!isNoEnvSuite) {
+  assertConfiguredSupabaseIsLocal(process.env);
+}
 
 /** Storage state produced by the fixtures auth-setup project. */
 const FIXTURES_STORAGE_STATE = "e2e/.auth/fixtures-user.json";

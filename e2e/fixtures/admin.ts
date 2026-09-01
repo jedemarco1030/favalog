@@ -1,13 +1,17 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { assertLoopbackSupabaseUrl } from "../../scripts/lib/local-supabase-target.mjs";
+
 /**
  * Service-role Supabase helpers for the fixture-backed E2E suite.
  *
  * These run in the Playwright RUNNER process (not the app), so they need the
- * local Supabase URL + service-role key that `playwright.config.ts` loads from
- * `.env.local` for the fixtures suites. They are used only to provision a test
- * user and to make authoritative "exactly once / no duplicate" assertions
- * against local Supabase. No secrets are hard-coded here.
+ * local Supabase URL + service-role key that `scripts/run-e2e-local.mjs`
+ * resolves from the running local stack (never `.env.local`) and injects into
+ * the environment. They are used only to provision a test user and to make
+ * authoritative "exactly once / no duplicate" assertions against local
+ * Supabase, and every admin client is loopback-gated by
+ * `assertLoopbackSupabaseUrl`. No secrets are hard-coded here.
  */
 
 /** The deterministic test account provisioned for authenticated fixtures specs. */
@@ -22,8 +26,9 @@ function requireEnv(name: string, fallback?: string): string {
   const value = (process.env[name] ?? fallback ?? "").trim();
   if (!value) {
     throw new Error(
-      `[e2e fixtures] Missing ${name}. The fixtures suite needs local Supabase ` +
-        `credentials from .env.local (run "npm run supabase:start").`,
+      `[e2e fixtures] Missing ${name}. The fixtures suite needs LOCAL Supabase ` +
+        `credentials injected by scripts/run-e2e-local.mjs (run the suite via ` +
+        `"npm run test:e2e:fixtures"; start the stack with "npm run supabase:start").`,
     );
   }
   return value;
@@ -36,6 +41,10 @@ export function createAdminClient(): SupabaseClient {
     "SUPABASE_SECRET_KEY",
     process.env.SUPABASE_SERVICE_ROLE_KEY,
   );
+  // Hard gate: refuse to build an admin client (and therefore to provision a
+  // user or write any row) unless the target is an unambiguous LOCAL loopback
+  // Supabase URL. There is no override that permits a hosted target.
+  assertLoopbackSupabaseUrl(url, "SUPABASE_URL");
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });

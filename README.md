@@ -751,8 +751,19 @@ they are wired together so `npm run validate` is a reliable local gate.
   the secret-free auth flow — signed-out header, sign-in/up/forgot pages render
   accessibly, the controlled no-config state, and `/onboarding` not being
   publicly reachable) against `next build` + `next start`, using semantic
-  locators. Supabase-enabled auth E2E (real sign-up/in/onboarding) is a
-  separate, gated concern requiring a disposable test project.
+  locators.
+- **Local-only E2E isolation.** Every mutation-capable Playwright suite (the
+  ordinary `configured` suite and the Catalog Platform v1B `fixtures` /
+  `fixtures-prod-reject` suites) runs **only** against a local loopback Supabase
+  stack. The protected runner `scripts/run-e2e-local.mjs` resolves LOCAL
+  credentials from the running stack (`supabase status`) or an explicitly
+  ignored `.env.e2e.local` and, via the shared guard
+  `scripts/lib/local-supabase-target.mjs`, hard-verifies the target is loopback
+  **before** building, starting Next.js, or executing tests — it never reads the
+  hosted `.env.local`, and there is no override that permits a hosted target.
+  The `no-env` suite (`scripts/run-e2e-no-env.mjs`) explicitly removes
+  Supabase/provider credentials. Start the stack with `npm run supabase:start`
+  before running these suites.
 - **Storybook** documents genuine component states (media/review/activity
   cards, badges, ratings, empty states) on the Favalog dark theme and provides
   an accessibility panel for visual/a11y review.

@@ -373,6 +373,64 @@ place (harmless when the flag is off). No data migration is needed to disable.
   should still set a **short, explicit** retention for operational logs and
   confirm Analytics retention — this repo does not configure either.
 
+## Incident log
+
+### 2026-08-31 — E2E fixtures briefly wrote to hosted Supabase
+
+**What happened.** While first bringing up the deterministic Catalog Platform
+v1B fixtures E2E suite, the mutation-capable Playwright run inherited this
+repo's `.env.local`, which points at the **hosted** Supabase project
+(`bbfutvrzdrutuijmslpl.supabase.co`) rather than a local stack. Next.js and the
+service-role admin helper therefore resolved the **hosted** target, so two early
+fixture runs provisioned a test account and materialized one fixture title
+against production instead of local.
+
+**Exact temporary scope.** The known fixture identity only: the auth user
+`e2e-materialize@example.com` (username `e2ematerialize`) and one materialized
+fixture catalog row (`source='tmdb'`, `external_id='movie:999001'`, title
+"Fixture Voyager Chronicles"). No real user data was modified.
+
+**Cleanup performed.** The specific fixture user and the single fixture
+`media_items` row were deleted by their exact known identity (targeted deletes,
+never a broad wipe) at the time of discovery.
+
+**Read-only verification (2026-08-31).** A strictly read-only, SELECT/`head`
+audit against the hosted project (using the exact fixture identity, not broad
+scans) confirmed **zero** remaining fixture `media_items`, `media_external_ids`,
+search documents, fixture auth user, fixture profile, and therefore no
+fixture-owned diary entries / reviews / favorites / lists / list items. The
+catalog baseline is unchanged: `media_items` total **28**, `media_external_ids`
+**0** (the v1B alias table remains local-only), and `media_search_documents`
+(the compatible embedding corpus) **28**. No additional mutation was performed
+because no leftover row was found.
+
+**Permanent remediation (loopback-only).** Every mutation-capable E2E entry
+point is now pinned to a **local loopback** Supabase target and can never
+implicitly load `.env.local`:
+
+- A single shared, unit-tested guard (`scripts/lib/local-supabase-target.mjs`)
+  structurally parses each Supabase URL and accepts only unambiguous loopback
+  hosts (`127.0.0.1` / `localhost` / `::1`), rejecting missing, malformed,
+  quoted, non-HTTP(S), user-info-obscured, and remote URLs, and verifying all
+  relevant URLs agree on the local target.
+- The protected runner (`scripts/run-e2e-local.mjs`) resolves LOCAL credentials
+  from the running local stack (`supabase status`) or an explicitly-ignored
+  `.env.e2e.local`, hard-verifies loopback **before** building, starting
+  Next.js, or executing tests, and injects them so they win over `.env.local`.
+  It drives **all** mutation-capable suites — the ordinary `configured` suite
+  and the fixtures suites — and there is **no** override that permits a hosted
+  target.
+- The fixtures admin client (`e2e/fixtures/admin.ts`) re-asserts loopback before
+  creating a service-role client (i.e. before provisioning a user or writing any
+  row), and `playwright.config.ts` refuses to configure any non–`no-env` suite
+  when a present Supabase URL is not loopback.
+- The `no-env` suite (`scripts/run-e2e-no-env.mjs`) explicitly **removes**
+  Supabase/provider credentials rather than inheriting them.
+
+**Secret exposure.** None. No secrets were printed, committed, or logged during
+the incident, the cleanup, or the read-only audit; only counts and the already
+known non-secret fixture identifiers were emitted.
+
 ## Owner setup tasks (not done by this change)
 
 These require access to the Vercel project / hosting console and are **not**
