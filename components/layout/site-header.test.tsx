@@ -9,10 +9,15 @@ vi.mock("@/components/layout/header-auth", () => ({
 }));
 
 import { SiteHeader } from "@/components/layout/site-header";
+import { ThemeProvider } from "@/components/theme/theme-provider";
 
 describe("SiteHeader", () => {
   it("renders the shell: home link, notifications, and the auth cluster slot", () => {
-    render(<SiteHeader />);
+    render(
+      <ThemeProvider>
+        <SiteHeader />
+      </ThemeProvider>,
+    );
 
     expect(
       screen.getByRole("link", { name: "Favalog — home" }),

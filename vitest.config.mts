@@ -45,6 +45,10 @@ export default defineConfig({
         // Deterministic domain / data logic.
         "lib/data/**/*.ts",
         "lib/cn.ts",
+        // Theme system: the pure model + the interactive provider/toggle.
+        "lib/theme.ts",
+        "components/theme/theme-provider.tsx",
+        "components/theme/theme-toggle.tsx",
         // Pure backend utilities: env validation + DB->domain mapper. The
         // Supabase clients / session refresh / generated types are runtime
         // integration surfaces (Next.js request context, Supabase network)

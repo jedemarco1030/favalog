@@ -88,7 +88,9 @@ stated explicitly.
 - No games surface.
 - No personalized recommendations; discovery is retrieval-only, not
   personalized or generative.
-- Theming is dark-only; no light/system preference.
+- Light/dark/system theming is implemented and verified in the repository
+  (2026-09-01) but is not yet deployed to production; hosted production remains
+  dark-only until the next deploy.
 - Explore has real hybrid _search_ but no real server-backed global _browse_
   (filters, global sorts, pagination) over the production catalog.
 - Growth, monetization, and portfolio-packaging work has not started.

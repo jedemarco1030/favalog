@@ -31,6 +31,35 @@
   --accent-foreground: #0b0b0f;
 }
 
+/*
+ * Light theme. Applied when the root carries `data-theme="light"` (set before
+ * paint by the boot script, then owned at runtime by `ThemeProvider`). Same
+ * editorial, artwork-forward identity — warm off-white paper, charcoal ink, a
+ * slightly deeper violet accent so links, focus rings, and accent buttons keep
+ * readable contrast on light surfaces. Dark stays the default (`:root` above),
+ * so first-time and dark visitors never see a flash.
+ */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  /* Base surfaces — warm paper, not stark white */
+  --background: #f6f2ea; /* warm off-white */
+  --surface-1: #fffdf8; /* first elevation, cards */
+  --surface-2: #ece5d8; /* second elevation, chips / poster bg */
+
+  /* Text — warm charcoal ink */
+  --foreground: #1a1712; /* near-black warm charcoal */
+  --foreground-muted: #6b6459;
+
+  /* Borders */
+  --border: #d8cfbf;
+
+  /* Brand accent — deeper violet for AA contrast on light surfaces */
+  --accent: #6b45e6;
+  --accent-strong: #5a34d6;
+  --accent-foreground: #ffffff;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

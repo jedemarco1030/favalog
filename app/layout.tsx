@@ -4,6 +4,8 @@ import "./globals.css";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { MobileNav } from "@/components/layout/mobile-nav";
+import { ThemeProvider } from "@/components/theme/theme-provider";
+import { ThemeScript } from "@/components/theme/theme-script";
 import { siteConfig } from "@/lib/site-config";
 import { AnalyticsWithRedaction } from "@/components/analytics/analytics";
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -54,8 +56,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0b0b0f",
-  colorScheme: "dark",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f6f2ea" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b0b0f" },
+  ],
 };
 
 export default function RootLayout({
@@ -64,13 +68,18 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      data-theme="dark"
+      suppressHydrationWarning
       className={`${inter.variable} ${fraunces.variable} ${jetbrainsMono.variable}`}
     >
       <body className="flex min-h-dvh flex-col bg-background text-foreground antialiased">
-        <SiteHeader />
-        <main className="flex-1">{children}</main>
-        <SiteFooter />
-        <MobileNav />
+        <ThemeScript />
+        <ThemeProvider>
+          <SiteHeader />
+          <main className="flex-1">{children}</main>
+          <SiteFooter />
+          <MobileNav />
+        </ThemeProvider>
         <AnalyticsWithRedaction />
         <SpeedInsights />
       </body>

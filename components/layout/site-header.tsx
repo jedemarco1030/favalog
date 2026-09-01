@@ -6,6 +6,7 @@ import { Logo } from "@/components/brand/logo";
 import { SearchInput } from "@/components/ui/search-input";
 import { PrimaryNavLinks } from "@/components/layout/primary-nav-links";
 import { HeaderAuth } from "@/components/layout/header-auth";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 /**
  * Application shell top bar. A Server Component: wordmark, primary nav
@@ -41,8 +42,9 @@ export function SiteHeader() {
           <SearchInput hint="⌘K" />
         </div>
 
-        {/* Right-hand utility cluster (notifications + auth) */}
+        {/* Right-hand utility cluster (theme + notifications + auth) */}
         <div className="ml-auto flex items-center gap-2 md:ml-0">
+          <ThemeToggle />
           <button
             type="button"
             aria-label="Notifications"
