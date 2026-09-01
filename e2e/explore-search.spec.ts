@@ -125,12 +125,17 @@ test.describe("Explore catalog search — security & product guarantees @configu
     expect(content).not.toMatch(/AI-generated/i);
   });
 
-  test("Explore renders editorial shelves and the search box", async ({
+  test("Explore renders the real catalog browser and the search box", async ({
     page,
   }) => {
     await page.goto("/explore");
 
-    await expect(page.getByText(/Editorial examples/)).toBeVisible();
+    // With Supabase configured and no active query, the no-query view is the
+    // REAL server-backed catalog browser (not the no-env editorial examples).
+    await expect(
+      page.getByRole("heading", { name: "Browse the catalog" }),
+    ).toBeVisible();
+    await expect(page.getByRole("combobox", { name: "Sort" })).toBeVisible();
     await expect(exploreSearchbox(page)).toBeVisible();
   });
 });

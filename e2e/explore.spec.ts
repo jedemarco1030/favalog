@@ -52,8 +52,11 @@ test.describe("Explore discovery @configured", () => {
   }) => {
     await page.goto("/explore");
 
-    // Before any committed query the editorial examples are shown.
-    await expect(page.getByText(/Editorial examples/)).toBeVisible();
+    // Before any committed query the real server-backed catalog browser is
+    // shown (Supabase configured), not a search results heading.
+    await expect(
+      page.getByRole("heading", { name: "Browse the catalog" }),
+    ).toBeVisible();
 
     // Typing updates the input but must NOT navigate or run a search.
     await exploreSearchbox(page).fill("afterglow");
