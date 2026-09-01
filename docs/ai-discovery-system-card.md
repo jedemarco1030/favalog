@@ -5,7 +5,9 @@
 > catalog. It generates **no** text: every result is a real `media_items` row.
 > Real local evaluation results (2026-08-25) are recorded below, and AI
 > Discovery v1 is **production-active and verified** as of 2026-08-27 (see
-> **Production state**).
+> **Production state**). As of **2026-09-01**, hosted production has grown to
+> **29 titles** (28 curated + the imported Open Library Work `OL893414W`) under
+> Catalog Platform v1B (see **Update 2026-09-01**).
 
 ## Intended use
 
@@ -106,8 +108,10 @@ flowchart TD
 ## Offline evaluation dataset
 
 - A **human-reviewed golden dataset** of representative queries mapped to
-  expected catalog titles, defined over the **stable** 28-title corpus (so
-  expectations do not drift).
+  expected catalog titles, defined over the **stable** 28-title local curated
+  corpus (so expectations do not drift). (Hosted production has since grown to
+  29 titles — see **Production state** — but the offline golden dataset stays
+  pinned to the 28 curated titles for stable evaluation.)
 - Includes exact-title queries, paraphrase/intent queries, and per-category
   (movie / TV / book) coverage.
 - Drives the harness via `npm run eval:search`.
@@ -143,8 +147,10 @@ flowchart TD
 
 ## Known limitations
 
-- Small, curated corpus (28 titles): great for precision and evaluation, but not
-  a comprehensive catalog. Out-of-catalog intents simply have no match.
+- Small, curated corpus (28 curated titles locally; 29 in hosted production
+  including the imported Open Library Work `OL893414W`): great for precision and
+  evaluation, but not a comprehensive catalog. Out-of-catalog intents simply
+  have no match.
 - Semantic quality depends on `text-embedding-3-small` at `dimensions: 512`
   with a relevance cutoff (max cosine distance `0.72`). Local evaluation
   shows a Precision/Recall trade: negativeCleanRate raised to 0.800 at a small
@@ -261,8 +267,10 @@ failure.
   corpus for the catalog (provider `openai`, model `text-embedding-3-small`,
   `dimensions: 512`, document version `v1`). The read-only hosted corpus,
   provenance, compatible-corpus (`compatible_embedding_count` for that exact
-  provenance, matching the 28-title catalog), security, and idempotency checks
-  **all returned their documented expected results**.
+  provenance, matching the hosted catalog as of that date — 28 titles;
+  the hosted catalog has since grown to 29, see the **Update 2026-09-01**
+  below), security, and idempotency checks **all returned their documented
+  expected results**.
 - **Resolved incident (superseded).** An earlier accidental hosted **fake**-
   embedding write occurred and was **cleaned up before** the guarded real
   backfill, so no placeholder vectors remained when the OpenAI corpus was
@@ -302,6 +310,35 @@ taxes online this year` returned zero results with the controlled
   remote target; local writes keep their current behavior; authorization is
   never inferred from a service key being present; keys and vectors are never
   logged.
+
+## Update 2026-09-01 — hosted catalog now 29 titles (Catalog Platform v1B)
+
+Since the 2026-08-27 verification above, **Catalog Platform v1B** (federated
+Explore discovery + canonical on-demand materialization —
+[ADR 0004](adr/0004-external-provider-catalog-ingestion.md)) has been hosted and
+production-verified, changing the current hosted corpus count:
+
+- **Hosted catalog is now 29 titles.** The local curated-catalog migration still
+  owns exactly **28** curated titles; **hosted production now contains 29** — the
+  28 curated titles **plus** the imported Open Library Work `OL893414W`, which
+  resolves through canonical on-demand materialization to the canonical **Dune**
+  title.
+- **Compatible corpus is now 29 documents.** `public.media_search_documents` in
+  hosted production holds a complete, compatible embedding corpus of **29**
+  documents (provider `openai`, model `text-embedding-3-small`,
+  `dimensions: 512`, document version `v1`); `OL893414W` participates in hybrid
+  semantic search. All 25 migrations through `20260815120600` are applied to
+  hosted Supabase.
+- **Providers.** **Open Library is enabled and production-verified.** The **TMDB
+  Compliance Gate** is unchanged: `TMDB_ENABLED` remains `false` in production
+  and must stay disabled until the owner confirms AI-use permission from TMDB;
+  TMDB titles remain excluded from the embedding corpus per
+  `lib/search/embedding-source-policy.ts`.
+- **Unchanged guarantees.** Hybrid semantic search remains production-active and
+  degrades safely to keyword-only on any semantic failure. The offline golden
+  dataset stays pinned to the 28 curated titles for stable evaluation, and the
+  dated local-evaluation metrics (2026-08-25) and 2026-08-27 verification facts
+  above remain accurate as history.
 
 ## Rollout plan
 

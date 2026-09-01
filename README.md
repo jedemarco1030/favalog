@@ -19,11 +19,15 @@ profile) are wired to it, and an authenticated user's **Diary**, **Lists**,
 **Favorites**, and **Profile** now render real Supabase data. A
 **Catalog Platform foundation** is also in place: the backend can now search
 and import (materialize) movies/TV from **TMDB** and books from **Open Library**
-into the real catalog. This ingestion layer is server-only and not yet wired to
-the user-facing search; the existing 28-title curated catalog remains the primary
-discovery source. The app still builds and runs with **no** Supabase or
-provider environment variables set. The architecture is designed so the
-remaining pieces can drop in without rewriting the UI.
+into the real catalog. This ingestion layer is server-only, and its federated
+Explore discovery + canonical on-demand materialization is now **wired and
+production-verified** (Open Library enabled; TMDB gated off). The **local**
+curated catalog migration owns **28** titles, while **hosted production**
+contains **29** — the 28 curated titles plus the imported Open Library Work
+`OL893414W`, which resolves to the canonical **Dune** title. The app still
+builds and runs with **no** Supabase or provider environment variables set. The
+architecture is designed so the remaining pieces can drop in without rewriting
+the UI.
 
 ---
 
@@ -177,8 +181,10 @@ once and reused.
 > direct favorite-removal from the profile, and follows remain deferred**, and
 > the catalog / community reviews still render from the `@/lib/data` mock layer.
 > The generated database types (`lib/database.types.ts`) are real and
-> drift-checked, the catalog migration owns all **28** curated titles, and
-> `seed.sql` references that catalog and remains **local only**.
+> drift-checked, the catalog migration owns all **28** curated titles (hosted
+> production adds a 29th via the imported Open Library Work `OL893414W` →
+> canonical **Dune**), and `seed.sql` references that catalog and remains
+> **local only**.
 > The app still builds and runs with **no** Supabase environment variables set —
 > public browsing keeps working and the auth/logging entry points show a
 > controlled unavailable state.
@@ -277,16 +283,19 @@ non-disclosure, immutable-slug edits, and the authoritative post-delete redirect
 to `/lists` (the former list URL correctly becomes not-found; commit `53eac02`
 fixed the client-navigation race) have been confirmed. Migrations for the
 favorites loop (**18th**), AI Discovery (**19th–22nd**), and the relevance
-cutoff (**23rd**) are now **applied to hosted Supabase** as well: all **23**
-migrations through `20260815120400` are recorded in the remote
-`schema_migrations` ledger, and commit `2c9ab54` is **deployed to Vercel
+cutoff (**23rd**), the Catalog Platform v1A provider ingestion (**24th**), and
+the v1B canonical-identity migration (**25th**) are now **applied to hosted
+Supabase** as well: all **25** migrations through `20260815120600` are recorded
+in the remote `schema_migrations` ledger, and commit `2c9ab54` is **deployed to Vercel
 production** (status Ready; the current repository tip includes commits
 `77790be` and `d9453e5`). **AI Discovery v1 is production-active and verified**
 (2026-08-27): the owner-controlled guarded OpenAI backfill completed
 successfully, so the hosted embedding corpus
 (`public.media_search_documents`) now holds a complete, compatible corpus
 (provider `openai`, model `text-embedding-3-small`, `dimensions: 512`, document
-version `v1`) matching the 28-title catalog, and **production semantic
+version `v1`) matching the catalog (28 curated locally; **29** in hosted
+production, including the imported Open Library Work `OL893414W` → canonical
+**Dune**), and **production semantic
 retrieval is enabled** — hybrid search runs on the deployed `/explore` and still
 degrades to keyword-only on any semantic failure. An earlier accidental hosted
 fake-embedding write was **cleaned up before** this guarded real backfill (no
@@ -314,12 +323,14 @@ trigger, sign-in, wrong-password rejection, owner onboarding update,
 case-insensitive duplicate-username rejection, RLS cross-user-update block, and
 sign-out.
 
-- **Schema & migrations (current)**: all **23** migrations through
-  `20260815120400` are on hosted Supabase — tables, both enums (`media_kind`,
+- **Schema & migrations (current)**: all **25** migrations through
+  `20260815120600` are on hosted Supabase — tables, both enums (`media_kind`,
   `list_visibility`), triggers/functions, constraints, indexes, RLS on every
   table, diary RPCs, the full list create/add/remove **and** edit/delete RPCs,
-  the favorites RPC, and the AI Discovery search schema/functions match the
-  intended owner-write / public-read (and private-embedding) model.
+  the favorites RPC, the AI Discovery search schema/functions, the Catalog
+  Platform v1A provider-ingestion schema/RPC (`20260815120500`), and the v1B
+  canonical-identity alias table + resolving materializer (`20260815120600`)
+  match the intended owner-write / public-read (and private-embedding) model.
 - **Database types (current)**: `lib/database.types.ts` is **genuinely
   generated** via `npm run supabase:types` and drift-checked; do not hand-edit
   it. Regenerate only when a migration changes the schema.
@@ -340,8 +351,9 @@ sign-out.
   (`public.media_search_documents`) is now **populated** by the owner-controlled
   guarded OpenAI backfill (2026-08-27): a complete, compatible corpus (provider
   `openai`, model `text-embedding-3-small`, `dimensions: 512`, document version
-  `v1`) matching the 28-title catalog. An earlier accidental hosted
-  fake-embedding write was **cleaned up before** this real backfill (no
+  `v1`) matching the catalog (28 curated locally; **29** in hosted production,
+  including the imported Open Library Work `OL893414W`). An earlier accidental
+  hosted fake-embedding write was **cleaned up before** this real backfill (no
   placeholder vectors remained). **Production semantic retrieval is enabled and
   verified**: `compatible_embedding_count > 0` so the deployed `/explore` serves
   hybrid results and still degrades to keyword-only on any semantic failure. The
@@ -417,7 +429,7 @@ For a hosted project (Authentication → URL Configuration, and Providers):
 - **Google provider**: create OAuth credentials in Google Cloud, set the
   authorized redirect URI to `https://<project-ref>.supabase.co/auth/v1/callback`,
   paste the client id/secret into Supabase, then set
-  `NEXT_PUBLIC_SUPABASE_GOOGLE_ENABLED=true` to reveal the button. The client
+  `NEXT_PUBLIC_SUPABASE_GOOGLE_ENABLE Strue` to reveal the button. The client
   secret lives only in Supabase — never in this repo.
 
 Local defaults live in `supabase/config.toml` (`[auth]` `site_url` +
@@ -515,9 +527,14 @@ discovery with on-demand materialization** on top of that foundation.
   immediately** and remains missing/stale for semantic embedding until the
   guarded, owner-controlled `npm run embed:catalog` re-embeds it.
 
-The v1A operator ingestion path is unchanged; the existing 28-title curated
-catalog remains the primary discovery source, and the canonical-identity
-migration is **local-only** in this change (no hosted rollout performed).
+The v1A operator ingestion path is unchanged. The canonical-identity migration
+(`20260815120600`) is now **applied to hosted Supabase and production-verified**
+(the 25th of 25 hosted migrations): federated Explore discovery and canonical
+on-demand materialization are enabled, the Open Library Work `OL893414W` has
+been imported into hosted production (resolving to the canonical **Dune** title,
+for **29** hosted titles vs. 28 curated locally), and `TMDB_ENABLED` remains
+**false** in production and must stay disabled pending owner licensing
+confirmation.
 
 ### Features
 
@@ -588,14 +605,18 @@ from **local** evaluation and remain the documented evidence of semantic
 quality.
 
 **Production state (2026-08-27):** AI Discovery v1 is **production-active and
-verified**. All 23 migrations (through `20260815120400`) are applied to hosted
-Supabase and commit `2c9ab54` is deployed to Vercel production (status Ready;
+verified**, and so are Catalog Platform v1A/v1B. All **25** migrations (through
+`20260815120600`, including the v1A provider-ingestion and v1B
+canonical-identity migrations) are applied to hosted Supabase and commit
+`2c9ab54` is deployed to Vercel production (status Ready;
 the current repository tip includes commits `77790be` and `d9453e5`). The
 owner-controlled guarded OpenAI backfill (above) **completed successfully**, so
 the hosted embedding corpus (`public.media_search_documents`) now holds a
 complete, compatible corpus (provider `openai`, model `text-embedding-3-small`,
-`dimensions: 512`, document version `v1`) matching the 28-title catalog; an
-earlier accidental hosted fake-embedding write was **cleaned up before** this
+`dimensions: 512`, document version `v1`) matching the hosted production catalog
+(**29** titles — 28 curated plus the imported Open Library Work `OL893414W`; 28
+curated locally); an earlier accidental hosted fake-embedding write was
+**cleaned up before** this
 real backfill. **Production semantic retrieval is enabled and verified:**
 `compatible_embedding_count > 0` so `/explore` serves hybrid results and still
 degrades to keyword-only on any semantic failure. The read-only hosted corpus /
@@ -943,7 +964,7 @@ the real content.
   fork; the shared `MediaItem` union drives everything, and every list item and
   card links to the existing `/title/[slug]` and `/list/[slug]` routes.
 - **Real list surfaces (`/lists`).** The index is server-first. Its header
-  carries a **Create list** launcher (`create-list-launcher.tsx`): signed-in →
+  carries a **Create list** launcerr (`create-list-launcher.tsx`): signed-in →
   a `CreateListDialog`; signed-out → a sign-in link with `returnTo=/lists`;
   no-env → a controlled unavailable state. Real sections (`real-lists-sections.tsx`)
   render the signed-in user's **Your lists** (`getMyLists`, public + private,
@@ -1063,7 +1084,7 @@ from the mutable `displayName`), so `/profile/jamie` is the primary demo
   diary, **Recent reviews** (`ReviewCard`, `EmptyState` when none), **Lists**
   (`ListCard` with a "Browse all lists" link), and a lightweight **Recent
   activity** feed (`ActivityCard`). Sections are composed with focused
-  `ProfileHeader`, `ProfileSection`, and `FavoriteMediaGrid` components rather
+  `ProfileHeader`, `ProfileSes ion`, and `FavoriteMediaGrid` components rather
   than one enormous page.
 - **Real lists on real profiles.** A **real** Supabase profile now shows a real
   **Lists** section and list count from `getRealListsForUser` (public-only for
@@ -1124,4 +1145,6 @@ from the mutable `displayName`), so `/profile/jamie` is the primary demo
   wired to a real catalog, replace these with remote URLs and add the host to
   `images.remotePatterns` in `next.config.ts`.
 - The app is dark-only for now. A light theme can be added later by swapping
+  the CSS custom properties in `app/globals.css`.
+  apping
   the CSS custom properties in `app/globals.css`.

@@ -22,11 +22,13 @@
 > `/title/[slug]`, real "Your lists" + "Community lists" and a "Create list"
 > launcher on `/lists`, real `/list/[slug]` detail with owner-only per-item
 > removal and owner-only edit/delete list controls, and a real **Lists** section
-> on `/profile/[username]`). All **23** migrations through
-> `20260815120400` — including the **17th** (edit/delete lists), the **18th**
-> (favorites), the **19th–22nd** (AI Discovery retrieval), and the **23rd**
-> (semantic cutoff) — are **applied to hosted Supabase** (the hosted migration
-> ledger contains them), and commit `2c9ab54` is **deployed to Vercel
+> on `/profile/[username]`). All **25** migrations through
+> `20260815120600` — including the **17th** (edit/delete lists), the **18th**
+> (favorites), the **19th–22nd** (AI Discovery retrieval), the **23rd**
+> (semantic cutoff), the **24th** (external-ingestion provenance columns), and
+> the **25th** (canonical `media_external_ids` alias table) — are **applied to
+> hosted Supabase** (the hosted migration ledger contains them), and commit
+> `2c9ab54` is **deployed to Vercel
 > production** (status Ready; the current repository tip includes commits
 > `77790be` and `d9453e5`). The AI Discovery v1 system (hybrid search over the
 > **28** curated titles) has been **evaluated locally** with a live OpenAI run
@@ -37,9 +39,11 @@
 > owner-controlled guarded OpenAI backfill completed successfully, so the hosted
 > embedding corpus (`public.media_search_documents`) now holds a complete,
 > compatible corpus (provider `openai`, model `text-embedding-3-small`,
-> `dimensions: 512`, document version `v1`) matching the 28-title catalog — an
-> earlier accidental hosted fake-embedding write was **cleaned up before** the
-> real backfill — so `compatible_embedding_count > 0` and production serves
+> `dimensions: 512`, document version `v1`) matching the hosted production
+> catalog (**29** titles — the 28 curated titles plus the imported Open Library
+> Work `OL893414W`) — an earlier accidental hosted fake-embedding write was
+> **cleaned up before** the real backfill — so `compatible_embedding_count > 0`
+> and production serves
 > hybrid results, still degrading to keyword-only on any semantic failure. The
 > read-only hosted corpus / provenance / compatible-corpus / security /
 > idempotency checks all returned their documented expected results, and browser
@@ -51,9 +55,11 @@
 > the typed mock-data layer (`@/lib/data`), and **reordering, curator notes, list
 > likes, follower-aware visibility, direct favorite-removal from the profile, and
 > follows are deferred**. The generated types
-> (`lib/database.types.ts`) are real and drift-checked; the catalog migration
-> owns all **28** curated titles; `seed.sql` references that catalog and is
-> **local-only**. The app still builds with no Supabase env set.
+> (`lib/database.types.ts`) are real and drift-checked; the local catalog
+> migration owns all **28** curated titles (hosted production additionally
+> contains the imported Open Library Work `OL893414W`, for **29** titles);
+> `seed.sql` references that catalog and is **local-only**. The app still builds
+> with no Supabase env set.
 
 This document describes the Supabase/PostgreSQL foundation added in Phase 2:
 why it exists, the schema, the security model, and the boundaries that keep the
@@ -659,8 +665,10 @@ mock layer, and favorite writes/reads report a controlled `unavailable` state.
 
 ## AI Discovery: hybrid catalog search (retrieval)
 
-**AI Discovery v1** adds real, catalog-backed search over the **28** curated
-`media_items` to `/explore`. It is **retrieval, not generative AI** — no
+**AI Discovery v1** adds real, catalog-backed search over the curated
+`media_items` (the local catalog migration owns **28** curated titles; hosted
+production contains **29**, including the imported Open Library Work
+`OL893414W`) to `/explore`. It is **retrieval, not generative AI** — no
 LLM-generated text is produced — fusing Postgres full-text search (lexical) and
 pgvector cosine similarity (semantic) with **Reciprocal-Rank Fusion** (`k = 60`)
 plus **exact-title protection**. See
@@ -849,9 +857,11 @@ Vercel remain an owner task.
 > production-active and verified (2026-08-27):** the owner-controlled guarded
 > OpenAI backfill completed successfully, so the hosted embedding corpus
 > (`public.media_search_documents`) now holds a complete, provenance-compatible
-> corpus matching the 28-title catalog — an earlier accidental hosted
-> fake-embedding write was **cleaned up before** the real backfill — so
-> `compatible_embedding_count > 0` and production serves hybrid results, still
+> corpus of **29** documents matching the hosted production catalog (the 28
+> curated titles plus the imported Open Library Work `OL893414W`) — an earlier
+> accidental hosted fake-embedding write was **cleaned up before** the real
+> backfill — so `compatible_embedding_count > 0` and production serves hybrid
+> results, still
 > degrading to keyword-only on any semantic failure. The read-only hosted
 > corpus / provenance / compatible-corpus / security / idempotency checks all
 > returned their documented expected results, and browser verification passed on
@@ -865,7 +875,8 @@ Vercel remain an owner task.
 
 A foundation for growing the catalog from trusted external sources: **TMDB**
 (movies and TV) and **Open Library** (books). This ingestion layer is
-server-only and not yet surfaced in the UI.
+server-only; v1B surfaces it to users through federated Explore discovery and
+on-demand materialization (see "Catalog Platform v1B" below).
 
 - **lib/catalog/** — the provider-neutral ingestion core.
   - `types.ts` / `errors.ts` — shared normalized shapes and failure modes.
@@ -966,11 +977,19 @@ title resolves and reuses all existing per-user features.
   `/title/[slug]` and are never offered for import; candidates already shown in
   the local results are dropped.
 
-> **Not applied to hosted Supabase in this change.** Migration
-> `20260815120600` and its pgTAP were developed and verified **locally**; the
-> hosted project is **not** mutated here (see the operations runbook for the
-> forward-only hosted rollout procedure). No hosted import or re-embedding was
-> performed, and no Vercel variables were changed or deployed.
+> **Applied to hosted Supabase and production-verified.** Migration
+> `20260815120600` (the **25th**) is **applied to the hosted project** — the
+> hosted migration ledger contains it — and its pgTAP was verified. Federated
+> Explore discovery and canonical on-demand materialization are **enabled and
+> production-verified** (no longer local-only): the Open Library Work
+> `OL893414W` was imported on demand and resolves to the canonical **Dune**
+> title, taking the hosted production catalog to **29** titles and the
+> compatible embedding corpus to **29** documents (it participates in hybrid
+> semantic search). `TMDB_ENABLED` remains **false** in production and must stay
+> disabled until the owner confirms AI-use permission from TMDB. Any future
+> production re-embedding still requires the owner-controlled guarded remote
+> backfill (see the operations runbook); the remote-write guard is never
+> bypassed and never automatic.
 
 ## Supabase clients
 
@@ -1467,8 +1486,9 @@ of the full mock catalog):
   "Catalog Platforms v1A" above — and **federated Explore discovery + on-demand
   materialization** are now wired behind the `EXTERNAL_CATALOG_ENABLED`,
   `TMDB_ENABLED`, and `OPEN_LIBRARY_ENABLED` flags; see
-  "Catalog Platform v1B" above. Still deferred: generative AI over external
-  results, non-Explore import surfaces, and any hosted rollout — the v1B
-  migration is **local-only** in this change. TMDB is disabled by default
-  in all environments pending owner licensing confirmation.)
+  "Catalog Platform v1B" above; v1B is now **hosted and production-verified**,
+  with the Open Library Work `OL893414W` imported into hosted production. Still
+  deferred: generative AI over external results and non-Explore import
+  surfaces. TMDB is disabled by default in all environments (and must remain
+  disabled in production) pending owner licensing confirmation.)
 - Full followers-only list visibility enforcement.

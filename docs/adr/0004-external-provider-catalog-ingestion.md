@@ -1,6 +1,6 @@
 # 0004 — Catalog Platform v1A: external-provider catalog ingestion foundation
 
-- **Status:** Accepted
+- **Status:** Accepted — v1B hosted & production-verified (see [Update 2026-09-01](#update-2026-09-01--v1b-hosted--production-verified))
 - **Date:** 2026-08-30
 - **Phase:** 4 (Catalog Platform — ingestion foundation)
 - **Builds on:** [0001 — Supabase/PostgreSQL as the Favalog backend](0001-supabase-backend.md), [0003 — AI Discovery v1: hybrid catalog retrieval](0003-ai-discovery-hybrid-catalog-retrieval.md)
@@ -108,4 +108,15 @@ v1A keyed catalog identity solely on `public.media_items (source, external_id)`.
 
 13. **TMDB Compliance Gate.** TMDB (search and import) is disabled by default via `TMDB_ENABLED=false` and must remain disabled in production until the owner confirms AI-use permission from TMDB; holding an API token is not proof of permission.
 
+> **Historical note (state as of 2026-08-30, superseded — see [Update 2026-09-01](#update-2026-09-01--v1b-hosted--production-verified)).** The paragraph below records the local-only constraints that applied when this amendment was first written. Those constraints have since been lifted: migration `20260815120600` is now applied to hosted Supabase and v1B is production-verified. The text is kept for decision history.
+
 The canonical-identity **database foundation and server layer** were implemented and verified earlier (migration applies on a clean `supabase db reset`; the full pgTAP suite passes — 320 tests, including 43 new canonical-identity assertions; generated types regenerated; typecheck clean; catalog unit tests green). The user-facing **federated Explore UI, external-result presentation, and the end-to-end materialization Server Action flow are now wired** on top of that foundation (this session's vertical slice; documentation-only follow-up recorded here). Constraints remain unchanged: **hosted Supabase is not mutated**, **no Vercel variables are changed and nothing is deployed**, **no hosted import or re-embedding is performed**, migration `20260815120600` and its pgTAP are **local-only**, existing migrations are not edited, and RLS/grants/pinned search paths/provider validation/remote-write guards/no-env behavior are not weakened. Generative AI over external results remains **deferred**; external search results in Explore are now the only newly-wired external-facing surface (import buttons live only within these Explore sections).
+
+## Update 2026-09-01 — v1B hosted & production-verified
+
+The local-only constraints in the historical note above have been lifted. Catalog Platform v1B is now **hosted and production-verified**, with the following facts superseding the "local-only / not deployed / not mutated" language earlier in this ADR:
+
+- **Migration hosted.** Migration `20260815120600_media_external_ids.sql` is now **applied to hosted Supabase**. The hosted migration ledger contains all **25 migrations through `20260815120600`**. (The local curated-catalog migration `20260806160100_catalog_media_items.sql` still owns exactly the 28 curated titles; hosted production now contains **29** titles — see below.)
+- **v1B production-verified.** Federated Explore discovery and canonical on-demand materialization are **enabled and production-verified** on the hosted deployment. **Open Library is enabled** (`OPEN_LIBRARY_ENABLED`) and production-verified; the imported Open Library Work `OL893414W` resolved through canonical on-demand materialization to the canonical **_Dune_** title and now participates in hybrid semantic search.
+- **TMDB stays gated.** The **TMDB Compliance Gate** is unchanged: `TMDB_ENABLED` remains `false` in production and must stay disabled until the owner confirms AI-use permission from TMDB. Holding an API token is not proof of permission.
+- **Security posture unchanged.** RLS, RPC EXECUTE grants (`materialize_external_media` / alias-table writes remain `service_role`-only), pinned empty search paths, provider validation, the identity-only import contract, the remote-write guard on `npm run embed:catalog`, and the embedding-source policy (curated + Open Library only; TMDB excluded) are **not weakened** by this update.

@@ -465,16 +465,19 @@ exists (schema, RLS, clients) and the following are wired to it:
   MRR 1.000, exact-title top-1 1.000, positiveZeroResultRate 0.000,
   negativeCleanRate 0.800 (hybrid). Keyword baseline: Recall@5 0.658, MRR 0.737,
   exact-title top-1 1.000, positiveZeroResultRate 0.263, negativeCleanRate 1.000.
-  Threshold check: PASS. **Production state (2026-08-27): AI Discovery v1 is
-  production-active and verified.** All 23 migrations through `20260815120400`
-  are hosted, commit `2c9ab54` is deployed to Vercel production, and the current
+  Threshold check: PASS. **Production state: AI Discovery v1 is production-active
+  and verified (2026-08-27), and so are Catalog Platform v1A/v1B (2026-09-01).**
+  All **25** migrations through `20260815120600` (including the v1A
+  provider-ingestion and v1B canonical-identity migrations) are hosted, commit
+  `2c9ab54` is deployed to Vercel production, and the current
   repository tip includes commits `77790be` and `d9453e5`. The owner-controlled
   guarded OpenAI backfill completed successfully, so the hosted embedding corpus
   (`media_search_documents`) now holds a complete, compatible corpus (provider
   `openai`, model `text-embedding-3-small`, `dimensions: 512`, document version
-  `v1`) matching the 28-title catalog; an earlier accidental hosted
-  fake-embedding write was **cleaned up before** this real backfill (no
-  placeholder vectors remained). With a compatible corpus,
+  `v1`) matching the hosted production catalog (**29** titles — 28 curated plus
+  the imported Open Library Work `OL893414W`; 28 curated locally); an earlier
+  accidental hosted fake-embedding write was **cleaned up before** this real
+  backfill (no placeholder vectors remained). With a compatible corpus,
   `compatible_embedding_count > 0`, so **production semantic retrieval is enabled
   and verified** — the deployed `/explore` serves hybrid results and still
   degrades to keyword-only on any semantic failure. Keep the four verification
@@ -544,7 +547,7 @@ exists (schema, RLS, clients) and the following are wired to it:
   `NEXT_PUBLIC_`, never logged). **TMDB attribution**
   (notice + logo) is required before user-facing results.
 - **Catalog Platform v1B — federated Explore discovery + canonical on-demand
-  materialization (wired; local-only).** v1A keyed identity solely on
+  materialization (wired; hosted & production-verified).** v1A keyed identity solely on
   `media_items (source, external_id)`, which would duplicate a curated title that
   represents the **same real-world work** as a provider result (the curated
   _Dune: Part Two_ is TMDB `movie:693134`). v1B adds a **canonical-identity**
@@ -610,10 +613,16 @@ exists (schema, RLS, clients) and the following are wired to it:
     bucket, retry count, and a safe error category — **never** raw query text, ids,
     title/slug, user email, credentials, descriptions, provider payloads, or
     vectors. With the flag off/unset or no provider configured, `/explore` keeps
-    its exact local-only experience with no build/import crash. **This change is
-    documentation-only and local-only:** hosted Supabase is not mutated, no Vercel
-    variables are changed, nothing is deployed, and no hosted import or
-    re-embedding is performed (migration `20260815120600` is local-only). See
+    its exact local-only experience with no build/import crash. **Update
+    (2026-09-01): v1B is now applied to hosted Supabase and production-verified.**
+    Migration `20260815120600` is the 25th of 25 hosted migrations, federated
+    Explore discovery and canonical on-demand materialization are enabled, and
+    the Open Library Work `OL893414W` has been imported into hosted production
+    (resolving to the canonical _Dune_ title, for **29** hosted titles vs. 28
+    curated locally). `TMDB_ENABLED` remains **false** in production and must
+    stay disabled; any future hosted import or re-embedding still requires the
+    owner-controlled guarded remote process (the remote-write guard is never
+    bypassed). See
     [ADR 0004](docs/adr/0004-external-provider-catalog-ingestion.md).
 
 Everything else is still mock-data. Do **not** introduce any of the following
@@ -623,9 +632,9 @@ reordering and direct favorite-removal controls on the profile — favorite
 removal is from the title page only this phase), **curator notes**, a follows
 UI, likes (reviews or lists), follower-aware list visibility, external catalog
 APIs beyond the wired TMDB / Open Library federation (e.g. **Google Books**, or
-any new provider), a hosted rollout of the v1B migration / Vercel flag / hosted
-import (the federated Explore + materialization slice is wired but **local-only**
-— see "Catalog Platform v1B" above). **TMDB Compliance Gate:** TMDB (search
+any new provider). (The v1B federated Explore + canonical materialization slice
+is now wired **and** hosted/production-verified — see "Catalog Platform v1B"
+above.) **TMDB Compliance Gate:** TMDB (search
 and import) is disabled by default via `TMDB_ENABLED=false` and must remain
 disabled in production until the owner confirms AI-use permission from TMDB;
 holding an API token is not proof of permission. **Generative AI** (LLM-written text,
