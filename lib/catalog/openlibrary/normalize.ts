@@ -13,14 +13,10 @@ import {
   MAX_SYNOPSIS_LENGTH,
   MAX_TITLE_LENGTH,
 } from "../config.ts";
-import {
-  capGenres,
-  capList,
-  capText,
-  coerceYear,
-} from "../normalize-helpers.ts";
+import { capList, capText, coerceYear } from "../normalize-helpers.ts";
 import type { CatalogSearchCandidate, NormalizedMediaItem } from "../types";
 import { openLibraryCoverUrl, workKeyToId } from "./config.ts";
+import { canonicalizeBookGenres } from "./genres.ts";
 import type {
   OpenLibraryDescription,
   OpenLibrarySearchDoc,
@@ -64,7 +60,11 @@ export function normalizeOpenLibraryWork(
     subtitle,
     synopsis: descriptionText(work.description),
     year: coerceYear(work.first_publish_date) ?? coerceYear(fallbackYear) ?? 0,
-    genres: capGenres(work.subjects),
+    // Open Library `subjects` are an uncontrolled folksonomy (awards, list
+    // metadata, provider syntax, dates, places, characters, prose). Map them
+    // through the closed, fail-closed canonical taxonomy so only true product
+    // genres are ever persisted — never raw subjects.
+    genres: canonicalizeBookGenres(work.subjects),
     posterUrl: openLibraryCoverUrl(coverId),
     authors: capList([...authorNames], MAX_AUTHORS),
     // Open Library page count is edition-specific, not a Work property; a Work

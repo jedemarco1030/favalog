@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTransition, type ChangeEvent, type ReactNode } from "react";
 import { MediaCard } from "@/components/media/media-card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { StyledSelect } from "@/components/ui/styled-select";
 import { cn } from "@/lib/cn";
 import { BROWSE_SORTS, type BrowseSort } from "@/lib/browse/query";
 import type { BrowseOutcome } from "@/lib/supabase/browse-view-model";
@@ -124,11 +125,11 @@ export function CatalogBrowse({ outcome }: CatalogBrowseProps) {
           <div className="flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 text-sm text-foreground/70">
               <span>Genre</span>
-              <select
+              <StyledSelect
+                aria-label="Genre"
                 value={appliedGenre ?? ""}
                 onChange={onGenreChange}
                 disabled={isPending || availableGenres.length === 0}
-                className="h-9 rounded-full border border-border/70 bg-surface-1 px-3 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-60"
               >
                 <option value="">All genres</option>
                 {availableGenres.map((genre) => (
@@ -136,23 +137,23 @@ export function CatalogBrowse({ outcome }: CatalogBrowseProps) {
                     {genre}
                   </option>
                 ))}
-              </select>
+              </StyledSelect>
             </label>
 
             <label className="flex items-center gap-2 text-sm text-foreground/70">
               <span>Sort</span>
-              <select
+              <StyledSelect
+                aria-label="Sort"
                 value={sort}
                 onChange={onSortChange}
                 disabled={isPending}
-                className="h-9 rounded-full border border-border/70 bg-surface-1 px-3 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-60"
               >
                 {BROWSE_SORTS.map((option) => (
                   <option key={option} value={option}>
                     {SORT_LABELS[option]}
                   </option>
                 ))}
-              </select>
+              </StyledSelect>
             </label>
           </div>
         </div>

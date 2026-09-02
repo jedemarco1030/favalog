@@ -136,7 +136,12 @@ export function ExploreSearch({
 
   function onSelectFilter(next: SearchKindFilter) {
     setFilter(next);
-    navigate(query, next);
+    // Navigate with the COMMITTED query (`initialQuery`), never the live input
+    // value. Otherwise unsubmitted text typed into the search box would be
+    // written to `?q=` on a media-type change, silently flipping the page into
+    // search mode and hiding the browse-only Genre/Sort controls. Changing the
+    // media type is a browse action; it must preserve — not activate — search.
+    navigate(initialQuery, next);
   }
 
   const hasActiveQuery = outcome !== null;

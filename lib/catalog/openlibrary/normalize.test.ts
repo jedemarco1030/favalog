@@ -50,7 +50,9 @@ describe("normalizeOpenLibraryWork", () => {
       externalId: "OL123W",
     });
     expect(item.title).toBe("Fantastic Mr Fox");
-    expect(item.genres).toEqual(["Children", "Fiction"]);
+    // Subjects are mapped through the canonical taxonomy: "Children" ->
+    // "Children's", "Fiction" -> "Fiction" (raw subjects are never persisted).
+    expect(item.genres).toEqual(["Children's", "Fiction"]);
     expect(item.year).toBe(1970);
     expect(item.posterUrl).toBe(
       "https://covers.openlibrary.org/b/id/456-L.jpg",
