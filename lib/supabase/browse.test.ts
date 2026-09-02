@@ -225,6 +225,34 @@ describe("browseCatalog", () => {
     );
   });
 
+  it("never lets polluted historical subjects reach the Genre dropdown", async () => {
+    // A malformed/legacy book row still holding raw Open Library subjects
+    // (query-like syntax, entities, dates, bestseller/list + award metadata,
+    // prose) alongside one genuine canonical genre.
+    const rows = [
+      makeRow(1, {
+        kind: "book",
+        genres: [
+          "award:nebula_award=novel",
+          "nyt:mass-market-monthly=2021-11-07",
+          "Dune (Imaginary place)",
+          "Fiction, science fiction, general",
+          "Accessible book",
+          "1979",
+          "Science Fiction", // the only real product genre
+        ],
+      }),
+    ];
+    const client = makeClient(rows);
+
+    const outcome = await browseCatalog({ kind: "book" }, makeDeps(client));
+
+    expect(outcome.status).toBe("ok");
+    if (outcome.status !== "ok") return;
+    // Only the canonical product genre survives; every polluted value is dropped.
+    expect(outcome.availableGenres).toEqual(["Science Fiction"]);
+  });
+
   it("drops an unknown/incompatible genre safely (no filter applied)", async () => {
     const rows = [makeRow(1, { genres: ["Drama"] })];
     const client = makeClient(rows);

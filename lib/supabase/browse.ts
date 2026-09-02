@@ -50,6 +50,7 @@ import {
   type BrowseLogFields,
   type BrowseOutcomeKind,
 } from "@/lib/browse/log";
+import { isAllowedBrowseGenre } from "@/lib/browse/genre-vocabulary";
 import { isSupabaseConfigured } from "./env";
 import { createClient } from "./server";
 import { mapMediaRowToDomain, type MediaItemRow } from "./mappers";
@@ -170,8 +171,20 @@ async function defaultGetClient(): Promise<BrowseTableClient> {
   };
 }
 
-/** Distinct, trimmed, alphabetically-sorted genres (canonical stored casing). */
-function distinctSortedGenres(rows: Array<{ genres: string[] }>): string[] {
+/**
+ * Distinct, trimmed, alphabetically-sorted genres (canonical stored casing),
+ * restricted to the closed product-genre vocabulary for the current media kind.
+ *
+ * This is a defense-in-depth READ boundary: any stored value that is not a
+ * recognised product genre for `kind` (raw provider subjects, awards, dates,
+ * bestseller-list ids, entities, provider query syntax, prose, …) is dropped so
+ * it can never repopulate the Genre dropdown — even if a historical or malformed
+ * row still holds it. Browsing "All" (kind `null`) admits the union across kinds.
+ */
+function distinctSortedGenres(
+  rows: Array<{ genres: string[] }>,
+  kind: DbKind,
+): string[] {
   const byKey = new Map<string, string>();
   for (const row of rows) {
     const genres = Array.isArray(row?.genres) ? row.genres : [];
@@ -179,6 +192,8 @@ function distinctSortedGenres(rows: Array<{ genres: string[] }>): string[] {
       if (typeof raw !== "string") continue;
       const trimmed = raw.trim();
       if (trimmed.length === 0) continue;
+      // Fail-closed: only allow-listed product genres reach the control.
+      if (!isAllowedBrowseGenre(kind, trimmed)) continue;
       const key = normalizeGenreKey(trimmed);
       if (!byKey.has(key)) byKey.set(key, trimmed);
     }
@@ -265,7 +280,7 @@ export async function browseCatalog(
     emit("error");
     return { status: "error", category: "database" };
   }
-  const availableGenres = distinctSortedGenres(genresRes.data ?? []);
+  const availableGenres = distinctSortedGenres(genresRes.data ?? [], dbKind);
   const appliedGenre = reconcileGenre(requestedGenre, availableGenres);
 
   // 2. Fetch the requested page (with exact count), then clamp to the real
