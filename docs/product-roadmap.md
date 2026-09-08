@@ -63,6 +63,11 @@ stated explicitly.
   delete, with globally unique immutable slugs and RLS-backed visibility.
 - **Favorites lifecycle** — idempotent favorite / unfavorite with server-ordered
   positions, public-read profiles.
+- **Follow lifecycle & follower-only lists (Phase 4B.1)** — atomic idempotent
+  `public.set_follow` (`SECURITY INVOKER`, transaction advisory lock serialization)
+  enables follow/unfollow by canonical username, live follower/following profile counts,
+  and follower-aware Row Level Security on lists and list items (`public`, `followers`, `private`).
+  Unfollowing immediately revokes access to follower-only lists.
 - **Real profiles** — derived stats, recently watched/read, real reviews, real
   lists and favorites; mock demo usernames still render mock profiles, unknown
   usernames `notFound()`, and a real profile never inherits mock data.
@@ -83,8 +88,8 @@ stated explicitly.
 
 - Most consumer product pages (Home, community reviews) still render from the
   `@/lib/data` mock layer rather than real Supabase reads.
-- No social graph yet: follows, follower-aware list visibility, likes on
-  reviews/lists, and notifications are all still absent or mock.
+- Remaining social graph features: feeds, likes on reviews/lists, notifications,
+  comments, blocking, private accounts, and follower directories remain deferred.
 - No games surface.
 - No personalized recommendations; discovery is retrieval-only, not
   personalized or generative.
