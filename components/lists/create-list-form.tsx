@@ -209,6 +209,21 @@ export function CreateListForm({
           <input
             type="radio"
             name="visibility"
+            value="followers"
+            disabled={inputBusy}
+            className="mt-0.5 size-4 border-border/70 bg-surface-2 text-accent focus-visible:ring-2 focus-visible:ring-accent"
+          />
+          <span>
+            Followers
+            <span className="block text-xs text-foreground/50">
+              Visible to people who follow you.
+            </span>
+          </span>
+        </label>
+        <label className="flex items-start gap-2 text-sm text-foreground/80">
+          <input
+            type="radio"
+            name="visibility"
             value="private"
             disabled={inputBusy}
             className="mt-0.5 size-4 border-border/70 bg-surface-2 text-accent focus-visible:ring-2 focus-visible:ring-accent"

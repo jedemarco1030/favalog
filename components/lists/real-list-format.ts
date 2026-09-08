@@ -8,38 +8,32 @@ import type { ListCreateVisibility, ListVisibility } from "@/lib/types";
  * or curator notes this phase, so nothing here fabricates those.
  */
 
-/** Human, short visibility label for a real list, e.g. "Public" / "Private". */
+/** Human, short visibility label for a real list, e.g. "Public" / "Followers" / "Private". */
 export function visibilityLabel(visibility: ListVisibility): string {
   switch (visibility) {
     case "public":
       return "Public";
-    case "private":
-      return "Private";
     case "followers":
-      // Reserved, not user-selectable this phase; treated like private.
+      return "Followers";
+    case "private":
       return "Private";
   }
 }
 
 /**
- * True when a list is only visible to its owner, so surfaces can flag it. The
- * reserved `followers` value behaves like private until follower-aware access
- * exists.
+ * True when a list is not public, so surfaces can flag it.
  */
 export function isPrivateVisibility(visibility: ListVisibility): boolean {
   return visibility !== "public";
 }
 
 /**
- * Reconcile a stored {@link ListVisibility} to a creatable/editable value. Only
- * `public` maps to `public`; everything else (including the reserved
- * `followers`) reconciles to `private`, so the edit form never offers an
- * unsupported choice and a `followers` list pre-fills safely as private.
+ * Reconcile a stored {@link ListVisibility} to a creatable/editable value.
  */
 export function toCreateVisibility(
   visibility: ListVisibility,
 ): ListCreateVisibility {
-  return visibility === "public" ? "public" : "private";
+  return visibility;
 }
 
 const updatedFormatter = new Intl.DateTimeFormat("en", {

@@ -191,12 +191,11 @@ exposed to a browser client.
 - **Diary entries are publicly readable.** They back the public-profile
   concept. If per-entry privacy is introduced later, add a privacy column and
   tighten the SELECT policy.
-- **`followers` and `private` lists are treated as private** for now: a list is
-  publicly readable only when `visibility = 'public'`. Real followers-only
-  access is **not faked** — it will be added once the `follows` relationship
-  powers a proper policy (a `followers` list becomes readable when
-  `EXISTS (select 1 from follows where following_id = lists.user_id and
-follower_id = auth.uid())`).
+- **Follower-aware list visibility:** a list is readable when `visibility = 'public'`,
+  when `user_id = auth.uid()` (owner), or when `visibility = 'followers'` and
+  the viewer follows the owner (`EXISTS (select 1 from public.follows where follower_id = auth.uid() and following_id = lists.user_id)`).
+  List items inherit exact parent list visibility via parent join.
+  `private` lists remain strictly owner-only.
 
 ## Ratings source of truth
 
@@ -662,6 +661,39 @@ Mock demo usernames (`jamie`, `mira`, …) still render their full mock profiles
 including mock favorites; a **real** Supabase profile renders real favorites and
 never inherits mock data. Without Supabase configured everything stays on the
 mock layer, and favorite writes/reads report a controlled `unavailable` state.
+
+## Follow lifecycle and follower-only lists (Phase 4B.1)
+
+Phase 4B.1 implements the persistent social follow lifecycle and follower-aware
+list visibility without adding speculative feeds or notification queues.
+
+### Migration `20260815120800_follow_lifecycle_and_follower_lists.sql`
+
+- **`public.set_follow(p_target_username text, p_is_follow boolean)` RPC:**
+  - `SECURITY INVOKER`, pinned empty `search_path = ''`, schema-qualified SQL.
+  - `EXECUTE` granted only to `authenticated`; revoked from `public` and `anon`.
+  - Caller identity derived exclusively from `auth.uid()`.
+  - Target identity resolved server-side from canonical username (case-insensitive).
+  - Rejects unauthenticated callers (`28000`), self-follow (`22023`), malformed inputs (`22023`), and unknown target profiles (`P0002`).
+  - Idempotent: follow uses `insert on conflict do nothing`; unfollow uses `delete`.
+  - Returns minimal serializable result `{ target_username, target_user_id, is_following, changed }`.
+  - **Concurrency:** operations on the exact `(follower_id, following_id)` pair are serialized via a transaction-scoped advisory lock (`pg_catalog.pg_advisory_xact_lock(hashtext(v_uid::text), hashtext(v_target_id::text))`), which guarantees serializability even when no row exists in `public.follows`.
+- **Updated `public.create_list` and `public.update_list` RPCs:**
+  - Accept `'followers'` visibility in addition to `'public'` and `'private'`.
+- **Follower-aware Row Level Security on `public.lists` and `public.list_items`:**
+  - `public.lists` SELECT policy permits reads when `visibility = 'public'`, `user_id = auth.uid()`, or `visibility = 'followers'` and `exists (select 1 from public.follows f where f.follower_id = auth.uid() and f.following_id = lists.user_id)`.
+  - `public.list_items` SELECT policy inherits the parent list's exact visibility via a join to `public.lists`.
+  - Directionality: the **viewer follows the list owner** (`follower_id = viewer, following_id = owner`). An owner following the viewer does not grant access.
+  - Inaccessible direct list routes return the non-disclosing 404 response.
+  - Direct write boundaries remain strictly owner-only.
+
+### Social boundaries and non-goals
+
+- **Public social graph:** all profiles and follow relationships are public. Follows are unilateral and require no approval.
+- **Privacy model:** follower-only lists are accessible to anyone who chooses to follow the owner. They are designed for casual sharing with followers, not for sensitive or confidential secrets.
+- **No private accounts, blocking, or muting:** deferred to later trust & safety phases.
+- **No feeds or notifications:** follow actions create no notification rows or activity feeds in this slice.
+- **No data leakage:** no social graph, follower lists, or relationship endpoints are sent to OpenAI or external catalog providers. Telemetry remains operational and redacted.
 
 ## AI Discovery: hybrid catalog search (retrieval)
 

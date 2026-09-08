@@ -22,6 +22,21 @@ export const FIXTURE_USER = {
   displayName: "E2E Materialize",
 } as const;
 
+/** Two test accounts for multi-user social & follower-aware list testing. */
+export const SOCIAL_USER_A = {
+  email: "social_a@example.com",
+  password: "Fixture-Passw0rd!23",
+  username: "social_a",
+  displayName: "Social User A",
+} as const;
+
+export const SOCIAL_USER_B = {
+  email: "social_b@example.com",
+  password: "Fixture-Passw0rd!23",
+  username: "social_b",
+  displayName: "Social User B",
+} as const;
+
 function requireEnv(name: string, fallback?: string): string {
   const value = (process.env[name] ?? fallback ?? "").trim();
   if (!value) {
@@ -78,6 +93,49 @@ export async function ensureFixtureUser(): Promise<void> {
   if (error) {
     throw new Error(
       `[e2e fixtures] Failed to create fixture user: ${error.message}`,
+    );
+  }
+}
+
+/**
+ * Ensure two distinct confirmed, onboarded social users exist.
+ */
+export async function ensureSocialFixtureUsers(): Promise<void> {
+  const admin = createAdminClient();
+
+  const { data: list } = await admin.auth.admin.listUsers({ perPage: 200 });
+  const existingA = list?.users.find((u) => u.email === SOCIAL_USER_A.email);
+  if (existingA) await admin.auth.admin.deleteUser(existingA.id);
+  const existingB = list?.users.find((u) => u.email === SOCIAL_USER_B.email);
+  if (existingB) await admin.auth.admin.deleteUser(existingB.id);
+
+  const { error: errA } = await admin.auth.admin.createUser({
+    email: SOCIAL_USER_A.email,
+    password: SOCIAL_USER_A.password,
+    email_confirm: true,
+    user_metadata: {
+      username: SOCIAL_USER_A.username,
+      display_name: SOCIAL_USER_A.displayName,
+    },
+  });
+  if (errA) {
+    throw new Error(
+      `[e2e fixtures] Failed to create social user A: ${errA.message}`,
+    );
+  }
+
+  const { error: errB } = await admin.auth.admin.createUser({
+    email: SOCIAL_USER_B.email,
+    password: SOCIAL_USER_B.password,
+    email_confirm: true,
+    user_metadata: {
+      username: SOCIAL_USER_B.username,
+      display_name: SOCIAL_USER_B.displayName,
+    },
+  });
+  if (errB) {
+    throw new Error(
+      `[e2e fixtures] Failed to create social user B: ${errB.message}`,
     );
   }
 }

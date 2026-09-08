@@ -188,9 +188,9 @@ select throws_ok(
 select throws_ok(
   $$ select public.update_list(
        (select id from public.lists where slug = 'alice-edit-my-films'),
-       'Best Films', null, false, 'followers') $$,
+       'Best Films', null, false, 'unlisted') $$,
   '22023', null,
-  'updating to a followers/other visibility is rejected');
+  'updating to an invalid visibility is rejected');
 
 -- Unknown list id fails safely.
 select throws_ok(

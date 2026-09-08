@@ -642,6 +642,10 @@ export type Database = {
         Args: { p_is_favorite: boolean; p_media_slug: string }
         Returns: Json
       }
+      set_follow: {
+        Args: { p_is_follow: boolean; p_target_username: string }
+        Returns: Json
+      }
       update_diary_entry: {
         Args: {
           p_contains_spoilers?: boolean

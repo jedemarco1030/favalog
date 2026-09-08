@@ -200,9 +200,9 @@ select throws_ok(
   'P0002', null,
   'removing an unknown media slug fails safely');
 select throws_ok(
-  $$ select public.create_list('Bad Visibility', null, false, 'followers') $$,
+  $$ select public.create_list('Bad Visibility', null, false, 'unlisted') $$,
   '22023', null,
-  'creating with a non-public/private visibility is rejected');
+  'creating with an invalid visibility is rejected');
 select throws_ok(
   $$ select public.create_list('   ', null, false, 'public') $$,
   '22023', null,

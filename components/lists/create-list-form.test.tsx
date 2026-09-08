@@ -29,25 +29,32 @@ describe("CreateListForm", () => {
       screen.getByRole("checkbox", { name: /Ranked list/ }),
     ).toBeInTheDocument();
     const publicRadio = screen.getByRole("radio", { name: /Public/ });
+    const followersRadio = screen.getByRole("radio", { name: /Followers/ });
     const privateRadio = screen.getByRole("radio", { name: /Private/ });
     expect(publicRadio).toBeChecked();
+    expect(followersRadio).not.toBeChecked();
     expect(privateRadio).not.toBeChecked();
     expect(
       screen.getByRole("button", { name: "Create list" }),
     ).toBeInTheDocument();
   });
 
-  it("lets the visibility be switched to private and toggles the ranked checkbox", async () => {
+  it("lets the visibility be switched to followers or private and toggles the ranked checkbox", async () => {
     const user = userEvent.setup();
     const action = vi.fn(async (): Promise<CreateListFormState> => ({
       status: "idle",
     }));
     render(<CreateListForm action={action} returnTo="/lists" />);
 
+    const followersRadio = screen.getByRole("radio", { name: /Followers/ });
+    await user.click(followersRadio);
+    expect(followersRadio).toBeChecked();
+    expect(screen.getByRole("radio", { name: /Public/ })).not.toBeChecked();
+
     const privateRadio = screen.getByRole("radio", { name: /Private/ });
     await user.click(privateRadio);
     expect(privateRadio).toBeChecked();
-    expect(screen.getByRole("radio", { name: /Public/ })).not.toBeChecked();
+    expect(followersRadio).not.toBeChecked();
 
     const ranked = screen.getByRole("checkbox", { name: /Ranked list/ });
     expect(ranked).not.toBeChecked();

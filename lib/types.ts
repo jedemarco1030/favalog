@@ -172,19 +172,14 @@ export interface Review {
  * Access model for a list. Reconciled to match the database `list_visibility`
  * enum (the single source of truth): `public`, `followers`, and `private`.
  *
- * `followers` visibility is represented but not yet enforced (it behaves like
- * `private` until real follower-aware access exists), so persistent list
- * creation only exposes {@link ListCreateVisibility} (`public` | `private`) for
- * now. Mock lists are all `public`.
+ * Mock lists are all `public`.
  */
 export type ListVisibility = "public" | "followers" | "private";
 
 /**
- * The visibility options a user may choose when creating a real list in the
- * current phase. `followers` is deliberately withheld until follower-aware
- * access is implemented.
+ * The visibility options a user may choose when creating or editing a real list.
  */
-export type ListCreateVisibility = "public" | "private";
+export type ListCreateVisibility = "public" | "followers" | "private";
 
 /**
  * A user-authored, cross-media collection of titles.

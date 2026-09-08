@@ -7,13 +7,10 @@ import {
 } from "@/components/lists/real-list-format";
 
 describe("visibilityLabel", () => {
-  it("labels public and private lists", () => {
+  it("labels public, followers, and private lists", () => {
     expect(visibilityLabel("public")).toBe("Public");
+    expect(visibilityLabel("followers")).toBe("Followers");
     expect(visibilityLabel("private")).toBe("Private");
-  });
-
-  it("treats the reserved followers visibility as private", () => {
-    expect(visibilityLabel("followers")).toBe("Private");
   });
 });
 
@@ -22,20 +19,17 @@ describe("isPrivateVisibility", () => {
     expect(isPrivateVisibility("public")).toBe(false);
   });
 
-  it("is true for private and the reserved followers visibility", () => {
+  it("is true for private and followers visibility", () => {
     expect(isPrivateVisibility("private")).toBe(true);
     expect(isPrivateVisibility("followers")).toBe(true);
   });
 });
 
 describe("toCreateVisibility", () => {
-  it("maps public to public", () => {
+  it("maps each visibility directly", () => {
     expect(toCreateVisibility("public")).toBe("public");
-  });
-
-  it("reconciles private and the reserved followers to private", () => {
+    expect(toCreateVisibility("followers")).toBe("followers");
     expect(toCreateVisibility("private")).toBe("private");
-    expect(toCreateVisibility("followers")).toBe("private");
   });
 });
 

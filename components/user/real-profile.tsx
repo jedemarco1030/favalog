@@ -17,6 +17,9 @@ import type { Profile } from "@/lib/types";
 import type { RealProfileActivity } from "@/lib/supabase/profile-activity";
 import type { ProfileListsResult } from "@/lib/supabase/lists";
 import type { ProfileFavoritesResult } from "@/lib/supabase/favorites";
+import type { ProfileSocialStateResult } from "@/lib/supabase/follows";
+import { FollowButton } from "./follow-button";
+import { setFollowAction } from "@/app/profile/[username]/actions";
 
 const joinedFormatter = new Intl.DateTimeFormat("en", {
   month: "long",
@@ -28,12 +31,16 @@ const reviewDateFormatter = new Intl.DateTimeFormat("en", {
   year: "numeric",
 });
 
+function formatCount(value: number): string {
+  return value.toLocaleString("en-US");
+}
+
 interface RealProfileProps {
   profile: Profile;
   activity: RealProfileActivity;
   /**
    * The profile owner's real lists, visibility-scoped by RLS (a non-owner sees
-   * only public lists; the owner sees all of theirs). Never mock data.
+   * only public lists and followers lists if following; the owner sees all of theirs). Never mock data.
    */
   lists: ProfileListsResult;
   /**
@@ -42,6 +49,10 @@ interface RealProfileProps {
    * Never mock data.
    */
   favorites: ProfileFavoritesResult;
+  /**
+   * Real follower/following counts and viewer relationship.
+   */
+  social: ProfileSocialStateResult;
   /** True when this is the signed-in viewer's own profile. */
   isCurrentUser?: boolean;
 }
@@ -63,6 +74,7 @@ export function RealProfile({
   activity,
   lists,
   favorites,
+  social,
   isCurrentUser = false,
 }: RealProfileProps) {
   const { stats, recentlyWatched, recentlyRead, reviews } = activity;
@@ -88,43 +100,105 @@ export function RealProfile({
   return (
     <Container className="flex flex-col gap-12 py-8 sm:gap-14 sm:py-10">
       <header className="relative overflow-hidden rounded-2xl border border-border/60 bg-surface-1 px-5 py-8 sm:px-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-          <ProfileAvatar
-            displayName={profile.displayName}
-            avatarUrl={profile.avatarUrl}
-            size="xl"
-            className="shrink-0 ring-4 ring-surface-1"
-          />
-          <div className="flex flex-col gap-2">
-            <div>
-              <h1 className="font-display text-3xl tracking-tight text-foreground sm:text-4xl">
-                {profile.displayName}
-              </h1>
-              <p className="text-sm text-foreground/50">@{profile.username}</p>
-            </div>
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+            <ProfileAvatar
+              displayName={profile.displayName}
+              avatarUrl={profile.avatarUrl}
+              size="xl"
+              className="shrink-0 ring-4 ring-surface-1"
+            />
+            <div className="flex flex-col gap-2">
+              <div>
+                <h1 className="font-display text-3xl tracking-tight text-foreground sm:text-4xl">
+                  {profile.displayName}
+                </h1>
+                <p className="text-sm text-foreground/50">
+                  @{profile.username}
+                </p>
+              </div>
 
-            {profile.bio && (
-              <p className="max-w-prose text-sm leading-relaxed text-foreground/75">
-                {profile.bio}
-              </p>
-            )}
-
-            <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-foreground/50">
-              {profile.location && (
-                <li className="inline-flex items-center gap-1">
-                  <MapPin className="size-3.5" aria-hidden="true" />
-                  {profile.location}
-                </li>
+              {profile.bio && (
+                <p className="max-w-prose text-sm leading-relaxed text-foreground/75">
+                  {profile.bio}
+                </p>
               )}
-              <li className="inline-flex items-center gap-1">
-                <CalendarDays className="size-3.5" aria-hidden="true" />
-                Joined{" "}
-                <time dateTime={profile.createdAt}>
-                  {joinedFormatter.format(new Date(profile.createdAt))}
-                </time>
-              </li>
-            </ul>
+
+              <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-foreground/50">
+                {profile.location && (
+                  <li className="inline-flex items-center gap-1">
+                    <MapPin className="size-3.5" aria-hidden="true" />
+                    {profile.location}
+                  </li>
+                )}
+                <li className="inline-flex items-center gap-1">
+                  <CalendarDays className="size-3.5" aria-hidden="true" />
+                  Joined{" "}
+                  <time dateTime={profile.createdAt}>
+                    {joinedFormatter.format(new Date(profile.createdAt))}
+                  </time>
+                </li>
+              </ul>
+
+              {social.status === "ok" && (
+                <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-foreground/60">
+                  <span>
+                    <strong className="font-semibold text-foreground tabular-nums">
+                      {formatCount(social.counts.followerCount)}
+                    </strong>{" "}
+                    {social.counts.followerCount === 1
+                      ? "follower"
+                      : "followers"}
+                  </span>
+                  <span>
+                    <strong className="font-semibold text-foreground tabular-nums">
+                      {formatCount(social.counts.followingCount)}
+                    </strong>{" "}
+                    following
+                  </span>
+                </p>
+              )}
+            </div>
           </div>
+
+          {!isCurrentUser && (
+            <div className="shrink-0 self-start sm:self-auto">
+              {social.status === "ok" &&
+              social.viewerState.kind === "viewer" ? (
+                <FollowButton
+                  username={profile.username}
+                  targetDisplayName={profile.displayName}
+                  returnTo={`/profile/${profile.username}`}
+                  initialIsFollowing={social.viewerState.isFollowing}
+                  action={setFollowAction}
+                />
+              ) : social.status === "ok" &&
+                social.viewerState.kind === "signed-out" ? (
+                <Link
+                  href={`/auth/sign-in?returnTo=${encodeURIComponent(`/profile/${profile.username}`)}`}
+                  className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-surface-2 px-4 py-2 text-sm font-medium text-foreground/80 transition-colors hover:border-border hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                >
+                  Follow
+                </Link>
+              ) : social.status === "error" ? (
+                <FollowButton
+                  username={profile.username}
+                  targetDisplayName={profile.displayName}
+                  returnTo={`/profile/${profile.username}`}
+                  initialIsFollowing={false}
+                  action={setFollowAction}
+                  available={false}
+                />
+              ) : (
+                <Link
+                  href={`/auth/sign-in?returnTo=${encodeURIComponent(`/profile/${profile.username}`)}`}
+                  className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-surface-2 px-4 py-2 text-sm font-medium text-foreground/80 transition-colors hover:border-border hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                >
+                  Follow
+                </Link>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
@@ -272,13 +346,6 @@ export function RealProfile({
             description="Please try again in a moment."
           />
         )}
-      </ProfileSection>
-
-      <ProfileSection title="More on their Favalog">
-        <EmptyState
-          title="Follows are coming soon."
-          description="Following people isn't wired up to accounts yet."
-        />
       </ProfileSection>
     </Container>
   );

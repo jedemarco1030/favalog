@@ -21,11 +21,11 @@ export const MAX_LIST_TITLE = 150;
 export const MAX_LIST_DESCRIPTION = 2000;
 
 /**
- * The visibility values a user may choose when creating a list this phase.
- * `followers` is deliberately withheld (see {@link ListCreateVisibility}).
+ * The visibility values a user may choose when creating or editing a list.
  */
 export const LIST_CREATE_VISIBILITIES: readonly ListCreateVisibility[] = [
   "public",
+  "followers",
   "private",
 ] as const;
 
@@ -75,7 +75,9 @@ function trimOrNull(value: string | null | undefined): string | null {
 export function normalizeVisibility(
   value: string | null | undefined,
 ): ListCreateVisibility | null {
-  return value === "public" || value === "private" ? value : null;
+  return value === "public" || value === "followers" || value === "private"
+    ? value
+    : null;
 }
 
 /**
@@ -111,7 +113,7 @@ export function validateCreateListInput(
   if (rawVisibility !== null) {
     const normalized = normalizeVisibility(rawVisibility);
     if (normalized === null) {
-      errors.visibility = "Choose either public or private.";
+      errors.visibility = "Choose public, followers, or private.";
     } else {
       visibility = normalized;
     }
@@ -201,7 +203,7 @@ export function validateUpdateListInput(
   if (rawVisibility !== null) {
     const normalized = normalizeVisibility(rawVisibility);
     if (normalized === null) {
-      errors.visibility = "Choose either public or private.";
+      errors.visibility = "Choose public, followers, or private.";
     } else {
       visibility = normalized;
     }

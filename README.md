@@ -13,9 +13,11 @@ backend foundation is in place: **authentication + onboarding**, the
 **persistent title-log lifecycle** (log a title with an optional rating and
 review, then edit or delete it), the **persistent list lifecycle** (create
 a list, add/remove titles, edit list metadata, delete a whole list, view the
-real list, and see it on the owner's profile), and the **persistent favorites
+real list, and see it on the owner's profile), the **persistent favorites
 loop** (favorite/unfavorite a title, and see the ordered shelf on the owner's
-profile) are wired to it, and an authenticated user's **Diary**, **Lists**,
+profile), and the **persistent follow lifecycle and follower-only lists** (follow/unfollow
+users, accurate follower/following counts, and follower-aware list visibility)
+are wired to it, and an authenticated user's **Diary**, **Lists**,
 **Favorites**, and **Profile** now render real Supabase data. A
 **Catalog Platform foundation** is also in place: the backend can now search
 and import (materialize) movies/TV from **TMDB** and books from **Open Library**
@@ -108,9 +110,9 @@ components/
                          ShareListButton) and the shared list view-model/helpers
   reviews/               ReviewCard
   user/                  UserAvatar, ProfileStats, ProfileHeader,
-                         ProfileSection, FavoriteMediaGrid, and the wired
-                         real-profile UI (RealProfile with a real Favorites
-                         section)
+                         ProfileSection, FavoriteMediaGrid, FollowButton, and the wired
+                         real-profile UI (RealProfile with real Favorites,
+                         Follows, and Lists sections)
   skeletons/             Media, activity/feed, and profile skeletons
 
 lib/

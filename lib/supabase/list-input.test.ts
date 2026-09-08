@@ -16,12 +16,13 @@ const UUID = "11111111-1111-1111-1111-111111111111";
 describe("normalizeVisibility", () => {
   it("accepts only the creatable values", () => {
     expect(normalizeVisibility("public")).toBe("public");
+    expect(normalizeVisibility("followers")).toBe("followers");
     expect(normalizeVisibility("private")).toBe("private");
   });
 
-  it("rejects followers and any unknown value", () => {
-    expect(normalizeVisibility("followers")).toBeNull();
+  it("rejects unknown values", () => {
     expect(normalizeVisibility("unlisted")).toBeNull();
+    expect(normalizeVisibility("friends")).toBeNull();
     expect(normalizeVisibility("")).toBeNull();
     expect(normalizeVisibility(null)).toBeNull();
     expect(normalizeVisibility(undefined)).toBeNull();
@@ -80,10 +81,19 @@ describe("validateCreateListInput", () => {
     expect(longDesc.errors.description).toBeTruthy();
   });
 
+  it("accepts followers visibility", () => {
+    const result = validateCreateListInput({
+      title: "Followers Only",
+      visibility: "followers",
+    });
+    expect(result.ok).toBe(true);
+    expect(result.value?.visibility).toBe("followers");
+  });
+
   it("rejects an explicit unknown visibility rather than coercing it", () => {
     const result = validateCreateListInput({
       title: "ok",
-      visibility: "followers",
+      visibility: "unlisted",
     });
     expect(result.ok).toBe(false);
     expect(result.errors.visibility).toBeTruthy();
@@ -179,11 +189,21 @@ describe("validateUpdateListInput", () => {
     expect(longDesc.errors.description).toBeTruthy();
   });
 
-  it("rejects an explicit unknown visibility rather than coercing it", () => {
+  it("accepts followers visibility", () => {
     const result = validateUpdateListInput({
       listId: UUID,
       title: "ok",
       visibility: "followers",
+    });
+    expect(result.ok).toBe(true);
+    expect(result.value?.visibility).toBe("followers");
+  });
+
+  it("rejects an explicit unknown visibility rather than coercing it", () => {
+    const result = validateUpdateListInput({
+      listId: UUID,
+      title: "ok",
+      visibility: "unlisted",
     });
     expect(result.ok).toBe(false);
     expect(result.errors.visibility).toBeTruthy();

@@ -36,6 +36,7 @@ import { getPublicProfileByUsername } from "@/lib/supabase/profiles";
 import { getRealProfileActivity } from "@/lib/supabase/profile-activity";
 import { getRealListsForUser } from "@/lib/supabase/lists";
 import { getRealFavoritesForUser } from "@/lib/supabase/favorites";
+import { getProfileSocial } from "@/lib/supabase/follows";
 import { siteConfig } from "@/lib/site-config";
 
 interface ProfilePageProps {
@@ -142,12 +143,18 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
           // publicly readable (the documented RLS model), so a visitor sees
           // them too. Never inherits mock favorites.
           const favoritesResult = await getRealFavoritesForUser(profile.id);
+          const socialResult = await getProfileSocial(
+            profile.id,
+            profile.username,
+            viewer?.id,
+          );
           return (
             <RealProfile
               profile={profile}
               activity={activityResult.activity}
               lists={listsResult}
               favorites={favoritesResult}
+              social={socialResult}
               isCurrentUser={isCurrentUser}
             />
           );

@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useFormStatus } from "react-dom";
-import { Check, Globe, ListOrdered, Lock, Plus, X } from "lucide-react";
+import { Check, Globe, ListOrdered, Lock, Plus, Users, X } from "lucide-react";
 import {
   initialListItemFormState,
   type CreateListFormState,
@@ -365,8 +365,6 @@ function MembershipRow({
       ? state.message
       : undefined;
 
-  const isPrivate = list.visibility !== "public";
-
   return (
     <form
       action={formAction}
@@ -385,8 +383,10 @@ function MembershipRow({
             </span>
             <span aria-hidden="true">·</span>
             <span className="inline-flex items-center gap-1">
-              {isPrivate ? (
+              {list.visibility === "private" ? (
                 <Lock className="size-3" aria-hidden="true" />
+              ) : list.visibility === "followers" ? (
+                <Users className="size-3" aria-hidden="true" />
               ) : (
                 <Globe className="size-3" aria-hidden="true" />
               )}

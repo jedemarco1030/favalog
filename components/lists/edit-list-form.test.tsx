@@ -51,6 +51,14 @@ describe("EditListForm", () => {
     expect(screen.getByLabelText(/Description/)).toHaveValue("A canon.");
     expect(screen.getByRole("checkbox", { name: /Ranked list/ })).toBeChecked();
     expect(screen.getByRole("radio", { name: /Private/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /Followers/ })).not.toBeChecked();
+    expect(screen.getByRole("radio", { name: /Public/ })).not.toBeChecked();
+  });
+
+  it("pre-fills followers visibility", () => {
+    renderForm({ initial: { ...initial, visibility: "followers" } });
+    expect(screen.getByRole("radio", { name: /Followers/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /Private/ })).not.toBeChecked();
     expect(screen.getByRole("radio", { name: /Public/ })).not.toBeChecked();
   });
 

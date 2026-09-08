@@ -48,6 +48,15 @@ describe("RealListCard", () => {
     expect(screen.getByText("Ranked")).toBeInTheDocument();
   });
 
+  it("surfaces the followers status only when showVisibility is set (owner view)", () => {
+    const followersList = makeList({ visibility: "followers" });
+    const { rerender } = render(<RealListCard list={followersList} />);
+    expect(screen.queryByText("Followers")).not.toBeInTheDocument();
+
+    rerender(<RealListCard list={followersList} showVisibility />);
+    expect(screen.getByText("Followers")).toBeInTheDocument();
+  });
+
   it("surfaces the private status only when showVisibility is set (owner view)", () => {
     const privateList = makeList({ visibility: "private" });
     const { rerender } = render(<RealListCard list={privateList} />);

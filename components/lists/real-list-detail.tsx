@@ -1,11 +1,10 @@
-import { Globe, ListOrdered, Lock } from "lucide-react";
+import { Globe, ListOrdered, Lock, Users } from "lucide-react";
 import { Container } from "@/components/ui/container";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProfileAvatar } from "@/components/user/profile-avatar";
 import { itemCountLabel } from "@/components/lists/list-view";
 import {
   formatUpdatedAt,
-  isPrivateVisibility,
   toCreateVisibility,
   visibilityLabel,
 } from "@/components/lists/real-list-format";
@@ -55,7 +54,6 @@ function mediaSummary(kinds: MediaKind[]): string {
 export function RealListDetail({ list }: RealListDetailProps) {
   const kinds = list.items.map((item) => item.kind);
   const updated = formatUpdatedAt(list.updatedAt);
-  const isPrivate = isPrivateVisibility(list.visibility);
   const returnTo = `/list/${list.slug}`;
 
   return (
@@ -78,8 +76,10 @@ export function RealListDetail({ list }: RealListDetailProps) {
                 <>
                   <span aria-hidden="true">·</span>
                   <span className="inline-flex items-center gap-1 text-foreground/50">
-                    {isPrivate ? (
+                    {list.visibility === "private" ? (
                       <Lock className="size-3" aria-hidden="true" />
+                    ) : list.visibility === "followers" ? (
+                      <Users className="size-3" aria-hidden="true" />
                     ) : (
                       <Globe className="size-3" aria-hidden="true" />
                     )}
