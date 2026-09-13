@@ -257,7 +257,10 @@ export function RealProfile({
         />
       )}
 
+      {/* Stable anchor: the following feed links here as the destination that
+          actually renders this author's reviews. */}
       <ProfileSection
+        id="reviews"
         title="Recent reviews"
         description={reviews.length > 0 ? "In their own words." : undefined}
       >

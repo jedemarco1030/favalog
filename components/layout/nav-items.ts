@@ -11,6 +11,7 @@ export interface NavItem {
 
 export const PRIMARY_NAV: readonly NavItem[] = [
   { href: "/", label: "Home" },
+  { href: "/feed", label: "Feed" },
   { href: "/explore", label: "Explore" },
   { href: "/diary", label: "Diary" },
   { href: "/lists", label: "Lists" },

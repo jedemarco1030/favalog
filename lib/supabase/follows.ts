@@ -37,6 +37,12 @@ async function revalidateFollowWrite(targetUsername: string): Promise<void> {
   const profile = await getCurrentProfile();
   if (profile) revalidatePath(`/profile/${profile.username}`);
   revalidatePath("/lists");
+  // Following is what the feed is derived from: both the dedicated feed and
+  // the Home preview must be re-rendered, so the client Router Cache cannot
+  // replay a followed account's activity after an unfollow (or miss a new
+  // follow's activity) on browser-back or a prefetch.
+  revalidatePath("/feed");
+  revalidatePath("/");
 }
 
 async function requireOnboardedUser(): Promise<
@@ -134,6 +140,31 @@ export async function setFollow(
 // ---------------------------------------------------------------------------
 // Reads
 // ---------------------------------------------------------------------------
+
+/**
+ * How many accounts the CURRENT viewer follows.
+ *
+ * The feed needs to tell two very different truths apart: "you follow nobody"
+ * and "the people you follow haven't logged anything yet". Both produce an
+ * empty page, so the distinction has to be read separately. Returns `null`
+ * when it cannot be determined (unconfigured, signed out, or a failed read) —
+ * never a fabricated zero.
+ */
+export async function getMyFollowingCount(): Promise<number | null> {
+  if (!isSupabaseConfigured()) return null;
+
+  const user = await getCurrentUser();
+  if (!user) return null;
+
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from("follows")
+    .select("*", { count: "exact", head: true })
+    .eq("follower_id", user.id);
+
+  if (error || typeof count !== "number") return null;
+  return count;
+}
 
 export interface ProfileSocialCounts {
   followerCount: number;

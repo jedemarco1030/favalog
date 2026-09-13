@@ -215,11 +215,104 @@ To avoid representing the same rating inconsistently:
   No `review_likes` / `list_likes` tables are added yet; those counts remain
   mock values until a dedicated persistence task, at which point they can be
   modeled securely (owner-scoped rows + a derived count).
-- **Activity.** No generic `activity` table is created. The social feed and
-  profile activity are **derivable** from diary entries, reviews, list
-  create/update, favorites, and follows. A dedicated event table becomes
-  justified only if/when derivation becomes too expensive (e.g. a high-volume
-  fan-out feed needing precomputed timelines) — deferred until then.
+- **Activity.** No generic `activity` table is created, and none was added for
+  the following feed. The feed and profile activity are **derived at read
+  time** from diary entries, reviews, and follows (see
+  [Following feed](#following-feed-derived-from-authoritative-records) below and
+  ADR 0005). A dedicated event table becomes justified only if/when derivation
+  becomes too expensive (e.g. a high-volume fan-out feed needing precomputed
+  timelines) — deferred until then.
+
+## Following feed (derived from authoritative records)
+
+The following feed is the viewer-scoped, chronological record of what the
+accounts they **currently** follow have watched, read, and reviewed. It is
+**derived**, not stored: `diary_entries`, `reviews`, and `follows` are already
+the authoritative, RLS-governed records, so an edit or a delete propagates for
+free and no snapshot can retain a stale excerpt. See
+[ADR 0005](adr/0005-following-feed-derived-from-authoritative-records.md).
+
+### The RPC contract
+
+`public.get_following_feed(p_limit, p_cursor_created_at, p_cursor_source,
+p_cursor_id)` (migration `20260815120900_following_feed.sql`, the 29th) returns
+one bounded page and follows exactly the same security model as `set_follow`:
+
+- `SECURITY INVOKER` — **no privilege escalation.** Every source table is
+  public-read under RLS, so the function needs none; following is an
+  _additional selection condition_, never a bypass. RLS stays an independent
+  second boundary and no service-role access is involved.
+- A pinned empty `search_path`, fully schema-qualified objects, no dynamic SQL.
+- `EXECUTE` revoked from `public`/`anon`, granted to `authenticated`.
+- **Viewer identity is `auth.uid()` only.** No caller-supplied viewer id
+  exists in the signature; an anonymous caller is rejected.
+- Eligibility: a row must belong to an account the caller currently follows
+  (`public.follows`) **and** must not be the caller's own
+  (explicit belt-and-braces exclusion).
+- The return columns are public identity, canonical media references,
+  authorized activity fields, and a bounded review body (`left(body, 600)`) —
+  never auth metadata, emails, or private list data.
+
+### Deduplication, wording, and ordering
+
+- **The diary entry is the activity unit.** The diary arm left-joins its linked
+  review so a log-plus-review is **one** row; the review arm takes only
+  standalone reviews (`diary_entry_id is null`). Because the deduplication
+  happens in SQL, it cannot be defeated at a page boundary.
+- Ratings resolve from the diary entry (the established source of truth).
+- Wording is source-backed only — _watched / rewatched / read / reread_ from
+  `deriveDiaryAction(kind, is_revisit)`, and _reviewed_ for a standalone
+  review. Nothing is ever inferred as "started" or "finished", and a rating
+  alone never implies completion.
+- **Total order `(created_at desc, source_rank asc, id desc)`** with
+  `source_rank` 0 for diary and 1 for review. This is unique and stable even
+  when two rows of different source types share a timestamp. `created_at` is
+  immutable (`set_updated_at` touches only `updated_at`), so editing an entry
+  never bumps its position; `logged_at` is displayed separately when the entry
+  was genuinely backdated.
+
+### Cursor and pagination
+
+- The cursor is `v1:<iso-with-microseconds>:<diary|review>:<uuid>`, encoded and
+  validated by the pure `lib/supabase/feed-cursor.ts`. The raw database
+  timestamp string is carried through, so microsecond precision is never lost
+  to a round-tripped JavaScript `Date`.
+- A cursor is a **position, never authorization**. Every page re-derives
+  `auth.uid()` and re-joins `follows` server-side, so unfollowing between page
+  one and page two removes that account from page two (asserted in pgTAP and
+  end to end).
+- `p_limit` is clamped in SQL (`1..50`) and again in the reader
+  (`FEED_MAX_PAGE_SIZE = 25`); eligibility and ordering are applied **before**
+  the limit. The reader requests `limit + 1` rows so the end of the feed is
+  detected from real data instead of guessed.
+- Supporting indexes: `diary_entries (user_id, created_at desc, id desc)` and a
+  partial `reviews (user_id, created_at desc, id desc) where diary_entry_id is
+null` — they match the seek order, so a page is an index scan per followed
+  account rather than a sort of the whole graph.
+
+### Application boundary
+
+- `lib/supabase/feed.ts` (`server-only`) exposes `getFollowingFeedPage` and
+  `getFollowingFeedPreview`, returning the usual
+  `unavailable | signed-out | error | ok` discriminated result. It uses **only**
+  the per-request SSR client — no `unstable_cache`, no cross-request
+  memoization — because the read is viewer-specific. It never substitutes mock
+  activity: an unconfigured environment is `unavailable` and a failed read is
+  `error`.
+- `feed-view-model.ts` (pure) maps rows to `FeedActivityView`;
+  `feed-errors.ts` maps database errors to safe messages.
+- `app/feed/page.tsx` renders page one plus each distinct state, and
+  `app/feed/actions.ts` (`loadMoreFeedAction`) is treated as a public endpoint:
+  it re-validates the user through the auth DAL and re-validates the cursor.
+- Follow writes and diary/review create-edit-delete revalidate `/feed` and `/`,
+  so the client Router Cache cannot replay a stale feed after browser-back or a
+  prefetch, and the client list is keyed by viewer identity so switching
+  accounts remounts it with empty state. Refreshing honestly restarts at the
+  newest activity — no frozen snapshot is promised.
+- **Spoilers are genuinely concealed.** `components/feed/spoiler-excerpt.tsx`
+  does not render spoiler-marked text at all until the reader activates an
+  accessible `aria-expanded` control, replacing the previous
+  stored-but-never-hidden behaviour.
 
 ## Catalog strategy
 

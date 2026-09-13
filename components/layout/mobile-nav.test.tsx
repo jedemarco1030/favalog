@@ -17,6 +17,10 @@ describe("MobileNav", () => {
     const explore = screen.getByRole("link", { name: "Explore" });
     expect(explore).toHaveAttribute("href", "/explore");
     expect(explore).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Feed" })).toHaveAttribute(
+      "href",
+      "/feed",
+    );
     expect(screen.getByRole("link", { name: "Diary" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Lists" })).toBeInTheDocument();
   });

@@ -92,6 +92,13 @@ export default defineConfig({
         "lib/browse/log.ts",
         "lib/supabase/browse.ts",
         "lib/supabase/browse-view-model.ts",
+        // Following feed: the pure cursor / view-model / error mapping plus the
+        // server read layer, all directly unit-tested (the Supabase RPC client
+        // and auth DAL are injected, like the browse service above).
+        "lib/supabase/feed-cursor.ts",
+        "lib/supabase/feed-view-model.ts",
+        "lib/supabase/feed-errors.ts",
+        "lib/supabase/feed.ts",
         // Aggregate product-analytics adapter (pure builders + coarse buckets +
         // never-throw emit) and the pure analytics-URL redactor, both directly
         // unit-tested.
@@ -149,6 +156,13 @@ export default defineConfig({
         "components/lists/list-view.ts",
         "components/layout/mobile-nav.tsx",
         "components/layout/nav-items.ts",
+        // Following feed UI: the card's link safety, the genuine spoiler
+        // concealment, and the client pagination list, all directly tested.
+        // The server-rendered `/feed` states are presentational and are
+        // verified through Playwright instead.
+        "components/feed/feed-card.tsx",
+        "components/feed/spoiler-excerpt.tsx",
+        "components/feed/feed-list.tsx",
       ],
       exclude: [
         "**/*.stories.{ts,tsx}",

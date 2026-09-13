@@ -17,6 +17,11 @@
  * There is deliberately NO flag that permits a hosted target.
  *
  * Usage: node scripts/run-e2e-local.mjs <configured|fixtures|fixtures-prod-reject>
+ *        [...extra playwright args]
+ *
+ * Any extra arguments are forwarded verbatim to `playwright test`, so a single
+ * spec or test title can be re-run without executing the whole suite (for
+ * example `node scripts/run-e2e-local.mjs configured feed.spec.ts`).
  */
 
 import { spawnSync } from "node:child_process";
@@ -53,5 +58,10 @@ console.log(
 console.log(`[e2e local] Building against local Supabase…`);
 run("npm", ["run", "build"]);
 
-console.log(`[e2e local] Running Playwright suite "${suite}"…`);
-run("npx", ["playwright", "test"]);
+const playwrightArgs = process.argv.slice(3);
+console.log(
+  `[e2e local] Running Playwright suite "${suite}"` +
+    (playwrightArgs.length > 0 ? ` (${playwrightArgs.join(" ")})` : "") +
+    `…`,
+);
+run("npx", ["playwright", "test", ...playwrightArgs]);

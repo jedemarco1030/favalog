@@ -1,6 +1,6 @@
 # Favalog product roadmap
 
-> Living document. Last reconciled: 2026-09-01, against the verified production
+> Living document. Last reconciled: 2026-09-13, against the verified production
 > state below. Update this file whenever a phase ships, a capability becomes
 > production-verified, or the agreed sequence changes. When a statement is only
 > true at a point in time, keep it and date it rather than deleting the history.
@@ -29,17 +29,22 @@ experience and eventually a social layer built around that record.
 
 ## Verified production baseline (2026-09-01)
 
-These facts are the source of truth for reconciling other documentation. Where a
-number differs between the local repository and hosted production, both are
-stated explicitly.
+These facts are the source of truth for reconciling other documentation. The
+counts and migration-ledger observations below are point-in-time evidence
+recorded on **2026-09-01**, not current measurements; where a number differs
+between the local repository and hosted production, both are stated explicitly.
 
-- The hosted database has all **25 migrations through `20260815120600`** applied.
+- The hosted database had all **25 migrations through `20260815120600`** applied
+  in the **2026-09-01 migration-ledger observation**.
 - The **local** curated catalog migration
-  (`20260806160100_catalog_media_items.sql`) owns **28** curated titles.
-- The **hosted production** catalog contains **29** titles: the 28 curated
+  (`20260806160100_catalog_media_items.sql`) owned **28** curated titles in the
+  **2026-09-01 repository observation**.
+- The **hosted production** catalog contained **29** titles in the
+  **2026-09-01 production observation**: the 28 curated
   titles plus the imported Open Library Work `OL893414W`, which resolves to the
   canonical **Dune** title via on-demand materialization.
-- The compatible OpenAI embedding corpus in production contains **29** documents
+- The compatible OpenAI embedding corpus in production contained **29** documents
+  in that **2026-09-01 production observation**
   (provider `openai`, model `text-embedding-3-small`, `dimensions: 512`,
   document version `v1`).
 - Open Library federation and canonical on-demand materialization are
@@ -50,6 +55,15 @@ stated explicitly.
   stay disabled until the owner confirms AI-use permission from TMDB.
 - Authentication, diary entries, lists, favorites, profiles, and external
   materialization all use real Supabase persistence.
+
+### Owner-provided TMDB clarification
+
+The owner has provided evidence that TMDB staff support periodically refreshed
+cached metadata and embeddings for semantic search. This is architectural
+context, not activation permission for Favalog: TMDB activation remains
+pending, `TMDB_ENABLED` remains **false**, and the refresh implementation is
+deferred to a separate task. No provider flags are changed by this
+reconciliation.
 
 ## Current production capabilities
 
@@ -68,6 +82,11 @@ stated explicitly.
   enables follow/unfollow by canonical username, live follower/following profile counts,
   and follower-aware Row Level Security on lists and list items (`public`, `followers`, `private`).
   Unfollowing immediately revokes access to follower-only lists.
+- **Phase 4B.1 production verification (owner-confirmed)** — the complete flow
+  was verified in production: community list → creator profile → follow →
+  follower-only list access → unfollow → the list disappears and its direct URL
+  becomes inaccessible. The creator-navigation patch used by this flow was also
+  production-verified.
 - **Real profiles** — derived stats, recently watched/read, real reviews, real
   lists and favorites; mock demo usernames still render mock profiles, unknown
   usernames `notFound()`, and a real profile never inherits mock data.
@@ -80,34 +99,81 @@ stated explicitly.
   (`media_external_ids`), federated Explore sections, and trusted on-demand
   materialization. Open Library is enabled and production-verified; TMDB is
   gated off.
+- **Catalog browsing and genre remediation** — Explore's real server-backed
+  browse mode (media-type and genre filters, global sorts, bounded pagination,
+  and validated shareable URL state) and the canonical book-genre taxonomy are
+  deployed and verified. Browse filtering and displayed title genres share the
+  same remediated vocabulary.
 - **No-environment resilience** — the app builds and renders with no Supabase or
   provider environment variables; curated demo content is clearly labelled as an
   example catalog and never presented as live production activity.
 
+## Phase 4B.2 — Real following feed and honest Home activity (implemented locally)
+
+**Status: implemented locally and verified on seeded local Supabase; NOT yet
+applied to hosted Supabase and NOT production-verified.** Migration
+`20260815120900_following_feed.sql` (the 29th) has been applied to the local
+database only; the hosted rollout is owner-controlled and has not been
+performed.
+
+What is implemented:
+
+- `public.get_following_feed(...)` — a `SECURITY INVOKER` RPC with a pinned
+  empty `search_path`, fully schema-qualified, `EXECUTE` revoked from
+  `public`/`anon` and granted to `authenticated`. Viewer identity comes only
+  from `auth.uid()`; no caller-supplied viewer id is accepted, and source RLS
+  remains an independent boundary. The follows join, self-exclusion,
+  linked-review deduplication, total ordering, keyset seek, and page-size clamp
+  all happen in SQL, so one bounded page crosses the boundary.
+- A server-only read layer (`lib/supabase/feed.ts`, `feed-cursor.ts`,
+  `feed-view-model.ts`, `feed-errors.ts`) returning the usual
+  `unavailable | signed-out | error | ok` result, with a validated versioned
+  cursor and a `limit + 1` end-of-feed probe. Viewer-specific reads use only
+  the per-request SSR client — no shared cache.
+- A `/feed` route (server-rendered first page plus a "Load more" Server
+  Action), a `Feed` primary-nav entry, and a Home `FollowingFeedPreview`
+  reading the same reader, with "View all" pointing at `/feed`.
+- **Genuine spoiler concealment** — spoiler-marked review text is not rendered
+  until the reader activates an accessible `aria-expanded` reveal control.
+  Previously `contains_spoilers` was stored but only italicised.
+- **Home truthfulness** — "Trending this week", "Popular reviews", and
+  "Because you liked …" are gone in configured mode (no trending, likes, or
+  recommendation machinery was built to justify them). One honest
+  "Explore the catalog" shelf uses the existing real `browseCatalog` reader and
+  is omitted entirely when that read is unavailable or fails. A configured read
+  failure is reported, never replaced with mock activity. No-environment mode
+  keeps clearly labelled example content.
+
+Deliberately not built: an event store, fan-out-on-write, queues, or content
+snapshots (see ADR 0005); list activity, favorites, follow announcements,
+likes, comments, notifications; inferred "started"/"finished" events; trending
+or recommendation algorithms; follow-time cutoffs.
+
+**Local verification actually performed** (2026-09-13): `supabase db reset`,
+`supabase test db` (15 files / 443 assertions, including
+`following_feed_rpc.test.sql`), regenerated database types with no drift,
+lint, typecheck, 1276 unit/component tests, coverage, configured and no-env
+production builds, the Storybook build, and all four Playwright suites —
+including the new seeded multi-user journey `e2e/feed.spec.ts` (follow →
+Home preview → `/feed` → pagination without duplicates → edit → delete →
+unfollow → revocation across pages → no leakage when signed out or on another
+account).
+
 ## Remaining gaps
 
-- Most consumer product pages (Home, community reviews) still render from the
-  `@/lib/data` mock layer rather than real Supabase reads.
-- Remaining social graph features: feeds, likes on reviews/lists, notifications,
-  comments, blocking, private accounts, and follower directories remain deferred.
-- No games surface.
-- No personalized recommendations; discovery is retrieval-only, not
-  personalized or generative.
-- Light/dark/system theming is implemented and verified in the repository
-  (2026-09-01) but is not yet deployed to production; hosted production remains
-  dark-only until the next deploy.
-- Explore now has a real server-backed global _browse_ mode (media-type + genre
-  filters, five global sorts, bounded pagination, shareable validated URL state)
-  over the real `public.media_items` catalog, alongside the existing hybrid
-  _search_. It is implemented and verified in-repo (2026-09-01) but not yet
-  deployed to production, and gracefully degrades to the labelled example
-  shelves when Supabase is unconfigured.
+- Community reviews still render from the `@/lib/data` mock layer rather than
+  real Supabase reads. Home's activity is now real (Phase 4B.2), but there is
+  no community-review system behind it.
+- Phase 4B.2 is local-only: migration `20260815120900` has not been applied to
+  hosted Supabase, so the following feed is not yet available in production.
+- Comments, blocking, private accounts, and follower directories remain
+  deferred.
 - Growth, monetization, and portfolio-packaging work has not started.
 
 ## Agreed phase sequence
 
-1. **Product Reality and Discovery UX** — real server-backed catalog browsing,
-   sorting, filtering, pagination, theming, and truthful documentation.
+1. **Product Reality and Discovery UX (delivered)** — real server-backed catalog
+   browsing, sorting, filtering, pagination, theming, and truthful documentation.
 2. **Social Graph and Network Loops** — follows, follower-aware visibility,
    likes, notifications, and the social feedback loops around the personal
    record.
@@ -132,20 +198,36 @@ stated explicitly.
 | 6. Growth & Monetization          | A sustainable, growing product.                                             | Acquisition, retention, and billing infrastructure done safely.                                                      | Shows business and growth literacy.                                             | A credible, fundable brand story.                           |
 | 7. Portfolio Packaging            | A clearly communicated body of work.                                        | Reproducible writeups and demos.                                                                                     | A strong, honest portfolio artifact.                                            | Consistent, professional external presentation.             |
 
-## Explicit non-goals for the current phase (Phase 1 — Product Reality)
+## Historical non-goals for Phase 1 — Product Reality
 
-The current phase deliberately excludes:
+The original Phase 1 scope deliberately excluded:
 
 - Migrating Home, community reviews, follows, likes, notifications, games, or
   recommendations off mock data.
-- Any social graph work (follows, follower-aware visibility, likes,
-  notifications).
 - Games, generative AI (LLM-written text/chat/agents), billing/monetization,
   background queues, Kubernetes, or new catalog providers.
 - Enabling TMDB or adding TMDB titles to the OpenAI embedding corpus.
 - Any hosted mutation, Vercel variable change, deployment, or production
   re-embedding.
-- Drag-and-drop / arbitrary reordering, curator notes, or a follows UI.
+- Drag-and-drop / arbitrary reordering or curator notes.
+
+The follow lifecycle and follower-only list visibility are no longer non-goals:
+they were delivered and production-verified in Phase 4B.1. The separate Phase
+4B.2 feed and Home-activity work is implemented locally (see above) and awaits
+the owner-controlled hosted rollout.
+
+## Explicitly deferred work
+
+The following remain deferred and are not implied by the Phase 4B.1 delivery or
+the locally implemented Phase 4B.2 feed:
+
+- TMDB activation and the owner-controlled refresh implementation for cached
+  metadata and embeddings; `TMDB_ENABLED` remains **false**.
+- Likes on reviews or lists.
+- Notifications.
+- Moderation.
+- Games.
+- Personalized discovery and recommendation algorithms.
 
 ## Success measures
 

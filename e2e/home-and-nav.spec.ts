@@ -22,6 +22,24 @@ test.describe("Home and navigation", () => {
     ).toBeVisible();
   });
 
+  test("homepage makes no fabricated popularity or personalization claim", async ({
+    page,
+  }) => {
+    await page.goto("/");
+
+    // Favalog has no trending signal, no likes, and no recommendation engine,
+    // so Home never claims any of them — in either configured or no-env mode.
+    await expect(
+      page.getByRole("heading", { name: "Trending this week" }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { name: "Popular reviews" }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { name: /^Because you liked/ }),
+    ).toHaveCount(0);
+  });
+
   test("navigates from Home to Explore", async ({ page }) => {
     await page.goto("/");
 

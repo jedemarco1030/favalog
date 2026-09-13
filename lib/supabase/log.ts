@@ -66,6 +66,13 @@ async function revalidateDiaryWrite(slug: string | null): Promise<void> {
   if (profile) {
     revalidatePath(`/profile/${profile.username}`);
   }
+  // The following feed is DERIVED from these records, so a create, edit, or
+  // delete must also refresh the feed and the Home preview — otherwise the
+  // Router Cache could replay a deleted entry or a stale review excerpt on
+  // browser-back or a prefetch. (Only the author's own followers see it; the
+  // paths are static, so no other user's route is revalidated.)
+  revalidatePath("/feed");
+  revalidatePath("/");
 }
 
 interface LogMediaRpcResult {

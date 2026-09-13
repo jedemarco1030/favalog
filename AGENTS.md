@@ -100,6 +100,7 @@ Book`. Keep shared fields in `MediaItemBase`; keep media-specific fields in
 Current primary routes:
 
 - `/`
+- `/feed`
 - `/explore`
 - `/diary`
 - `/lists`

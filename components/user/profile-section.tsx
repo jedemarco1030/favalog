@@ -3,6 +3,8 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { cn } from "@/lib/cn";
 
 interface ProfileSectionProps {
+  /** Optional stable anchor id, so other surfaces can link to this section. */
+  id?: string;
   title: string;
   description?: string;
   /** Optional trailing link, e.g. "Browse all lists". */
@@ -22,6 +24,7 @@ interface ProfileSectionProps {
  * readers structure.
  */
 export function ProfileSection({
+  id,
   title,
   description,
   href,
@@ -30,7 +33,7 @@ export function ProfileSection({
   className,
 }: ProfileSectionProps) {
   return (
-    <section className={cn(className)}>
+    <section id={id} className={cn(className)}>
       <SectionHeader
         as="h2"
         title={title}

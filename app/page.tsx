@@ -6,6 +6,13 @@ import { MediaPoster } from "@/components/media/media-poster";
 import { ActivityCard } from "@/components/activity/activity-card";
 import { ReviewCard } from "@/components/reviews/review-card";
 import { SectionHeader } from "@/components/ui/section-header";
+import { FeedCard } from "@/components/feed/feed-card";
+import {
+  FeedErrorState,
+  FeedNoActivityState,
+  FeedNoFollowsState,
+  FeedSignedOutState,
+} from "@/components/feed/feed-states";
 import {
   activity,
   books,
@@ -17,6 +24,13 @@ import {
   tvShows,
 } from "@/lib/data";
 import type { MediaItem } from "@/lib/types";
+import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { getFollowingFeedPreview } from "@/lib/supabase/feed";
+import { getMyFollowingCount } from "@/lib/supabase/follows";
+import { browseCatalog } from "@/lib/supabase/browse";
+
+/** How many real catalog titles the honest "Explore the catalog" shelf shows. */
+const CATALOG_SHELF_SIZE = 10;
 
 /**
  * Pick a small, deterministic mix of movie / TV / book artwork for the
@@ -28,7 +42,7 @@ function heroCollage(): MediaItem[] {
   return [...pick(movies, 2), ...pick(tvShows, 2), ...pick(books, 2)];
 }
 
-function trendingThisWeek(): MediaItem[] {
+function exampleTrending(): MediaItem[] {
   // Interleave kinds so the row visibly mixes movies / TV / books.
   const zipped: MediaItem[] = [];
   const max = Math.max(movies.length, tvShows.length, books.length);
@@ -40,20 +54,19 @@ function trendingThisWeek(): MediaItem[] {
   return zipped.slice(0, 10);
 }
 
-export default function HomePage() {
+/**
+ * Home.
+ *
+ * Configured mode is truthful: the only activity shown is the real following
+ * feed preview, and the only catalog shelf is the real catalog. Favalog has no
+ * trending signal, no likes, and no recommendation engine, so Home makes no
+ * such claim — those sections exist only as clearly labelled examples in a
+ * no-environment/demo build. A configured read failure is reported, never
+ * papered over with mock activity. The decorative hero is unchanged.
+ */
+export default async function HomePage() {
   const collage = heroCollage();
-  const trending = trendingThisWeek();
-  const circle = activity.slice(0, 6);
-  const popularReviews = [...reviews]
-    .sort((a, b) => b.likeCount - a.likeCount)
-    .slice(0, 4);
-  const shelf = recommendationShelves[0];
-  const seed = shelf ? getMediaById(shelf.seedMediaId) : undefined;
-  const recommendations = shelf
-    ? shelf.mediaIds
-        .map((id) => getMediaById(id))
-        .filter((m): m is MediaItem => Boolean(m))
-    : [];
+  const configured = isSupabaseConfigured();
 
   return (
     <>
@@ -129,98 +142,13 @@ export default function HomePage() {
         </Container>
       </section>
 
-      {/* Trending this week — mixed movies, TV, and books in one row. */}
-      <Container className="py-16">
-        <section aria-label="Trending this week">
-          <SectionHeader
-            title="Trending this week"
-            description="Movies, shows, and books people can't stop talking about."
-            href="/explore"
-            linkLabel="Explore"
-            as="h2"
-          />
-          <ul
-            role="list"
-            className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 lg:grid-cols-5"
-          >
-            {trending.map((item, index) => (
-              <li key={item.id}>
-                <MediaCard item={item} priority={index === 0} />
-              </li>
-            ))}
-          </ul>
-        </section>
-      </Container>
-
-      {/* From your circle */}
-      <Container className="pb-16">
-        <section aria-label="From your circle">
-          <SectionHeader
-            title="From your circle"
-            description="What the people you follow are watching, reading, and rating."
-            href="/diary"
-            linkLabel="View all"
-            as="h2"
-          />
-          <ul role="list" className="grid gap-3 sm:grid-cols-2">
-            {circle.map((entry) => {
-              const user = getUserById(entry.userId);
-              const media = getMediaById(entry.mediaId);
-              if (!user || !media) return null;
-              return (
-                <li key={entry.id}>
-                  <ActivityCard activity={entry} user={user} media={media} />
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      </Container>
-
-      {/* Popular reviews */}
-      <Container className="pb-16">
-        <section aria-label="Popular reviews">
-          <SectionHeader
-            title="Popular reviews"
-            description="Recent writing across films, series, and books."
-            as="h2"
-          />
-          <ul role="list" className="grid gap-4 md:grid-cols-2">
-            {popularReviews.map((review) => {
-              const user = getUserById(review.userId);
-              const media = getMediaById(review.mediaId);
-              if (!user || !media) return null;
-              return (
-                <li key={review.id}>
-                  <ReviewCard review={review} user={user} media={media} />
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      </Container>
-
-      {/* Because you liked … */}
-      {seed && recommendations.length > 0 && (
-        <Container className="pb-16">
-          <section aria-label={`Because you liked ${seed.title}`}>
-            <SectionHeader
-              title={`Because you liked ${seed.title}`}
-              description="A mix of films, series, and books that tend to travel with it."
-              as="h2"
-            />
-            <ul
-              role="list"
-              className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 lg:grid-cols-5"
-            >
-              {recommendations.map((item) => (
-                <li key={item.id}>
-                  <MediaCard item={item} />
-                </li>
-              ))}
-            </ul>
-          </section>
-        </Container>
+      {configured ? (
+        <>
+          <FollowingFeedPreview />
+          <ExploreCatalogShelf />
+        </>
+      ) : (
+        <ExampleSections />
       )}
 
       {/* Discovery / profile CTA */}
@@ -252,6 +180,207 @@ export default function HomePage() {
           </div>
         </section>
       </Container>
+    </>
+  );
+}
+
+/**
+ * The real following feed preview — the same read `/feed` uses, with a smaller
+ * bound, so Home can never disagree with the feed. Every state is told
+ * truthfully and mock activity is never substituted for a failed read.
+ */
+async function FollowingFeedPreview() {
+  const page = await getFollowingFeedPreview();
+  // `unavailable` cannot happen here (this section only renders when Supabase
+  // is configured), but it is handled as an error rather than as emptiness.
+
+  return (
+    <Container className="py-16">
+      <section aria-label="From your circle">
+        <SectionHeader
+          title="From your circle"
+          description="What the people you follow are watching, reading, and rating."
+          href="/feed"
+          linkLabel="View all"
+          as="h2"
+        />
+        {page.status === "signed-out" ? (
+          <FeedSignedOutState returnTo="/feed" />
+        ) : page.status === "ok" ? (
+          page.items.length > 0 ? (
+            <ul role="list" className="grid gap-3 sm:grid-cols-2">
+              {page.items.map((item) => (
+                <li key={item.key}>
+                  <FeedCard item={item} />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <FollowingFeedEmptyState />
+          )
+        ) : (
+          <FeedErrorState retryHref="/" />
+        )}
+      </section>
+    </Container>
+  );
+}
+
+/** An empty feed has two different causes; read the real relationship count. */
+async function FollowingFeedEmptyState() {
+  const followingCount = await getMyFollowingCount();
+  return followingCount === 0 ? (
+    <FeedNoFollowsState />
+  ) : (
+    <FeedNoActivityState />
+  );
+}
+
+/**
+ * The one honest catalog shelf: the real `media_items` catalog through the
+ * existing browse reader. No popularity claim is made, and when the read is
+ * unavailable or fails the shelf is simply omitted — never mock-substituted.
+ */
+async function ExploreCatalogShelf() {
+  const outcome = await browseCatalog({ sort: "recently_added" });
+  if (outcome.status !== "ok" || outcome.items.length === 0) return null;
+  const items = outcome.items.slice(0, CATALOG_SHELF_SIZE);
+
+  return (
+    <Container className="pb-16">
+      <section aria-label="Explore the catalog">
+        <SectionHeader
+          title="Explore the catalog"
+          description="Movies, shows, and books in Favalog's catalog, most recently added first."
+          href="/explore"
+          linkLabel="Browse all"
+          as="h2"
+        />
+        <ul
+          role="list"
+          className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 lg:grid-cols-5"
+        >
+          {items.map((item) => (
+            <li key={item.id}>
+              <MediaCard item={item} />
+            </li>
+          ))}
+        </ul>
+      </section>
+    </Container>
+  );
+}
+
+/**
+ * No-environment/demo mode only: clearly labelled example content so the
+ * landing page still demonstrates the product without a live Favalog. None of
+ * it is presented as real popularity, activity, or personalization.
+ */
+function ExampleSections() {
+  const trending = exampleTrending();
+  const circle = activity.slice(0, 6);
+  const popularReviews = [...reviews]
+    .sort((a, b) => b.likeCount - a.likeCount)
+    .slice(0, 4);
+  const shelf = recommendationShelves[0];
+  const seed = shelf ? getMediaById(shelf.seedMediaId) : undefined;
+  const recommendations = shelf
+    ? shelf.mediaIds
+        .map((id) => getMediaById(id))
+        .filter((m): m is MediaItem => Boolean(m))
+    : [];
+
+  return (
+    <>
+      <Container className="py-16">
+        <section aria-label="Example titles">
+          <SectionHeader
+            title="Example titles"
+            description="Sample movies, shows, and books shown while no Favalog environment is connected."
+            href="/explore"
+            linkLabel="Explore"
+            as="h2"
+          />
+          <ul
+            role="list"
+            className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 lg:grid-cols-5"
+          >
+            {trending.map((item, index) => (
+              <li key={item.id}>
+                <MediaCard item={item} priority={index === 0} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      </Container>
+
+      <Container className="pb-16">
+        <section aria-label="Example activity">
+          <SectionHeader
+            title="Example activity"
+            description="An illustration of how a following feed looks. Nobody here is a real Favalog account."
+            href="/feed"
+            linkLabel="View all"
+            as="h2"
+          />
+          <ul role="list" className="grid gap-3 sm:grid-cols-2">
+            {circle.map((entry) => {
+              const user = getUserById(entry.userId);
+              const media = getMediaById(entry.mediaId);
+              if (!user || !media) return null;
+              return (
+                <li key={entry.id}>
+                  <ActivityCard activity={entry} user={user} media={media} />
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      </Container>
+
+      <Container className="pb-16">
+        <section aria-label="Example reviews">
+          <SectionHeader
+            title="Example reviews"
+            description="Sample writing across films, series, and books."
+            as="h2"
+          />
+          <ul role="list" className="grid gap-4 md:grid-cols-2">
+            {popularReviews.map((review) => {
+              const user = getUserById(review.userId);
+              const media = getMediaById(review.mediaId);
+              if (!user || !media) return null;
+              return (
+                <li key={review.id}>
+                  <ReviewCard review={review} user={user} media={media} />
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      </Container>
+
+      {seed && recommendations.length > 0 && (
+        <Container className="pb-16">
+          <section aria-label="Example related titles">
+            <SectionHeader
+              title="Example related titles"
+              description={`A sample mix that tends to travel with ${seed.title}.`}
+              as="h2"
+            />
+            <ul
+              role="list"
+              className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 lg:grid-cols-5"
+            >
+              {recommendations.map((item) => (
+                <li key={item.id}>
+                  <MediaCard item={item} />
+                </li>
+              ))}
+            </ul>
+          </section>
+        </Container>
+      )}
     </>
   );
 }

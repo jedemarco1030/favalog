@@ -9,6 +9,7 @@ import {
   ListChecks,
   NotebookPen,
   Search,
+  Users,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -18,13 +19,14 @@ import { cn } from "@/lib/cn";
 
 const TAB_ICON: Record<string, LucideIcon> = {
   "/": Home,
+  "/feed": Users,
   "/explore": Compass,
   "/diary": NotebookPen,
   "/lists": ListChecks,
 };
 
 /**
- * Mobile-only bottom tab bar: one tap to Home, Explore, Diary, or Lists,
+ * Mobile-only bottom tab bar: one tap to Home, Feed, Explore, Diary, or Lists,
  * plus a Search tab that opens a full-screen search sheet. This is a
  * dedicated pattern for a social entertainment app rather than a
  * compressed version of the desktop nav — notifications and the profile

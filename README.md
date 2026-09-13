@@ -79,7 +79,7 @@ run `nvm use` before invoking the npm scripts.
 ```
 app/                     App Router routes, layouts, and global styles
   layout.tsx             Root layout — fonts, metadata, header, footer
-  page.tsx               Home page (hero collage, Trending this week, From your circle, Popular reviews, Because you liked …, and a Build your Favalog CTA)
+  page.tsx               Home page (hero collage; configured: the real From your circle following preview + an Explore the catalog shelf; no-env: clearly labelled example sections; Build your Favalog CTA)
   globals.css            Tailwind entry + design tokens
   explore/page.tsx       Explore — search, media-type filter, and editorial shelves
   diary/page.tsx         Diary — unified newest-first log of watched / read titles with a media-type filter
@@ -848,10 +848,15 @@ profile experiences**:
   distinct from the display title; `User` carries a stable `username`,
   distinct from the display name)
 - Mock data layer at `lib/data`
-- Home page composed of a hero (with a mixed movie / TV / book collage),
-  a unified **Trending this week** row, a **From your circle** social feed,
-  a **Popular reviews** section, a **Because you liked …** cross-media
-  recommendation preview, and a closing **Build your Favalog** CTA
+- Home page composed of a hero (with a mixed movie / TV / book collage) and,
+  when Supabase is configured, only truthful sections: the real **From your
+  circle** following-feed preview (`getFollowingFeedPreview`, "View all" →
+  `/feed`) with its distinct signed-out / following-nobody / no-activity /
+  error states, plus one honest **Explore the catalog** shelf from the real
+  browse reader (omitted when it reports unavailable or error — mock activity
+  is never substituted). Trending / popular / "Because you liked …" claims are
+  gone; in a no-environment build the mock rows remain as clearly labelled
+  **Example** sections. A closing **Build your Favalog** CTA ends the page.
 
 ### Primary navigation
 

@@ -496,6 +496,34 @@ export type Database = {
       }
       delete_diary_entry: { Args: { p_diary_entry_id: string }; Returns: Json }
       delete_list: { Args: { p_list_id: string }; Returns: Json }
+      get_following_feed: {
+        Args: {
+          p_cursor_created_at?: string
+          p_cursor_id?: string
+          p_cursor_source?: string
+          p_limit?: number
+        }
+        Returns: {
+          activity_id: string
+          actor_avatar_url: string
+          actor_display_name: string
+          actor_username: string
+          contains_spoilers: boolean
+          created_at: string
+          is_revisit: boolean
+          logged_at: string
+          media_kind: string
+          media_poster_url: string
+          media_slug: string
+          media_title: string
+          media_year: number
+          rating: number
+          review_body: string
+          review_id: string
+          review_title: string
+          source: string
+        }[]
+      }
       hybrid_search: {
         Args: {
           p_dimensions: number
