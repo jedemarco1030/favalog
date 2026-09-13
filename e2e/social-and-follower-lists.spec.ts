@@ -121,7 +121,7 @@ test.describe
       );
 
       // -----------------------------------------------------------------------
-      // Step 2: User B signs in and visits User A's profile
+      // Step 2: User B signs in, discovers User A via Community lists, and opens profile
       // -----------------------------------------------------------------------
       await pageB.goto("/auth/sign-in");
       await pageB.getByLabel("Email").fill(SOCIAL_USER_B.email);
@@ -129,7 +129,35 @@ test.describe
       await pageB.getByRole("button", { name: "Sign in" }).click();
       await expect(pageB).not.toHaveURL(/\/auth\/sign-in/);
 
-      await pageB.goto(`/profile/${SOCIAL_USER_A.username}`);
+      // Start discovery from Community lists (not a manually entered profile URL)
+      await pageB.goto("/lists");
+      const communitySection = pageB.locator("section", {
+        has: pageB.getByRole("heading", { level: 2, name: "Community lists" }),
+      });
+      await expect(communitySection).toBeVisible();
+
+      // Find User A's public list card in Community lists
+      const listCard = communitySection.locator("article", {
+        has: pageB.getByRole("heading", {
+          level: 3,
+          name: "A Public Collection",
+        }),
+      });
+      await expect(listCard).toBeVisible();
+
+      // Click User A's creator attribution link on the list card
+      const creatorLink = listCard.getByRole("link", {
+        name: SOCIAL_USER_A.displayName,
+      });
+      await expect(creatorLink).toHaveAttribute(
+        "href",
+        `/profile/${SOCIAL_USER_A.username}`,
+      );
+      await creatorLink.click();
+
+      // User A's real profile opens
+      await pageB.waitForURL(`/profile/${SOCIAL_USER_A.username}`);
+      await expect(pageB).toHaveURL(`/profile/${SOCIAL_USER_A.username}`);
 
       // B sees 0 followers, 0 following
       await expect(pageB.getByText("0 followers")).toBeVisible();
@@ -186,6 +214,15 @@ test.describe
       // Follower count updates to 1 follower
       await expect(pageB.getByText("1 follower")).toBeVisible();
 
+      // Refresh to prove persisted Following state
+      await pageB.reload();
+      await expect(
+        pageB.getByRole("button", {
+          name: `Unfollow ${SOCIAL_USER_A.displayName}`,
+        }),
+      ).toBeVisible();
+      await expect(pageB.getByText("1 follower")).toBeVisible();
+
       // A's Followers list now appears!
       await expect(
         pageB.getByRole("heading", {
@@ -211,6 +248,16 @@ test.describe
           name: "A Followers Only Collection",
         }),
       ).toBeVisible();
+
+      // B sees creator attribution linking to User A's profile on detail page
+      const detailCreatorLink = pageB.getByRole("link", {
+        name: new RegExp(`a list by ${SOCIAL_USER_A.displayName}`, "i"),
+      });
+      await expect(detailCreatorLink).toBeVisible();
+      await expect(detailCreatorLink).toHaveAttribute(
+        "href",
+        `/profile/${SOCIAL_USER_A.username}`,
+      );
 
       // Reload preserves access
       await pageB.reload();

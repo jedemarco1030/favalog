@@ -74,7 +74,7 @@ export interface ListDetailView {
   visibility: ListVisibility;
   isRanked: boolean;
   updatedAt: string;
-  owner: ListOwnerView;
+  owner: ListOwnerView | null;
   items: ListDetailItemView[];
   /** True only when the current viewer owns the list (drives mutation UI). */
   isOwner: boolean;
@@ -147,7 +147,7 @@ export interface ListOwnerRowLike {
  */
 export function toListDetailView(
   row: ListRowLike,
-  owner: ListOwnerRowLike,
+  owner: ListOwnerRowLike | null | undefined,
   items: ListItemRowLike[],
   isOwner: boolean,
 ): ListDetailView {
@@ -159,11 +159,13 @@ export function toListDetailView(
     visibility: normalizeStoredVisibility(row.visibility),
     isRanked: row.is_ranked,
     updatedAt: row.updated_at,
-    owner: {
-      username: owner.username,
-      displayName: owner.display_name,
-      avatarUrl: owner.avatar_url ?? null,
-    },
+    owner: owner
+      ? {
+          username: owner.username,
+          displayName: owner.display_name,
+          avatarUrl: owner.avatar_url ?? null,
+        }
+      : null,
     items: [...items]
       .sort((a, b) => a.position - b.position)
       .map(toListDetailItemView),

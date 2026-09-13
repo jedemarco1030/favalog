@@ -106,4 +106,12 @@ describe("toListDetailView", () => {
     expect(view.isOwner).toBe(false);
     expect(view.items).toEqual([]);
   });
+
+  it("handles null or undefined owner gracefully", () => {
+    const view = toListDetailView(baseRow, null, [], false);
+    expect(view.owner).toBeNull();
+
+    const viewUndef = toListDetailView(baseRow, undefined, [], false);
+    expect(viewUndef.owner).toBeNull();
+  });
 });

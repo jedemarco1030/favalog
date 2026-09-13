@@ -72,9 +72,46 @@ describe("RealListCard", () => {
     expect(screen.getByText("Public")).toBeInTheDocument();
   });
 
-  it("renders the owner's name when an owner is passed", () => {
+  it("renders the owner's name and avatar as a profile link when an owner is passed", () => {
     render(<RealListCard list={makeList()} owner={owner} />);
-    expect(screen.getByText("Jamie Rivera")).toBeInTheDocument();
+    const creatorLink = screen.getByRole("link", { name: "Jamie Rivera" });
+    expect(creatorLink).toHaveAttribute("href", "/profile/jamie");
+
+    const titleLink = screen.getByRole("link", { name: "Favorite Sci-Fi" });
+    expect(titleLink).toHaveAttribute("href", "/list/favorite-sci-fi");
+  });
+
+  it("handles missing or empty creator username gracefully without broken links", () => {
+    const missingUsernameOwner: ListOwnerView = {
+      username: "",
+      displayName: "Former Member",
+      avatarUrl: null,
+    };
+    render(<RealListCard list={makeList()} owner={missingUsernameOwner} />);
+    expect(screen.getByText("Former Member")).toBeInTheDocument();
+    // Only the list title link should exist, not a broken profile link.
+    const links = screen.getAllByRole("link");
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAttribute("href", "/list/favorite-sci-fi");
+  });
+
+  it("handles null owner gracefully without broken links or errors", () => {
+    render(<RealListCard list={makeList()} owner={null} />);
+    const links = screen.getAllByRole("link");
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAttribute("href", "/list/favorite-sci-fi");
+  });
+
+  it("never nests links inside the card article", () => {
+    const { container } = render(
+      <RealListCard list={makeList()} owner={owner} />,
+    );
+    const links = container.querySelectorAll("a");
+    expect(links.length).toBe(2);
+    // Ensure no <a> contains another <a>
+    links.forEach((link) => {
+      expect(link.querySelector("a")).toBeNull();
+    });
   });
 
   it("never renders a like count", () => {

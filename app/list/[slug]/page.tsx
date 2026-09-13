@@ -40,15 +40,21 @@ export async function generateMetadata({
   const real = await getRealListBySlug(slug);
   if (real.status === "ok") {
     const { list: realList } = real;
+    const ownerName = realList.owner?.displayName;
     const realDescription =
       realList.description ??
-      `A cross-media collection by ${realList.owner.displayName} on ${siteConfig.name}.`;
+      (ownerName
+        ? `A cross-media collection by ${ownerName} on ${siteConfig.name}.`
+        : `A cross-media collection on ${siteConfig.name}.`);
+    const ogTitle = ownerName
+      ? `${realList.title} — a list by ${ownerName}`
+      : realList.title;
     return {
       title: realList.title,
       description: realDescription,
       openGraph: {
         type: "article",
-        title: `${realList.title} — a list by ${realList.owner.displayName}`,
+        title: ogTitle,
         description: realDescription,
         url: `/list/${realList.slug}`,
         siteName: siteConfig.name,

@@ -582,7 +582,7 @@ export async function getMyLists(): Promise<MyListsResult> {
 
 /** A public list card plus its owner identity, for the community section. */
 export interface PublicListView extends ListSummaryView {
-  owner: ListOwnerView;
+  owner: ListOwnerView | null;
 }
 
 export type PublicListsResult =
@@ -611,7 +611,7 @@ export async function getPublicLists(limit = 12): Promise<PublicListsResult> {
   const { data, error } = await supabase
     .from("lists")
     .select(
-      "id, slug, title, description, visibility, is_ranked, updated_at, list_items(count), profiles!inner(username, display_name, avatar_url)",
+      "id, slug, title, description, visibility, is_ranked, updated_at, list_items(count), profiles(username, display_name, avatar_url)",
     )
     .eq("visibility", "public")
     .order("updated_at", { ascending: false })
@@ -620,16 +620,16 @@ export async function getPublicLists(limit = 12): Promise<PublicListsResult> {
   if (error) return { status: "error" };
 
   const rows = (data ?? []) as unknown as PublicListRow[];
-  const lists: PublicListView[] = rows
-    .filter((r) => r.profiles !== null)
-    .map((r) => ({
-      ...toListSummaryView(r, countOf(r)),
-      owner: {
-        username: r.profiles!.username,
-        displayName: r.profiles!.display_name,
-        avatarUrl: r.profiles!.avatar_url ?? null,
-      },
-    }));
+  const lists: PublicListView[] = rows.map((r) => ({
+    ...toListSummaryView(r, countOf(r)),
+    owner: r.profiles
+      ? {
+          username: r.profiles.username,
+          displayName: r.profiles.display_name,
+          avatarUrl: r.profiles.avatar_url ?? null,
+        }
+      : null,
+  }));
 
   return { status: "ok", lists };
 }
@@ -672,7 +672,7 @@ export async function getRealListBySlug(slug: string): Promise<RealListResult> {
   const { data, error } = await supabase
     .from("lists")
     .select(
-      "id, user_id, slug, title, description, visibility, is_ranked, updated_at, profiles!inner(username, display_name, avatar_url), list_items(media_id, position, media_items!inner(slug, title, year, kind, poster_url))",
+      "id, user_id, slug, title, description, visibility, is_ranked, updated_at, profiles(username, display_name, avatar_url), list_items(media_id, position, media_items!inner(slug, title, year, kind, poster_url))",
     )
     .eq("slug", slug)
     .maybeSingle();
@@ -680,7 +680,6 @@ export async function getRealListBySlug(slug: string): Promise<RealListResult> {
   if (error || !data) return { status: "not-found" };
 
   const row = data as unknown as ListDetailRow;
-  if (!row.profiles) return { status: "not-found" };
 
   const isOwner = viewer?.id === row.user_id;
   const list = toListDetailView(

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Globe, ListOrdered, Lock, Users } from "lucide-react";
 import { Container } from "@/components/ui/container";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -93,20 +94,46 @@ export function RealListDetail({ list }: RealListDetailProps) {
               {list.title}
             </h1>
 
-            <div className="flex items-center gap-2 text-sm text-foreground/70">
-              <ProfileAvatar
-                displayName={list.owner.displayName}
-                avatarUrl={list.owner.avatarUrl}
-                size="sm"
-                decorative
-              />
-              <span>
-                A list by{" "}
-                <span className="text-foreground">
-                  {list.owner.displayName}
-                </span>
-              </span>
-            </div>
+            {list.owner ? (
+              <div className="flex items-center gap-2 text-sm text-foreground/70">
+                {list.owner.username?.trim() ? (
+                  <Link
+                    href={`/profile/${list.owner.username}`}
+                    className="group/creator inline-flex items-center gap-2 rounded outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent"
+                  >
+                    <ProfileAvatar
+                      displayName={
+                        list.owner.displayName || list.owner.username
+                      }
+                      avatarUrl={list.owner.avatarUrl}
+                      size="sm"
+                      decorative
+                    />
+                    <span>
+                      A list by{" "}
+                      <span className="text-foreground underline-offset-4 group-hover/creator:underline">
+                        {list.owner.displayName || list.owner.username}
+                      </span>
+                    </span>
+                  </Link>
+                ) : (
+                  <div className="inline-flex items-center gap-2">
+                    <ProfileAvatar
+                      displayName={list.owner.displayName || "Anonymous"}
+                      avatarUrl={list.owner.avatarUrl}
+                      size="sm"
+                      decorative
+                    />
+                    <span>
+                      A list by{" "}
+                      <span className="text-foreground">
+                        {list.owner.displayName || "Anonymous"}
+                      </span>
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
 
           {list.description && (

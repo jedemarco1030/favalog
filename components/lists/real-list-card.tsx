@@ -15,7 +15,7 @@ import { cn } from "@/lib/cn";
 interface RealListCardProps {
   list: ListSummaryView;
   /** When present, the card shows real owner identity (community section). */
-  owner?: ListOwnerView;
+  owner?: ListOwnerView | null;
   /**
    * When true, the private/public status is surfaced. Use for owner-facing
    * surfaces ("Your lists", the owner's own profile) so private lists are
@@ -43,80 +43,99 @@ export function RealListCard({
 }: RealListCardProps) {
   const href = `/list/${list.slug}`;
   const updated = formatUpdatedAt(list.updatedAt);
-  const accessibleName = owner
-    ? `${list.title} — a list by ${owner.displayName}, ${itemCountLabel(list.itemCount)}`
-    : `${list.title} — ${itemCountLabel(list.itemCount)}`;
+  const hasValidOwnerUsername =
+    typeof owner?.username === "string" && owner.username.trim() !== "";
 
   return (
     <article
       className={cn(
-        "group rounded-xl border border-border/60 bg-surface-1 transition-colors hover:border-border",
+        "group relative flex h-full flex-col gap-3 rounded-xl border border-border/60 bg-surface-1 p-5 transition-colors hover:border-border",
         className,
       )}
     >
-      <Link
-        href={href}
-        aria-label={accessibleName}
-        className="flex h-full flex-col gap-3 rounded-xl p-5 outline-none focus-visible:ring-2 focus-visible:ring-accent"
-      >
-        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-foreground/50">
-          {list.isRanked && (
+      <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-foreground/50">
+        {list.isRanked && (
+          <span className="inline-flex items-center gap-1">
+            <ListOrdered className="size-3" aria-hidden="true" />
+            Ranked
+          </span>
+        )}
+        {showVisibility && (
+          <>
+            {list.isRanked && <span aria-hidden="true">·</span>}
             <span className="inline-flex items-center gap-1">
-              <ListOrdered className="size-3" aria-hidden="true" />
-              Ranked
+              {list.visibility === "private" ? (
+                <Lock className="size-3" aria-hidden="true" />
+              ) : list.visibility === "followers" ? (
+                <Users className="size-3" aria-hidden="true" />
+              ) : (
+                <Globe className="size-3" aria-hidden="true" />
+              )}
+              {visibilityLabel(list.visibility)}
             </span>
-          )}
-          {showVisibility && (
-            <>
-              {list.isRanked && <span aria-hidden="true">·</span>}
-              <span className="inline-flex items-center gap-1">
-                {list.visibility === "private" ? (
-                  <Lock className="size-3" aria-hidden="true" />
-                ) : list.visibility === "followers" ? (
-                  <Users className="size-3" aria-hidden="true" />
-                ) : (
-                  <Globe className="size-3" aria-hidden="true" />
-                )}
-                {visibilityLabel(list.visibility)}
-              </span>
-            </>
-          )}
-        </div>
+          </>
+        )}
+      </div>
 
-        <h3 className="font-display text-lg leading-snug text-foreground group-hover:text-accent">
+      <h3 className="font-display text-lg leading-snug text-foreground group-hover:text-accent">
+        <Link
+          href={href}
+          className="rounded outline-none focus-visible:ring-2 focus-visible:ring-accent after:absolute after:inset-0 after:rounded-xl"
+        >
           {list.title}
-        </h3>
+        </Link>
+      </h3>
 
-        {owner && (
-          <div className="flex items-center gap-2 text-sm text-foreground/60">
-            <ProfileAvatar
-              displayName={owner.displayName}
-              avatarUrl={owner.avatarUrl}
-              size="sm"
-              decorative
-            />
-            <span className="truncate">{owner.displayName}</span>
-          </div>
-        )}
-
-        {list.description && (
-          <p className="line-clamp-2 text-sm text-foreground/60">
-            {list.description}
-          </p>
-        )}
-
-        <div className="mt-auto flex items-center gap-2 pt-1 text-xs text-foreground/50 tabular-nums">
-          <span>{itemCountLabel(list.itemCount)}</span>
-          {updated && (
-            <>
-              <span aria-hidden="true">·</span>
-              <span className="normal-case">
-                Updated <time dateTime={list.updatedAt}>{updated}</time>
+      {owner && (
+        <div className="relative z-10 flex items-center gap-2 text-sm text-foreground/60">
+          {hasValidOwnerUsername ? (
+            <Link
+              href={`/profile/${owner.username}`}
+              className="inline-flex items-center gap-2 rounded outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              <ProfileAvatar
+                displayName={owner.displayName || owner.username}
+                avatarUrl={owner.avatarUrl}
+                size="sm"
+                decorative
+              />
+              <span className="truncate underline-offset-4 hover:underline">
+                {owner.displayName || owner.username}
               </span>
-            </>
+            </Link>
+          ) : (
+            <div className="inline-flex items-center gap-2">
+              <ProfileAvatar
+                displayName={owner.displayName || "Anonymous"}
+                avatarUrl={owner.avatarUrl}
+                size="sm"
+                decorative
+              />
+              <span className="truncate">
+                {owner.displayName || "Anonymous"}
+              </span>
+            </div>
           )}
         </div>
-      </Link>
+      )}
+
+      {list.description && (
+        <p className="line-clamp-2 text-sm text-foreground/60">
+          {list.description}
+        </p>
+      )}
+
+      <div className="mt-auto flex items-center gap-2 pt-1 text-xs text-foreground/50 tabular-nums">
+        <span>{itemCountLabel(list.itemCount)}</span>
+        {updated && (
+          <>
+            <span aria-hidden="true">·</span>
+            <span className="normal-case">
+              Updated <time dateTime={list.updatedAt}>{updated}</time>
+            </span>
+          </>
+        )}
+      </div>
     </article>
   );
 }
