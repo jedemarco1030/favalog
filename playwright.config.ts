@@ -29,29 +29,35 @@ import { assertConfiguredSupabaseIsLocal } from "./scripts/lib/local-supabase-ta
  *  - `E2E_SUITE=no-env`  -> only the `no-env` project + a single server on port
  *    3100. The caller must have produced a build with the Supabase vars blanked
  *    (see the `test:e2e:no-env` npm script).
- *  - otherwise           -> the `default` + `configured` projects + a single
+ *  - `E2E_SUITE=social` -> only the `social` project + a single server on port
+ *    3400, against a normally configured build.
+ *  - otherwise          -> the `default` + `configured` projects + a single
  *    server on port 3000, against a normally configured build.
  *
  * Specs are routed to a project by a tag in their `describe` title
- * (`@configured` / `@no-env` / `@fixtures` / `@prodreject`); everything untagged
- * is the `default` project. Tagged specs are excluded from `default` so the
- * fixture-backed suites only ever run in their dedicated servers.
+ * (`@configured` / `@no-env` / `@fixtures` / `@prodreject` / `@social`);
+ * everything untagged is the `default` project. Tagged specs are excluded
+ * from `default` so the fixture-backed suites only ever run in their dedicated
+ * servers.
  */
 
 const CONFIGURED_PORT = 3000;
 const NO_ENV_PORT = 3100;
 const FIXTURES_PORT = 3200;
 const FIXTURES_PROD_PORT = 3300;
+const SOCIAL_PORT = 3400;
 const FIXTURE_SERVER_PORT = 5599;
 const configuredBaseURL = `http://localhost:${CONFIGURED_PORT}`;
 const noEnvBaseURL = `http://localhost:${NO_ENV_PORT}`;
 const fixturesBaseURL = `http://localhost:${FIXTURES_PORT}`;
 const fixturesProdBaseURL = `http://localhost:${FIXTURES_PROD_PORT}`;
+const socialBaseURL = `http://localhost:${SOCIAL_PORT}`;
 const isCI = !!process.env.CI;
 const suite = process.env.E2E_SUITE;
 const isNoEnvSuite = suite === "no-env";
 const isFixturesSuite = suite === "fixtures";
 const isFixturesProdRejectSuite = suite === "fixtures-prod-reject";
+const isSocialSuite = suite === "social";
 
 // The fixture-backed suites drive the REAL provider adapters against a local
 // fixture HTTP server via the loopback-guarded transport seam, and provision an
@@ -61,9 +67,10 @@ const isFixturesProdRejectSuite = suite === "fixtures-prod-reject";
 // points at a HOSTED Supabase project, and the mutation-capable suites write
 // data. LOCAL Supabase credentials are injected into the environment by
 // `scripts/run-e2e-local.mjs` (loopback-verified). Run these suites ONLY via
-// `npm run test:e2e:configured` / `npm run test:e2e:fixtures` /
-// `npm run test:e2e:fixtures:prod-reject`. If the local creds are missing, the
-// admin helper and the app fail closed rather than touching hosted.
+// `npm run test:e2e:configured` / `npm run test:e2e:social` /
+// `npm run test:e2e:fixtures` / `npm run test:e2e:fixtures:prod-reject`. If the
+// local creds are missing, the admin helper and the app fail closed rather than
+// touching hosted.
 //
 // BEFORE-TESTS GATE: for every suite except the credential-free `no-env` one,
 // refuse to configure Playwright (and therefore to start Next.js or execute
@@ -135,12 +142,20 @@ const fixturesProdRejectProjects = [
   },
 ];
 
+const socialProjects = [
+  {
+    name: "social",
+    grep: /@social\b/,
+    use: { ...devices["Desktop Chrome"], baseURL: socialBaseURL },
+  },
+];
+
 const configuredProjects = [
   {
     // Every existing spec (auth, diary, lists, favorites, …). These are
     // written to be local-safe and run against the configured server.
     name: "default",
-    grepInvert: /@configured|@no-env|@fixtures|@prodreject/,
+    grepInvert: /@configured|@no-env|@fixtures|@prodreject|@social/,
     use: { ...devices["Desktop Chrome"], baseURL: configuredBaseURL },
   },
   {
@@ -179,7 +194,9 @@ export default defineConfig({
       ? fixturesProjects
       : isFixturesProdRejectSuite
         ? fixturesProdRejectProjects
-        : configuredProjects,
+        : isSocialSuite
+          ? socialProjects
+          : configuredProjects,
   webServer: isNoEnvSuite
     ? {
         // The no-env build must already exist (produced with the public Supabase
@@ -222,10 +239,18 @@ export default defineConfig({
               },
             },
           ]
-        : {
-            command: `npm run start -- --port ${CONFIGURED_PORT}`,
-            url: configuredBaseURL,
-            reuseExistingServer: !isCI,
-            timeout: 120_000,
-          },
+        : isSocialSuite
+          ? {
+              command: `npm run start -- --port ${SOCIAL_PORT}`,
+              url: socialBaseURL,
+              reuseExistingServer: !isCI,
+              timeout: 120_000,
+              env: { SEMANTIC_SEARCH_ENABLED: "false" },
+            }
+          : {
+              command: `npm run start -- --port ${CONFIGURED_PORT}`,
+              url: configuredBaseURL,
+              reuseExistingServer: !isCI,
+              timeout: 120_000,
+            },
 });

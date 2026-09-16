@@ -196,6 +196,22 @@ export function assertConfiguredSupabaseIsLocal(env = process.env) {
 }
 
 /**
+ * True when NO Supabase target is configured at all (the intentional
+ * unconfigured / no-env build). A PRESENT target is deliberately NOT judged
+ * here: {@link assertLoopbackSupabaseUrl} remains the only local/hosted
+ * decision, so a hosted or half-configured environment still fails loudly.
+ *
+ * @param {Record<string, string | undefined>} [env]
+ * @returns {boolean}
+ */
+export function isSupabaseTargetAbsent(env = process.env) {
+  const urls = [env.SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_URL];
+  return urls.every(
+    (value) => typeof value !== "string" || value.trim() === "",
+  );
+}
+
+/**
  * Parse `KEY="value"` / `KEY=value` lines into a plain object. Shared by the
  * `supabase status` reader and the local env-file fallback.
  * @param {string} raw

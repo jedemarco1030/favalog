@@ -218,7 +218,8 @@ npm run test
 npm run test:coverage
 npm run build
 npm run build-storybook
-npm run test:e2e
+npm run test:e2e         # every Playwright suite
+npm run test:e2e:social  # the loopback-only following-feed journey
 npm run validate       # format:check + lint + typecheck + test
 npm run validate:full  # validate + build + test:e2e
 ```
@@ -238,6 +239,15 @@ Also run:
 - relevant Playwright tests (`npm run test:e2e`) when user flows change;
 - `npm run build-storybook` when shared components or stories change;
 - `npm run test:coverage` when tests or significant domain logic change.
+
+The following-feed journey (`e2e/feed.spec.ts`) lives in its own `@social`
+Playwright suite (port 3400) and runs **only** against a local loopback
+Supabase stack via `npm run test:e2e:social`; it is excluded from the
+credential-free `default` project and is exercised in CI by the dedicated
+secret-free `social-integration` job (local Supabase start + `db reset`). A
+credential-free invocation skips with an explicit reason (and a GitHub
+`::notice::` annotation in CI), while a hosted or half-configured target still
+fails loudly.
 
 Run `npm run validate:full` when the change affects routes, application
 integration, production rendering, or critical end-to-end behavior and the

@@ -8,6 +8,7 @@ import {
   describeSupabaseTarget,
   isLoopbackHostUrl,
   isLoopbackSupabaseUrl,
+  isSupabaseTargetAbsent,
 } from "./local-supabase-target.mjs";
 
 /**
@@ -99,6 +100,29 @@ describe("assertLoopbackSupabaseUrl", () => {
     expect(message).toMatch(/Refusing to proceed/i);
     expect(message).not.toContain("sup3rsecret");
     expect(message).not.toContain("admin:");
+  });
+});
+
+describe("isSupabaseTargetAbsent", () => {
+  it.each([
+    {},
+    { SUPABASE_URL: undefined, NEXT_PUBLIC_SUPABASE_URL: undefined },
+    { SUPABASE_URL: "", NEXT_PUBLIC_SUPABASE_URL: "" },
+    { SUPABASE_URL: "   ", NEXT_PUBLIC_SUPABASE_URL: "\t\n" },
+  ])("reports absent for %p", (env) => {
+    expect(isSupabaseTargetAbsent(env)).toBe(true);
+  });
+
+  it.each([
+    { SUPABASE_URL: "http://127.0.0.1:54321" },
+    { NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321" },
+    // A hosted value is PRESENT, so it must never be reported as absent: the
+    // loopback guard, not this predicate, rejects it.
+    { SUPABASE_URL: "https://abcdefgh.supabase.co" },
+    { NEXT_PUBLIC_SUPABASE_URL: "https://abcdefgh.supabase.co" },
+    { SUPABASE_URL: "", NEXT_PUBLIC_SUPABASE_URL: "http://localhost:54321" },
+  ])("reports NOT absent for %p", (env) => {
+    expect(isSupabaseTargetAbsent(env)).toBe(false);
   });
 });
 

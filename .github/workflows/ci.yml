@@ -302,3 +302,111 @@ jobs:
           name: playwright-report-explore-integration
           path: playwright-report
           retention-days: 7
+
+  # STRICT, secret-free social integration: the multi-user following-feed
+  # journey (`@social`) needs service-role seeding, so it can only run against a
+  # real database. It uses a throwaway local Supabase stack (Docker on
+  # GitHub-hosted runners) and NO repository secrets, so it runs identically on
+  # fork PRs.
+  #
+  # Like `explore-integration`, it does NOT reuse the `verify` artifact: Next
+  # inlines `NEXT_PUBLIC_SUPABASE_*` at BUILD time and `verify` builds with NO
+  # Supabase config. This job builds its OWN Supabase-configured build so the
+  # journey exercises real sign-in, follows, feed, and diary writes.
+  #
+  # The suite runs on its own port (3400) with its own database reset, so it can
+  # never race the `@fixtures` social-lists journey over `social_a`/`social_b`.
+  social-integration:
+    name: Following feed E2E (seeded Supabase, secret-free)
+    runs-on: ubuntu-latest
+    needs: verify
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start local Supabase stack
+        run: npx supabase start
+
+      - name: Apply migrations + seed
+        # `db reset` re-applies every migration, so the curated catalog the feed
+        # fixtures seed against (`dune-part-two`, `salt-tide`, `arc-lighthouse`,
+        # `the-gilded-room`, …) is present from migrations `20260806160100` and
+        # `20260815120000` alone — no extra seed data is required.
+        run: npx supabase db reset
+
+      # Publish the local stack's public config so the `social` server is
+      # actually Supabase-backed, and the service-role config so the e2e
+      # fixtures can provision the two social accounts. No secrets are involved
+      # — these credentials belong to the throwaway local stack only.
+      - name: Export local Supabase config
+        run: |
+          set -euo pipefail
+          # `supabase status -o env` prints SHELL-QUOTED assignments, e.g.
+          #   NEXT_PUBLIC_SUPABASE_URL="http://127.0.0.1:54321"
+          # Appending that verbatim to $GITHUB_ENV keeps the literal quote
+          # characters (GitHub does NOT strip them), so the loopback guard in
+          # `assertLoopbackSupabaseUrl` would receive a quoted URL, fail to parse
+          # it, and conservatively reject the target. Instead: SOURCE the trusted
+          # first-party assignments into this shell and re-emit the RESOLVED,
+          # UNQUOTED values with printf.
+          status_public="$(npx supabase status -o env \
+            --override-name api.url=NEXT_PUBLIC_SUPABASE_URL \
+            --override-name auth.anon_key=NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)"
+          status_service="$(npx supabase status -o env \
+            --override-name api.url=SUPABASE_URL \
+            --override-name auth.service_role_key=SUPABASE_SECRET_KEY)"
+          eval "$status_public"
+          eval "$status_service"
+          # Fail closed unless the resolved URL is an unambiguously LOCAL
+          # loopback Supabase endpoint. This guarantees we never publish remote
+          # config into $GITHUB_ENV and keeps the loopback write guard in the
+          # e2e fixtures untouched.
+          case "$SUPABASE_URL" in
+            http://127.0.0.1:* | http://localhost:* | http://0.0.0.0:* | "http://[::1]:"*) ;;
+            *)
+              echo "::error::Refusing to export non-local Supabase URL: ${SUPABASE_URL}"
+              exit 1
+              ;;
+          esac
+          # Export exactly the variables the build + fixtures need, unquoted.
+          printf '%s=%s\n' \
+            NEXT_PUBLIC_SUPABASE_URL "$NEXT_PUBLIC_SUPABASE_URL" \
+            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY "$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
+            SUPABASE_URL "$SUPABASE_URL" \
+            SUPABASE_SECRET_KEY "$SUPABASE_SECRET_KEY" \
+            >> "$GITHUB_ENV"
+
+      # Build with the local stack's public config now present in the
+      # environment, so Next inlines a Supabase-CONFIGURED build. Semantic
+      # search is pinned off so no OpenAI path is reachable.
+      - name: Production build (Supabase-configured)
+        run: npm run build
+        env:
+          SEMANTIC_SEARCH_ENABLED: "false"
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run following feed Playwright journey
+        run: E2E_SUITE=social npx playwright test --project=social
+
+      - name: Stop local Supabase stack
+        if: ${{ always() }}
+        run: npx supabase stop --no-backup
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-social-integration
+          path: playwright-report
+          retention-days: 7

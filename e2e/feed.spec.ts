@@ -6,6 +6,7 @@ import {
   SOCIAL_USER_C,
   detachReviewsByDeletingDiaryEntries,
   ensureFeedFixtureUsers,
+  hasFixtureSupabaseTarget,
   seedDiaryActivity,
   seedPublicList,
   seedStandaloneReviews,
@@ -30,11 +31,10 @@ import {
  *  9. B unfollows A; A disappears from Home, the feed, and later pages.
  * 10. Signed-out navigation (including browser-back) never leaks B's feed.
  *
- * This spec deliberately runs in the untagged `default` project (the
- * `configured` suite) rather than the `@fixtures` suite: it re-provisions the
- * shared social accounts, and the `@fixtures` social-lists journey does the
- * same, so keeping them in separate suites (separate runs, with a database
- * reset between) means they can never race each other.
+ * This spec runs in its dedicated `@social` suite rather than the `@fixtures`
+ * suite: it re-provisions the shared social accounts, and the `@fixtures`
+ * social-lists journey does the same. Its own server and database reset mean
+ * the two journeys can never race each other.
  *
  * Every write goes through the loopback-guarded service-role helper in
  * `fixtures/admin.ts`; hosted Supabase can never be seeded or reset.
@@ -185,10 +185,15 @@ function cardsForTitle(page: Page, slug: string) {
   });
 }
 
-test.describe.serial("Following feed journey", () => {
+test.describe.serial("@social Following feed journey", () => {
   test("a real, deduplicated, revocable feed across the whole journey", async ({
     browser,
   }) => {
+    test.skip(
+      !hasFixtureSupabaseTarget(),
+      "Requires a LOCAL Supabase target. Run via `npm run test:e2e:social` " +
+        "(start the stack with `npm run supabase:start`).",
+    );
     // A long multi-account journey with several server-rendered navigations.
     test.setTimeout(240_000);
 

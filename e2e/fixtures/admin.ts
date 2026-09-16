@@ -1,6 +1,11 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-import { assertLoopbackSupabaseUrl } from "../../scripts/lib/local-supabase-target.mjs";
+import {
+  assertLoopbackSupabaseUrl,
+  isSupabaseTargetAbsent,
+} from "../../scripts/lib/local-supabase-target.mjs";
+
+import { emitCiNotice } from "./ci-notice";
 
 /**
  * Service-role Supabase helpers for the fixture-backed E2E suite.
@@ -67,6 +72,27 @@ function requireEnv(name: string, fallback?: string): string {
     );
   }
   return value;
+}
+
+/**
+ * Skip-gate input: a Supabase target is "available" unless NOTHING is
+ * configured at all. This is deliberately an ABSENCE check only — a present
+ * hosted URL still fails loudly through `assertLoopbackSupabaseUrl`, and a
+ * loopback URL with a missing service-role key still fails through
+ * `requireEnv`. When no target exists the skip is announced in CI so it can
+ * never be mistaken for coverage.
+ */
+export function hasFixtureSupabaseTarget(): boolean {
+  const available = !isSupabaseTargetAbsent(process.env);
+  if (!available) {
+    emitCiNotice(
+      "Following feed journey skipped",
+      "No Supabase target is configured, so the service-role fixtures cannot " +
+        "seed the journey. Run it via `npm run test:e2e:social` against LOCAL " +
+        "Supabase (`npm run supabase:start`).",
+    );
+  }
+  return available;
 }
 
 /** Build a service-role admin client against local Supabase. */

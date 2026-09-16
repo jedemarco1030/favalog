@@ -707,7 +707,8 @@ npm run test:watch         # Vitest (watch mode)
 npm run test:coverage      # Vitest with coverage report
 
 # End-to-end tests
-npm run test:e2e           # Playwright against a production build
+npm run test:e2e           # Playwright against a production build (all suites)
+npm run test:e2e:social    # Following-feed journey only (loopback Supabase)
 npm run test:e2e:ui        # Playwright interactive UI mode
 
 # Component development
@@ -768,7 +769,9 @@ they are wired together so `npm run validate` is a reliable local gate.
   queries — never internal state or class names.
 - **Playwright** covers complete user journeys (home → explore → title,
   search, media-type filtering, movie vs. book detail, the custom 404, the
-  diary, the lists flow — index → list → title, list search, and the
+  diary, the following-feed journey — follow → feed → edit → delete → unfollow,
+  which runs in its own loopback-only `social` suite, the lists flow — index →
+  list → title, list search, and the
   invalid-list-slug 404, the profile flow — profile, derived statistics,
   favorite title, one of the user's lists, and the unknown-username 404, and
   the secret-free auth flow — signed-out header, sign-in/up/forgot pages render
@@ -776,8 +779,9 @@ they are wired together so `npm run validate` is a reliable local gate.
   publicly reachable) against `next build` + `next start`, using semantic
   locators.
 - **Local-only E2E isolation.** Every mutation-capable Playwright suite (the
-  ordinary `configured` suite and the Catalog Platform v1B `fixtures` /
-  `fixtures-prod-reject` suites) runs **only** against a local loopback Supabase
+  ordinary `configured` suite, the `social` following-feed suite, and the
+  Catalog Platform v1B `fixtures` / `fixtures-prod-reject` suites) runs **only**
+  against a local loopback Supabase
   stack. The protected runner `scripts/run-e2e-local.mjs` resolves LOCAL
   credentials from the running stack (`supabase status`) or an explicitly
   ignored `.env.e2e.local` and, via the shared guard
@@ -786,7 +790,13 @@ they are wired together so `npm run validate` is a reliable local gate.
   hosted `.env.local`, and there is no override that permits a hosted target.
   The `no-env` suite (`scripts/run-e2e-no-env.mjs`) explicitly removes
   Supabase/provider credentials. Start the stack with `npm run supabase:start`
-  before running these suites.
+  before running these suites. Each suite resets the database first, so the
+  `social` and `fixtures` journeys never race over the shared social accounts;
+  a credential-free invocation of the `social` suite skips honestly (with a
+  GitHub `::notice::` annotation in CI) instead of failing confusingly, while a
+  hosted or half-configured target still fails loudly. CI runs the suite for
+  real in the secret-free `social-integration` job against a throwaway local
+  Supabase stack.
 - **Storybook** documents genuine component states (media/review/activity
   cards, badges, ratings, empty states) on the Favalog dark theme and provides
   an accessibility panel for visual/a11y review.
