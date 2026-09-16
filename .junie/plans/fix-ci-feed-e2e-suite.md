@@ -255,7 +255,7 @@ README.md, AGENTS.md                          # suite/command documentation
 ```mermaid
 graph TD
   V[verify job: build with NO Supabase] --> A[e2e job]
-  A -->|E2E_SUITE=configured --project=default| D[default project<br/>secret-free specs<br/>@social excluded]
+  A -->|E2E_SUITE=configured --project=default| D[default project<br/>secret-free specs<br/>social excluded]
   A -->|E2E_SUITE=no-env| N[no-env project]
 
   S[social-integration job] --> L[supabase start + db reset]
