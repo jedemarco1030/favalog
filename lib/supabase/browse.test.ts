@@ -5,8 +5,15 @@ import {
   type BrowseDeps,
   type BrowseTableClient,
 } from "./browse";
+import { createClient } from "./server";
 import type { MediaItemRow } from "./mappers";
 import type { BrowseLogFields } from "@/lib/browse/log";
+
+// `vi.mock` is hoisted above imports by Vitest, so the real per-request SSR
+// client is never constructed; the adapter tests below drive `createClient`
+// through a query-builder recorder to assert the removal-hiding clause.
+vi.mock("./server", () => ({ createClient: vi.fn() }));
+const mockedCreateClient = vi.mocked(createClient);
 
 function makeRow(
   i: number,
@@ -336,6 +343,74 @@ describe("browseCatalog", () => {
       totalPages: 1,
       hasPrev: false,
       hasNext: false,
+    });
+  });
+
+  // Adapter-level coverage: assert the REAL production query path (the default
+  // Supabase-backed client, not the port fake) applies the removal-hiding
+  // clause on both the genre-facet read and the paginated grid read, so a
+  // confirmed-removed provider row leaves discovery entirely.
+  describe("removal-hiding on the real Supabase adapter", () => {
+    afterEach(() => {
+      mockedCreateClient.mockReset();
+    });
+
+    it("filters `provider_removed_at is null` on both the facet and the page read", async () => {
+      const isCalls: Array<[string, unknown]> = [];
+
+      function makeChain() {
+        let isGenreRead = false;
+        const chain = {
+          select(columns: string) {
+            isGenreRead = columns === "genres";
+            return chain;
+          },
+          eq() {
+            return chain;
+          },
+          contains() {
+            return chain;
+          },
+          is(column: string, value: unknown) {
+            isCalls.push([column, value]);
+            return chain;
+          },
+          order() {
+            return chain;
+          },
+          range() {
+            return Promise.resolve({ data: [], count: 0, error: null });
+          },
+          then(
+            resolve: (value: unknown) => unknown,
+            reject?: (reason: unknown) => unknown,
+          ) {
+            // The facet read awaits the builder directly (no `.range`).
+            const result = isGenreRead
+              ? { data: [], error: null }
+              : { data: [], count: 0, error: null };
+            return Promise.resolve(result).then(resolve, reject);
+          },
+        };
+        return chain;
+      }
+
+      mockedCreateClient.mockResolvedValue({
+        from: () => makeChain(),
+      } as never);
+
+      let t = 0;
+      const outcome = await browseCatalog(
+        {},
+        { now: () => (t += 1), log: () => {} },
+      );
+
+      expect(outcome.status).toBe("ok");
+      const removalClauses = isCalls.filter(
+        ([column, value]) => column === "provider_removed_at" && value === null,
+      );
+      // One for the genre facet read, one for the paginated grid read.
+      expect(removalClauses).toHaveLength(2);
     });
   });
 });

@@ -60,10 +60,61 @@ between the local repository and hosted production, both are stated explicitly.
 
 The owner has provided evidence that TMDB staff support periodically refreshed
 cached metadata and embeddings for semantic search. This is architectural
-context, not activation permission for Favalog: TMDB activation remains
-pending, `TMDB_ENABLED` remains **false**, and the refresh implementation is
-deferred to a separate task. No provider flags are changed by this
-reconciliation.
+context for those specific uses, not blanket approval or activation permission
+for Favalog. As of the **TMDB activation-readiness** work below, the refresh
+implementation is no longer deferred — it is implemented and locally verified —
+but **TMDB activation itself remains pending**: `TMDB_ENABLED` remains **false**
+in hosted production and no provider flags, hosted secrets, or schedules are
+changed by this work. Turning it on is the owner-controlled procedure in
+[`docs/tmdb-activation-rollout.md`](tmdb-activation-rollout.md).
+
+## TMDB activation readiness & periodic metadata refresh (implemented locally)
+
+**Status: implemented locally and verifiable on seeded local Supabase with
+deterministic provider fixtures; NOT activated in hosted production.** This work
+prepares Favalog to safely activate movie/TV discovery and imports, keep
+imported provider metadata fresh, and regenerate affected embeddings while
+preserving users' records.
+
+What is implemented:
+
+- **Reconciled provider gating & attribution.** Obsolete unconditional
+  "permission pending" restrictions are replaced with the documented activation
+  requirements. Default and unconfigured environments stay disabled; TMDB
+  credentials remain server-only; disabled/unconfigured TMDB makes no request;
+  provider failures never break local catalog or Open Library results.
+- **Canonical identity preserved.** Movie and TV records with the same numeric
+  TMDB id stay distinct; repeated/concurrent imports resolve to one canonical
+  row; refresh preserves media id, slug, aliases, and all diary/review/list/
+  favorite references; only provider-owned metadata is refreshed; curated rows
+  linked to a provider alias are not overwritten.
+- **Bounded periodic refresh worker** (`scripts/refresh-catalog.mjs` +
+  tested `scripts/refresh-catalog-core.ts`, migrations
+  `20260815120700_refresh_external_media_provider_metadata.sql` and
+  `20260815121000_external_media_refresh_lifecycle.sql`): deterministic bounded
+  batches, oldest-checked-first, resumable, with timeouts, bounded concurrency,
+  per-run limits, bounded retries/backoff honoring `429`/`Retry-After`, a
+  configurable **7-day engineering-default** freshness target with daily checks,
+  successful-check vs. content-change tracking, a write-free dry-run mode, and
+  the preserved remote-write guard. Authoritative removals are handled
+  separately from transient outages.
+- **Embedding consistency.** Changed metadata refreshes the canonical document
+  and invalidates the stale embedding so an older-hash vector is never served as
+  current; only eligible missing/stale embeddings are regenerated via the
+  existing bounded tooling; poster-only/timestamp changes do not churn
+  embeddings; embedding failure preserves keyword search and leaves the row
+  retry-eligible.
+- **Executable scheduler** delivered as an applyable, owner-gated GitHub Actions
+  workflow (see [scheduler handoff](ci/catalog-refresh-scheduler-handoff.md)):
+  manual dispatch + daily schedule, a `CATALOG_REFRESH_ENABLED` activation
+  variable defaulting to disabled, protected secrets + explicit target project,
+  minimal permissions, overlap prevention, and bounded refresh followed by
+  bounded stale-embedding backfill.
+
+Deliberately not built: TMDB activation in production, a bulk catalog clone, new
+media types, episode tracking, generative AI, or any hosted mutation. The exact
+owner-controlled activation procedure and disable/recovery steps live in
+[`docs/tmdb-activation-rollout.md`](tmdb-activation-rollout.md).
 
 ## Current production capabilities
 

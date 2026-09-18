@@ -53,16 +53,45 @@ export function isExternalCatalogEnabled(): boolean {
  * (`true`/`1`/`on`/`yes`). Any other value — unset, blank, or falsey — keeps
  * TMDB disabled.
  *
- * WHY it defaults off: the current TMDB API Terms broadly restrict using TMDB
- * APIs/content in connection with an AI/ML-based application. Favalog has NOT
- * obtained permission or licensing for that use, so live TMDB search and
- * materialization must stay OFF in production until the owner confirms
- * appropriate permission through TMDB's official API licensing/support channel.
- * The presence of `TMDB_API_READ_TOKEN` is NOT proof of such permission and
- * never enables TMDB on its own. Returns only a boolean, never the raw value.
+ * WHY it is opt-in and defaults off (activation requirements, not a blanket
+ * ban): live TMDB search and materialization are an owner-controlled surface,
+ * so activating them in any environment requires BOTH this explicit flag AND a
+ * configured server-only `TMDB_API_READ_TOKEN`. The presence of the token is
+ * NOT itself enablement and never turns TMDB on by accident. The owner has
+ * clarified (per TMDB staff guidance in the provided screenshot) that caching
+ * TMDB metadata is acceptable when it is periodically refreshed; that
+ * clarification is scoped to the described discovery/import/refresh use and is
+ * not blanket approval of unrelated uses or commercial licensing. Attribution
+ * remains mandatory wherever TMDB content appears. Returns only a boolean,
+ * never the raw value.
  */
 export function isTmdbEnabled(): boolean {
   const raw = process.env.TMDB_ENABLED?.trim().toLowerCase();
+  if (raw === undefined || raw === "") return false;
+  return TRUTHY_TOKENS.has(raw);
+}
+
+/**
+ * Explicit, server-only control for whether TMDB-sourced catalog rows
+ * (`source = 'tmdb'`) may enter the OpenAI embedding pipeline
+ * (`TMDB_EMBEDDING_ENABLED`).
+ *
+ * DEFAULTS TO DISABLED and must be turned on with an explicit truthy token
+ * (`true`/`1`/`on`/`yes`); any other value — unset, blank, or falsey — keeps
+ * TMDB rows OUT of embeddings. This is deliberately INDEPENDENT of
+ * {@link isTmdbEnabled}: enabling live discovery/import does not automatically
+ * make imported rows embeddable, and an operator can turn embedding off without
+ * disabling the provider. The owner clarification (per TMDB staff guidance in
+ * the provided screenshot) is that embeddings for semantic search over cached
+ * metadata are acceptable for Favalog's described use; this flag is the single
+ * explicit opt-in that acts on it. Accepts an optional env record so the
+ * server-only operator CLI can pass its injected environment; defaults to
+ * `process.env`. Returns only a boolean, never the raw value.
+ */
+export function isTmdbEmbeddingEnabled(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  const raw = env.TMDB_EMBEDDING_ENABLED?.trim().toLowerCase();
   if (raw === undefined || raw === "") return false;
   return TRUTHY_TOKENS.has(raw);
 }
