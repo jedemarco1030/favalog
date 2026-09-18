@@ -123,6 +123,7 @@ interface BrowseQueryBuilder extends PromiseLike<DbResult> {
   ): BrowseQueryBuilder;
   eq(column: string, value: string): BrowseQueryBuilder;
   contains(column: string, value: string[]): BrowseQueryBuilder;
+  is(column: string, value: null): BrowseQueryBuilder;
   order(
     column: string,
     options: { ascending: boolean; nullsFirst?: boolean },
@@ -145,6 +146,11 @@ async function defaultGetClient(): Promise<BrowseTableClient> {
     async fetchGenres(kind) {
       let q = supabase.from("media_items").select("genres");
       if (kind) q = q.eq("kind", kind);
+      // Discovery hides confirmed-removed provider rows so a title pulled from
+      // the provider (Section 3 authoritative removal) can never repopulate the
+      // Genre facet. Canonical identity and user references are untouched — this
+      // is a read-only discovery filter, not a delete.
+      q = q.is("provider_removed_at", null);
       const res = await q;
       return {
         data: (res.data as Array<{ genres: string[] }> | null) ?? null,
@@ -155,6 +161,9 @@ async function defaultGetClient(): Promise<BrowseTableClient> {
       let q = supabase.from("media_items").select("*", { count: "exact" });
       if (kind) q = q.eq("kind", kind);
       if (genre) q = q.contains("genres", [genre]);
+      // Same discovery filter as the facet read: removed provider rows leave the
+      // Explore grid (and the exact count) while their canonical row survives.
+      q = q.is("provider_removed_at", null);
       for (const oc of orderColumnsForSort(sort)) {
         q = q.order(oc.column, {
           ascending: oc.ascending,
