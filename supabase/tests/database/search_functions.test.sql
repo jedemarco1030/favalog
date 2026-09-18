@@ -16,7 +16,7 @@
 -- Run with the local stack: `npm run db:test` (requires Docker + Supabase CLI).
 
 begin;
-select plan(72);
+select plan(85);
 
 -- ---------------------------------------------------------------------------
 -- 1. Extension: pgvector installed, and living in the `extensions` schema.
@@ -182,6 +182,63 @@ select is(
       and pronargs = 4),
   0,
   'the old unguarded hybrid_search(text, vector, kind, limit) overload is removed');
+
+-- Overload reconciliation (migration 20260815121100): the obsolete pre-cutoff
+-- overloads that 20260815121000 accidentally reintroduced (7-arg semantic_search,
+-- 8-arg hybrid_search) must be gone, leaving EXACTLY ONE overload of each name so
+-- a cutoff-omitting call is unambiguous. The ambiguity regression these prevent
+-- surfaces as 42725 ("function ... is not unique") at the first such call.
+select is(
+  (select count(*)::int from pg_proc
+    where proname = 'semantic_search'
+      and pronamespace = 'public'::regnamespace),
+  1,
+  'exactly one semantic_search overload remains after reconciliation');
+select is(
+  (select count(*)::int from pg_proc
+    where proname = 'hybrid_search'
+      and pronamespace = 'public'::regnamespace),
+  1,
+  'exactly one hybrid_search overload remains after reconciliation');
+select is(
+  (select count(*)::int from pg_proc
+    where proname = 'semantic_search'
+      and pronamespace = 'public'::regnamespace
+      and pronargs = 7),
+  0,
+  'the accidentally-reintroduced 7-arg semantic_search overload is removed');
+select is(
+  (select count(*)::int from pg_proc
+    where proname = 'hybrid_search'
+      and pronamespace = 'public'::regnamespace
+      and pronargs = 8),
+  0,
+  'the accidentally-reintroduced 8-arg hybrid_search overload is removed');
+
+-- A call OMITTING the optional cutoff must bind the single canonical overload
+-- (an ambiguous resolution would raise 42725 here rather than run).
+select lives_ok(
+  $$ select * from public.semantic_search(
+       ('[1' || repeat(',0', 511) || ']')::extensions.vector,
+       'fake', 'fake', 512, 'v1', null, 5) $$,
+  'semantic_search resolves unambiguously when the relevance cutoff is omitted');
+select lives_ok(
+  $$ select * from public.semantic_search(
+       ('[1' || repeat(',0', 511) || ']')::extensions.vector,
+       'fake', 'fake', 512, 'v1', null, 5, 0.5::real) $$,
+  'semantic_search resolves with an explicit relevance cutoff');
+select lives_ok(
+  $$ select * from public.hybrid_search(
+       'dune',
+       ('[1' || repeat(',0', 511) || ']')::extensions.vector,
+       'fake', 'fake', 512, 'v1', null, 5) $$,
+  'hybrid_search resolves unambiguously when the relevance cutoff is omitted');
+select lives_ok(
+  $$ select * from public.hybrid_search(
+       'dune',
+       ('[1' || repeat(',0', 511) || ']')::extensions.vector,
+       'fake', 'fake', 512, 'v1', null, 5, 0.5::real) $$,
+  'hybrid_search resolves with an explicit relevance cutoff');
 
 -- prosecdef: keyword INVOKER (false), semantic + hybrid + count DEFINER (true).
 select is(
@@ -517,6 +574,56 @@ select lives_ok(
   'anon can run semantic_search even though the table is private');
 
 reset role;
+
+-- ---------------------------------------------------------------------------
+-- 13. Removal-aware retrieval (migrations 20260815121000 + 20260815121100).
+--     Soft-removing a provider row (provider_removed_at set) must drop it from
+--     EVERY discovery arm — keyword, semantic, and hybrid — including an
+--     exact-title match, and from the compatible-corpus count, WITHOUT deleting
+--     the row or its embedding. Clearing the flag makes it discoverable again
+--     (resurrection), proving the removal is a reversible discovery filter, not
+--     a delete. 'quiet-signal' carries the seeded axis-1 embedding.
+-- ---------------------------------------------------------------------------
+update public.media_items
+  set provider_removed_at = now()
+  where slug = 'quiet-signal';
+
+select is(
+  (select count(*)::int from public.keyword_search('Quiet Signal', null, 5)
+    where slug = 'quiet-signal'),
+  0,
+  'keyword_search hides a soft-removed row even on an exact-title match');
+select is(
+  (select count(*)::int from public.semantic_search(
+     ('[1' || repeat(',0', 511) || ']')::extensions.vector,
+     'fake', 'fake', 512, 'v1', null, 5)
+    where slug = 'quiet-signal'),
+  0,
+  'semantic_search hides a soft-removed row');
+select is(
+  (select count(*)::int from public.hybrid_search(
+     'quiet signal',
+     ('[1' || repeat(',0', 511) || ']')::extensions.vector,
+     'fake', 'fake', 512, 'v1', null, 5)
+    where slug = 'quiet-signal'),
+  0,
+  'hybrid_search hides a soft-removed row across both arms (incl. exact-title)');
+select is(
+  public.compatible_embedding_count('fake', 'fake', 512, 'v1'),
+  1,
+  'compatible_embedding_count excludes the soft-removed row''s embedding');
+
+-- Resurrection: clearing the flag re-exposes the row with its untouched embedding.
+update public.media_items
+  set provider_removed_at = null
+  where slug = 'quiet-signal';
+select is(
+  (select slug from public.semantic_search(
+     ('[1' || repeat(',0', 511) || ']')::extensions.vector,
+     'fake', 'fake', 512, 'v1', null, 5)
+    limit 1),
+  'quiet-signal',
+  'a resurrected row returns first with its preserved embedding');
 
 select * from finish();
 rollback;
