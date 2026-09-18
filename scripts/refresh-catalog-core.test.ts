@@ -119,6 +119,15 @@ interface FakeStoreOptions {
   lockAcquired?: boolean;
   /** Per-external-id refresh RPC result; defaults to a "changed" success. */
   refreshResult?: (args: Record<string, unknown>) => RpcEnvelope;
+  /**
+   * Result of an embedding invalidation. Defaults to a single successful
+   * invalidation ({ invalidated: 1 }); supply a function to vary by media id or
+   * to simulate a failure.
+   */
+  invalidateResult?: (input: {
+    mediaId: string;
+    freshDocumentHash: string;
+  }) => { invalidated: number; error: { message: string } | null };
 }
 
 interface RecordingStore extends RefreshStore {
@@ -126,6 +135,7 @@ interface RecordingStore extends RefreshStore {
     refresh: Record<string, unknown>[];
     markFailed: Record<string, unknown>[];
     markRemoved: Record<string, unknown>[];
+    invalidate: { mediaId: string; freshDocumentHash: string }[];
     lockAcquired: number;
     lockReleased: number;
   };
@@ -136,6 +146,7 @@ function fakeStore(options: FakeStoreOptions): RecordingStore {
     refresh: [] as Record<string, unknown>[],
     markFailed: [] as Record<string, unknown>[],
     markRemoved: [] as Record<string, unknown>[],
+    invalidate: [] as { mediaId: string; freshDocumentHash: string }[],
     lockAcquired: 0,
     lockReleased: 0,
   };
@@ -171,6 +182,12 @@ function fakeStore(options: FakeStoreOptions): RecordingStore {
     async markRemoved(args) {
       calls.markRemoved.push(args);
       return { data: { outcome: "removed" }, error: null };
+    },
+    async invalidateStaleEmbedding(input) {
+      calls.invalidate.push(input);
+      return (
+        options.invalidateResult?.(input) ?? { invalidated: 1, error: null }
+      );
     },
   };
 }
@@ -639,5 +656,130 @@ describe("runRefreshCatalog dry run", () => {
       logger.lines.find((l) => l.includes("refresh_catalog_report")) ?? "{}",
     );
     expect(report).toMatchObject({ dryRun: true, removed: 1 });
+  });
+});
+
+// --- runRefreshCatalog: embedding invalidation ------------------------------
+
+describe("runRefreshCatalog embedding invalidation", () => {
+  it("invalidates a stale embedding on a changed refresh, keyed on the row's media id and a canonical document hash", async () => {
+    const logger = makeLogger();
+    const store = fakeStore({ rows: [row("1")] });
+    const registry = fakeRegistry({ "1": movieItem("1") });
+    const code = await runRefreshCatalog(
+      [],
+      deps(liveEnv(), registry, store, logger),
+    );
+    expect(code).toBe(0);
+    // Exactly one invalidation, for the changed row, carrying a stable non-empty
+    // canonical embedding-document hash. (The precise field membership of that
+    // hash — poster excluded, synopsis included — is pinned by the cross-run
+    // tests below.)
+    expect(store.calls.invalidate).toHaveLength(1);
+    expect(store.calls.invalidate[0].mediaId).toBe("media-1");
+    expect(store.calls.invalidate[0].freshDocumentHash).toMatch(
+      /^[0-9a-f]{64}$/,
+    );
+    const report = JSON.parse(
+      logger.lines.find((l) => l.includes("refresh_catalog_report")) ?? "{}",
+    );
+    expect(report).toMatchObject({ changed: 1, embeddingsInvalidated: 1 });
+  });
+
+  it("does not invalidate on unchanged, removed, transient, or stale outcomes", async () => {
+    const logger = makeLogger();
+    const rows = [row("2"), row("3"), row("4"), row("6")];
+    const registry = fakeRegistry({
+      "2": movieItem("2"), // -> unchanged
+      // "3" omitted -> not_found -> removed
+      "4": "unavailable", // -> transient
+      "6": movieItem("6"), // -> stale (P0005)
+    });
+    const store = fakeStore({
+      rows,
+      refreshResult: (args) => {
+        const ext = args.p_external_id;
+        if (ext === "movie:2") {
+          return {
+            data: { outcome: "unchanged", changed: false },
+            error: null,
+          };
+        }
+        if (ext === "movie:6") {
+          return { data: null, error: { message: "stale", code: "P0005" } };
+        }
+        return { data: { outcome: "changed", changed: true }, error: null };
+      },
+    });
+    await runRefreshCatalog(
+      ["--concurrency", "1"],
+      deps(liveEnv(), registry, store, logger),
+    );
+    expect(store.calls.invalidate).toHaveLength(0);
+    const report = JSON.parse(
+      logger.lines.find((l) => l.includes("refresh_catalog_report")) ?? "{}",
+    );
+    expect(report).toMatchObject({ embeddingsInvalidated: 0 });
+  });
+
+  it("performs NO invalidation on a dry run (write-free)", async () => {
+    const logger = makeLogger();
+    const store = fakeStore({ rows: [row("1", "old")] });
+    const registry = fakeRegistry({ "1": movieItem("1") });
+    await runRefreshCatalog(
+      ["--dry-run"],
+      deps(liveEnv(), registry, store, logger),
+    );
+    expect(store.calls.invalidate).toHaveLength(0);
+  });
+
+  it("passes an identical document hash for a poster-only change, so the store no-ops", async () => {
+    const logger = makeLogger();
+    // Two runs of the same title differing ONLY by posterUrl must yield the same
+    // invalidation key — proving the canonical document excludes the poster, so
+    // the store's `neq(content_hash)` guard makes the invalidation a no-op.
+    const hashes: string[] = [];
+    for (const posterUrl of [undefined, "https://img.example/p.jpg"]) {
+      const store = fakeStore({ rows: [row("1")] });
+      const registry = fakeRegistry({ "1": movieItem("1", { posterUrl }) });
+      await runRefreshCatalog([], deps(liveEnv(), registry, store, logger));
+      expect(store.calls.invalidate).toHaveLength(1);
+      hashes.push(store.calls.invalidate[0].freshDocumentHash);
+    }
+    expect(hashes[0]).toBe(hashes[1]);
+  });
+
+  it("passes a DIFFERENT document hash when a canonical field (synopsis) changes", async () => {
+    const logger = makeLogger();
+    const hashes: string[] = [];
+    for (const synopsis of ["A synopsis.", "A very different synopsis."]) {
+      const store = fakeStore({ rows: [row("1")] });
+      const registry = fakeRegistry({ "1": movieItem("1", { synopsis }) });
+      await runRefreshCatalog([], deps(liveEnv(), registry, store, logger));
+      hashes.push(store.calls.invalidate[0].freshDocumentHash);
+    }
+    expect(hashes[0]).not.toBe(hashes[1]);
+  });
+
+  it("treats a failed invalidation as non-fatal: still counts changed, warns, and exits 0", async () => {
+    const logger = makeLogger();
+    const store = fakeStore({
+      rows: [row("1")],
+      invalidateResult: () => ({
+        invalidated: 0,
+        error: { message: "update rejected" },
+      }),
+    });
+    const registry = fakeRegistry({ "1": movieItem("1") });
+    const code = await runRefreshCatalog(
+      [],
+      deps(liveEnv(), registry, store, logger),
+    );
+    expect(code).toBe(0);
+    expect(logger.lines.join("\n")).toContain("embedding invalidation failed");
+    const report = JSON.parse(
+      logger.lines.find((l) => l.includes("refresh_catalog_report")) ?? "{}",
+    );
+    expect(report).toMatchObject({ changed: 1, embeddingsInvalidated: 0 });
   });
 });

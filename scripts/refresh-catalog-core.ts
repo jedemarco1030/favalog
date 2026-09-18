@@ -41,8 +41,11 @@
 import {
   authorizeEmbeddingWrite,
   classifyTarget,
+  rowToMediaItem,
   type AuthorizationDecision,
+  type MediaRow,
 } from "./embed-catalog-core.ts";
+import { canonicalDocumentFor } from "../lib/search/canonical-document.ts";
 import {
   MAX_YEAR,
   MIN_YEAR,
@@ -358,6 +361,19 @@ export interface RefreshStore {
   markFailed(args: Record<string, unknown>): Promise<RpcEnvelope>;
   /** Record a confirmed removal (mark_external_media_removed). */
   markRemoved(args: Record<string, unknown>): Promise<RpcEnvelope>;
+  /**
+   * Invalidate a now-stale embedding after a content change: null the vector and
+   * its provenance for `mediaId` UNLESS the stored embedded-document hash already
+   * equals `freshDocumentHash` (an unchanged embedding input — e.g. a poster-only
+   * refresh — or a concurrent re-embed that already wrote the fresh document).
+   * Touches ONLY the private embedding store; never deletes the row, its
+   * content, or any user data, and never affects keyword search. Returns how
+   * many rows were invalidated (0 or 1).
+   */
+  invalidateStaleEmbedding(input: {
+    mediaId: string;
+    freshDocumentHash: string;
+  }): Promise<{ invalidated: number; error: { message: string } | null }>;
 }
 
 /** Minimal logger surface (injected so tests stay quiet and assertable). */
@@ -398,11 +414,28 @@ export interface RefreshSummary {
   stale: number;
   /** Estimated rows still due after this run (resumable-progress hint). */
   remainingDue: number;
+  /**
+   * Stale embeddings invalidated this run because a content change altered the
+   * canonical embedding document, so the previous vector is no longer served as
+   * compatible until the embedding pipeline regenerates it. A poster-only or
+   * rating-only change (excluded from the canonical document) never counts here.
+   */
+  embeddingsInvalidated: number;
 }
 
 /** Per-record outcome kinds accumulated into the summary. */
 type OutcomeKind =
   "changed" | "unchanged" | "removed" | "unavailable" | "failed" | "stale";
+
+/**
+ * The result of processing one due row: the summary bucket it falls into, plus
+ * whether it invalidated a now-stale embedding (only ever possible on a live
+ * `changed` outcome whose embedding input actually differs).
+ */
+interface RefreshOneResult {
+  kind: OutcomeKind;
+  embeddingInvalidated: boolean;
+}
 
 /** The transient provider categories that map to the `unavailable` bucket. */
 const TRANSIENT: ReadonlySet<ProviderErrorCategory> = new Set([
@@ -471,6 +504,35 @@ function buildRefreshArgs(
   };
 }
 
+/**
+ * The canonical EMBEDDING-document hash for a refreshed record — the exact hash
+ * the embedding pipeline stores next to a vector. It is built from the SAME
+ * fields (title/subtitle/kind/year/genres/credits/synopsis) through the shared
+ * `rowToMediaItem` + `canonicalDocumentFor`, so it agrees byte-for-byte with the
+ * pipeline. It intentionally EXCLUDES poster/backdrop/rating/timestamps, so a
+ * poster-only or rating-only refresh yields an unchanged hash and never
+ * needlessly invalidates a good embedding.
+ */
+export function embeddingDocumentHash(
+  row: RefreshCandidateRow,
+  item: NormalizedMediaItem,
+): string {
+  const mediaRow: MediaRow = {
+    id: row.mediaId,
+    slug: row.slug,
+    source: row.source,
+    kind: row.kind,
+    title: item.title,
+    subtitle: item.subtitle ?? null,
+    synopsis: item.synopsis,
+    year: item.year,
+    poster_url: item.posterUrl ?? null,
+    genres: item.genres,
+    details: buildDetails(item),
+  };
+  return canonicalDocumentFor(rowToMediaItem(mediaRow)).contentHash;
+}
+
 /** Guard a normalized fetch is safe to persist (title + plausible year). */
 function isMaterializable(item: NormalizedMediaItem): boolean {
   return (
@@ -514,7 +576,13 @@ async function refreshOne(
   deps: RefreshDeps,
   store: RefreshStore,
   registry: ProviderRegistry,
-): Promise<OutcomeKind> {
+): Promise<RefreshOneResult> {
+  // Most outcomes never invalidate an embedding; only a live content change can.
+  const bucket = (kind: OutcomeKind): RefreshOneResult => ({
+    kind,
+    embeddingInvalidated: false,
+  });
+
   let item: NormalizedMediaItem;
   try {
     item = await fetchDetail(registry, row);
@@ -527,48 +595,49 @@ async function refreshOne(
 
     // A confirmed provider removal is authoritative — soft-hide the row.
     if (category === "not_found") {
-      if (args.dryRun) return "removed";
+      if (args.dryRun) return bucket("removed");
       const { error: rpcError } = await store.markRemoved({
         p_source: row.source,
         p_kind: row.kind,
         p_external_id: row.externalId,
       });
-      if (rpcError) return "failed";
-      return "removed";
+      if (rpcError) return bucket("failed");
+      return bucket("removed");
     }
 
     // Everything else is a NON-authoritative failure: record it transiently so
     // the record stays due for a later retry, and never treat it as removal.
-    if (args.dryRun) return TRANSIENT.has(category) ? "unavailable" : "failed";
+    if (args.dryRun)
+      return bucket(TRANSIENT.has(category) ? "unavailable" : "failed");
     const { error: rpcError } = await store.markFailed({
       p_source: row.source,
       p_kind: row.kind,
       p_external_id: row.externalId,
       p_error: category,
     });
-    if (rpcError) return "failed";
-    return TRANSIENT.has(category) ? "unavailable" : "failed";
+    if (rpcError) return bucket("failed");
+    return bucket(TRANSIENT.has(category) ? "unavailable" : "failed");
   }
 
   // A malformed provider payload (missing title / implausible year) is a data
   // failure, not a removal: record it transiently and keep the record due.
   if (!isMaterializable(item)) {
-    if (args.dryRun) return "failed";
+    if (args.dryRun) return bucket("failed");
     const { error: rpcError } = await store.markFailed({
       p_source: row.source,
       p_kind: row.kind,
       p_external_id: row.externalId,
       p_error: "validation",
     });
-    if (rpcError) return "failed";
-    return "failed";
+    if (rpcError) return bucket("failed");
+    return bucket("failed");
   }
 
   const contentHash = normalizedContentHash(item);
 
-  // Dry run: preview the outcome WITHOUT any write.
+  // Dry run: preview the outcome WITHOUT any write (including no invalidation).
   if (args.dryRun) {
-    return isContentChanged(row, contentHash) ? "changed" : "unchanged";
+    return bucket(isContentChanged(row, contentHash) ? "changed" : "unchanged");
   }
 
   const { data, error } = await store.refresh(
@@ -577,17 +646,42 @@ async function refreshOne(
   if (error) {
     // P0005 = optimistic-concurrency rejection: a newer writer already advanced
     // the row, so our stale result is safely discarded (benign, not a failure).
-    if (error.code === "P0005") return "stale";
+    if (error.code === "P0005") return bucket("stale");
     // P0002 (unknown identity) / P0004 (curated) should not occur for a selected
     // provider row; any write error is a non-transient failure for this record.
-    return "failed";
+    return bucket("failed");
   }
 
   const outcome =
     data && typeof data === "object"
       ? (data as Record<string, unknown>).outcome
       : undefined;
-  return outcome === "changed" ? "changed" : "unchanged";
+  if (outcome !== "changed") return bucket("unchanged");
+
+  // The content changed: invalidate any embedding whose embedded canonical
+  // document no longer matches the fresh one, so the previous vector stops being
+  // served/counted as compatible until the embedding pipeline regenerates it.
+  // The store makes this a no-op when the embedding input is unchanged (e.g. a
+  // poster-only refresh, which the canonical document excludes) or when a
+  // concurrent re-embed already wrote the fresh document.
+  const freshDocumentHash = embeddingDocumentHash(row, item);
+  const { invalidated, error: invalidateError } =
+    await store.invalidateStaleEmbedding({
+      mediaId: row.mediaId,
+      freshDocumentHash,
+    });
+  if (invalidateError) {
+    // The authoritative content write already committed; a failed invalidation
+    // is NON-fatal because the embedding pipeline independently re-embeds a
+    // changed document (its stored hash no longer matches). Surface it for
+    // observability without failing the record or disturbing keyword search.
+    deps.logger.warn(
+      `[refresh-catalog] embedding invalidation failed for ${row.slug} (${row.source}); ` +
+        `the embedding pipeline will re-embed on its next run: ${invalidateError.message}`,
+    );
+    return { kind: "changed", embeddingInvalidated: false };
+  }
+  return { kind: "changed", embeddingInvalidated: invalidated > 0 };
 }
 
 /** Run an async worker over `items` with bounded concurrency, in index order. */
@@ -615,6 +709,7 @@ function formatSummary(s: RefreshSummary): string {
     `due ${s.due}, processed ${s.processed}, checked ${s.checked} ` +
     `(changed ${s.changed}, unchanged ${s.unchanged}, removed ${s.removed}), ` +
     `unavailable ${s.unavailable}, failed ${s.failed}, stale ${s.stale}, ` +
+    `embeddings invalidated ${s.embeddingsInvalidated}, ` +
     `remaining due ${s.remainingDue}`
   );
 }
@@ -734,14 +829,15 @@ export async function runRefreshCatalog(
       failed: 0,
       stale: 0,
       remainingDue: due,
+      embeddingsInvalidated: 0,
     };
 
     let aborted = false;
     await runPool(rows, args.concurrency, async (row) => {
       if (aborted) return;
-      let kind: OutcomeKind;
+      let result: RefreshOneResult;
       try {
-        kind = await refreshOne(row, args, deps, store, registry);
+        result = await refreshOne(row, args, deps, store, registry);
       } catch (error) {
         if (error instanceof FatalConfigError) {
           aborted = true;
@@ -749,7 +845,8 @@ export async function runRefreshCatalog(
         }
         throw error;
       }
-      summary[kind] += 1;
+      summary[result.kind] += 1;
+      if (result.embeddingInvalidated) summary.embeddingsInvalidated += 1;
     });
 
     if (aborted) {

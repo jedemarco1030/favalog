@@ -140,6 +140,34 @@ function createStore(url, key) {
         error: error ? { message: error.message, code: error.code } : null,
       };
     },
+    async invalidateStaleEmbedding({ mediaId, freshDocumentHash }) {
+      // Null the vector + its four provenance columns for this row, but ONLY
+      // when the row still carries an embedding AND its stored embedded-document
+      // hash differs from the fresh one. That `neq(content_hash)` guard makes
+      // this a deliberate no-op for an unchanged embedding input (e.g. a
+      // poster-only refresh) and never clobbers a concurrent re-embed that
+      // already wrote the fresh document. Nulling all five embedding fields
+      // together satisfies the all-or-nothing provenance CHECK; content,
+      // content_hash, document_version, keyword search, and every user row are
+      // left untouched. Returns the number of rows invalidated (0 or 1).
+      const { data, error } = await supabase
+        .from("media_search_documents")
+        .update({
+          embedding: null,
+          embedding_model: null,
+          embedding_provider: null,
+          embedding_dimensions: null,
+          embedded_at: null,
+        })
+        .eq("media_id", mediaId)
+        .neq("content_hash", freshDocumentHash)
+        .not("embedding", "is", null)
+        .select("media_id");
+      return {
+        invalidated: Array.isArray(data) ? data.length : 0,
+        error: error ? { message: error.message } : null,
+      };
+    },
   };
 }
 
