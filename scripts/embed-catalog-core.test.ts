@@ -613,9 +613,11 @@ describe("runEmbedCatalog", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Provider embedding policy — TMDB is NEVER embedded (AI/ML compliance gate).
-// These prove the single source-policy decision keeps TMDB out of the OpenAI
-// pipeline on every run, including a fully-confirmed hosted (remote) backfill.
+// Provider embedding policy — TMDB is excluded BY DEFAULT and admitted only when
+// the operator sets TMDB_EMBEDDING_ENABLED. These prove the single source-policy
+// decision keeps TMDB out of the OpenAI pipeline on every run — including a
+// fully-confirmed hosted (remote) backfill — unless that explicit flag is set,
+// while unknown sources always fail closed.
 // ---------------------------------------------------------------------------
 
 /** Build a MediaRow fixture with a given id/slug/source. */
@@ -669,6 +671,38 @@ describe("runEmbedCatalog — provider embedding policy", () => {
     // Curated + Open Library retain existing behavior; TMDB is filtered out.
     expect(slugs).toEqual(["curated-title", "ol-title"]);
     expect(slugs).not.toContain("tmdb-title");
+  });
+
+  it("embeds source='tmdb' when TMDB_EMBEDDING_ENABLED is explicitly set", async () => {
+    const h = createHarness({
+      env: {
+        SUPABASE_URL: LOCAL_URL,
+        SUPABASE_SECRET_KEY: SERVICE_KEY,
+        TMDB_EMBEDDING_ENABLED: "true",
+      },
+      mediaRows: [FAVALOG_ROW, TMDB_ROW, OPENLIBRARY_ROW],
+    });
+    const code = await runEmbedCatalog(["--fake"], h.deps);
+    expect(code).toBe(0);
+    const slugs = (h.captured.records ?? []).map((r) => r.slug);
+    // With the explicit opt-in, TMDB joins the permitted sources.
+    expect(slugs).toEqual(["curated-title", "tmdb-title", "ol-title"]);
+  });
+
+  it("still EXCLUDES unknown sources even when TMDB embedding is enabled", async () => {
+    const h = createHarness({
+      env: {
+        SUPABASE_URL: LOCAL_URL,
+        SUPABASE_SECRET_KEY: SERVICE_KEY,
+        TMDB_EMBEDDING_ENABLED: "true",
+      },
+      mediaRows: [FAVALOG_ROW, TMDB_ROW, UNKNOWN_SOURCE_ROW],
+    });
+    const code = await runEmbedCatalog(["--fake"], h.deps);
+    expect(code).toBe(0);
+    const slugs = (h.captured.records ?? []).map((r) => r.slug);
+    expect(slugs).toEqual(["curated-title", "tmdb-title"]);
+    expect(slugs).not.toContain("mystery-title");
   });
 
   it("fails closed on an unknown source (a missing policy cannot silently embed)", async () => {

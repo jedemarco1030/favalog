@@ -29,8 +29,10 @@ import {
   CANONICAL_DOCUMENT_VERSION,
   canonicalDocumentFor,
 } from "../lib/search/canonical-document.ts";
+import { isTmdbEmbeddingEnabled } from "../lib/catalog/feature-flag.ts";
 import {
   classifyEmbeddingSource,
+  type EmbeddingSourcePolicy,
   partitionEmbeddableRows,
 } from "../lib/search/embedding-source-policy.ts";
 import type { EmbeddingProvider } from "../lib/search/embedding-provider.ts";
@@ -590,18 +592,21 @@ export async function runEmbedCatalog(
   }
 
   // Provider embedding policy (single decision point): only allow-listed
-  // sources may be embedded. TMDB rows are excluded by default because the
-  // current TMDB API Terms broadly restrict AI/ML use and Favalog has no
-  // permission for that use; an unknown/blank source is also excluded (fail
-  // closed). This filter is applied to EVERY run — including a guarded remote
-  // (hosted) live backfill — so no re-embedding command can accidentally embed
-  // a TMDB row.
+  // sources may be embedded. TMDB rows are excluded BY DEFAULT and admitted only
+  // when the operator explicitly enables the dedicated `TMDB_EMBEDDING_ENABLED`
+  // control (read here from the injected env, so tests stay hermetic); an
+  // unknown/blank source is always excluded (fail closed). This filter is
+  // applied to EVERY run — including a guarded remote (hosted) live backfill —
+  // so no re-embedding command can embed a policy-excluded row.
+  const policy: EmbeddingSourcePolicy = {
+    tmdbEmbeddingEnabled: isTmdbEmbeddingEnabled(env),
+  };
   const allRows = (rows as MediaRow[]) ?? [];
-  const { embeddable, excluded } = partitionEmbeddableRows(allRows);
+  const { embeddable, excluded } = partitionEmbeddableRows(allRows, policy);
   if (excluded.length > 0) {
     const byReason = new Map<string, number>();
     for (const row of excluded) {
-      const reason = classifyEmbeddingSource(row.source);
+      const reason = classifyEmbeddingSource(row.source, policy);
       byReason.set(reason, (byReason.get(reason) ?? 0) + 1);
     }
     const summary = Array.from(byReason.entries())
@@ -609,7 +614,8 @@ export async function runEmbedCatalog(
       .join(", ");
     logger.log(
       `[embed-catalog] Provider policy excluded ${excluded.length} row(s) from ` +
-        `embedding (${summary}). TMDB and unknown sources are never embedded.`,
+        `embedding (${summary}). Unknown sources are never embedded; TMDB is ` +
+        `embedded only when TMDB_EMBEDDING_ENABLED is set.`,
     );
   }
 

@@ -1,41 +1,77 @@
 /**
  * Provider policy for the OpenAI embedding pipeline (AI Discovery).
  *
- * WHY THIS EXISTS: the current TMDB API Terms broadly restrict using TMDB APIs
- * or TMDB content in connection with an AI/ML-based application. Favalog has NOT
- * obtained permission or licensing for that use, so — until the owner confirms
- * appropriate permission through TMDB's official API licensing/support channel —
- * TMDB-sourced catalog rows (`source = 'tmdb'`) MUST NOT enter the OpenAI
- * embedding pipeline. Excluding TMDB from embeddings does NOT by itself resolve
- * every licensing question; the production TMDB provider must additionally stay
- * disabled (see `lib/catalog/feature-flag.ts` / the TMDB enablement flag).
+ * WHY THIS EXISTS: which catalog sources may enter the embedding pipeline is a
+ * deliberate, auditable decision rather than an implicit side effect of what
+ * happens to be in the catalog. This is the ONE place that decision lives, so
+ * `source === 'tmdb'` checks never scatter across scripts and the eval harness.
  *
- * DESIGN: this is the ONE place that decides which `media_items.source` values
- * are eligible for embedding, rather than scattering `source === 'tmdb'` checks
- * across scripts and the eval harness. It is a strict ALLOWLIST that fails
- * closed: a source is embeddable only if it is explicitly permitted here, so an
- * unknown, missing, blank, or newly-added source can never be embedded silently.
+ * TMDB SPECIFICALLY: the owner has clarified (per TMDB staff guidance in the
+ * provided screenshot) that generating embeddings for semantic search over
+ * cached TMDB metadata is acceptable for Favalog's described use. That
+ * clarification is scoped to this use; it is not blanket approval of unrelated
+ * uses or commercial licensing. Accordingly, TMDB rows are still EXCLUDED BY
+ * DEFAULT and become embeddable ONLY when an operator explicitly turns the
+ * dedicated embedding control on (see `isTmdbEmbeddingEnabled` in
+ * `lib/catalog/feature-flag.ts`, which reads the server-only
+ * `TMDB_EMBEDDING_ENABLED` flag). Enabling embeddings is independent from — and
+ * does not by itself resolve — the separate question of whether the live TMDB
+ * provider is enabled (`TMDB_ENABLED`).
  *
- * Pure and dependency-free (no I/O, no env, no secrets); safe to import from the
- * embedding CLI core, the eval harness, and tests.
+ * DESIGN: a strict ALLOWLIST that FAILS CLOSED. A source is embeddable only if
+ * it is explicitly permitted — unconditionally for {@link EMBEDDABLE_SOURCES},
+ * or conditionally (policy-gated) for {@link PROVIDER_GATED_EMBEDDABLE_SOURCES}.
+ * An unknown, missing, blank, or newly-added source can never be embedded
+ * silently.
+ *
+ * Pure and dependency-free (no I/O, no env, no secrets): the enablement DECISION
+ * is read at the boundary and passed in as an {@link EmbeddingSourcePolicy}, so
+ * this module stays safe to import from the embedding CLI core, the eval
+ * harness, and tests.
  */
 
 /**
- * The catalog sources that MAY be embedded, lower-cased and trimmed.
+ * The catalog sources that are ALWAYS embeddable, lower-cased and trimmed.
  *
  *   - `favalog`     curated/internal seed rows (the original AI Discovery corpus).
  *   - `openlibrary` books materialized from Open Library (no AI/ML use restriction
  *                   comparable to the current TMDB terms).
  *
- * NOTE the deliberate ABSENCE of `tmdb`: TMDB rows are excluded by default. Do
- * not add a source here without a documented policy decision.
+ * Provider-gated sources (e.g. `tmdb`) are deliberately NOT listed here; see
+ * {@link PROVIDER_GATED_EMBEDDABLE_SOURCES}.
  */
 export const EMBEDDABLE_SOURCES = ["favalog", "openlibrary"] as const;
 
-/** A source that is present in the catalog but intentionally NOT embeddable. */
-export const EMBEDDING_EXCLUDED_SOURCES = ["tmdb"] as const;
+/**
+ * Sources that are embeddable ONLY when their dedicated policy control is
+ * explicitly enabled. `tmdb` is excluded by default and admitted solely when the
+ * operator sets {@link EmbeddingSourcePolicy.tmdbEmbeddingEnabled}.
+ */
+export const PROVIDER_GATED_EMBEDDABLE_SOURCES = ["tmdb"] as const;
 
 export type EmbeddableSource = (typeof EMBEDDABLE_SOURCES)[number];
+
+/**
+ * Explicit, serializable embedding-eligibility decisions. Read once at the
+ * boundary (from env, via `lib/catalog/feature-flag.ts`) and threaded through so
+ * this module performs no I/O of its own.
+ */
+export interface EmbeddingSourcePolicy {
+  /**
+   * Whether TMDB-sourced rows (`source = 'tmdb'`) may be embedded. Defaults to
+   * `false` everywhere; only an operator's explicit opt-in flips it on.
+   */
+  tmdbEmbeddingEnabled: boolean;
+}
+
+/**
+ * The safe default policy: provider-gated sources stay OUT of the embedding
+ * pipeline. Used whenever no explicit policy is supplied, so a caller that
+ * forgets to pass one can never accidentally widen eligibility.
+ */
+export const DEFAULT_EMBEDDING_SOURCE_POLICY: EmbeddingSourcePolicy = {
+  tmdbEmbeddingEnabled: false,
+};
 
 const EMBEDDABLE_SOURCE_SET: ReadonlySet<string> = new Set(EMBEDDABLE_SOURCES);
 
@@ -50,18 +86,27 @@ function normalizeSource(source: string | null | undefined): string {
 
 /**
  * Whether a catalog row from the given `source` is allowed into the embedding
- * pipeline. STRICT ALLOWLIST / DEFAULT DENY: returns `true` ONLY for an
- * explicitly permitted source ({@link EMBEDDABLE_SOURCES}). Everything else —
- * `tmdb`, an unknown/new provider, or a missing/blank/non-string value —
- * returns `false`, so a missing policy entry can never silently allow embedding.
+ * pipeline under `policy`. STRICT ALLOWLIST / DEFAULT DENY: returns `true` only
+ * for an always-permitted source ({@link EMBEDDABLE_SOURCES}), or for a
+ * policy-gated source when its control is explicitly enabled (currently only
+ * `tmdb` via `policy.tmdbEmbeddingEnabled`). Everything else — an unknown/new
+ * provider, or a missing/blank/non-string value — returns `false`, so a missing
+ * policy entry can never silently allow embedding.
  */
-export function isSourceEmbeddable(source: string | null | undefined): boolean {
-  return EMBEDDABLE_SOURCE_SET.has(normalizeSource(source));
+export function isSourceEmbeddable(
+  source: string | null | undefined,
+  policy: EmbeddingSourcePolicy = DEFAULT_EMBEDDING_SOURCE_POLICY,
+): boolean {
+  const normalized = normalizeSource(source);
+  if (EMBEDDABLE_SOURCE_SET.has(normalized)) return true;
+  if (normalized === "tmdb") return policy.tmdbEmbeddingEnabled === true;
+  return false;
 }
 
 /**
  * Machine-readable reason a source was excluded from embedding (safe to log;
  * never contains user content). `permitted` means the row IS embeddable.
+ * `excluded_tmdb` means the row is TMDB and the TMDB embedding control is off.
  */
 export type EmbeddingSourceDecision =
   "permitted" | "excluded_tmdb" | "excluded_unknown";
@@ -73,26 +118,32 @@ export type EmbeddingSourceDecision =
  */
 export function classifyEmbeddingSource(
   source: string | null | undefined,
+  policy: EmbeddingSourcePolicy = DEFAULT_EMBEDDING_SOURCE_POLICY,
 ): EmbeddingSourceDecision {
   const normalized = normalizeSource(source);
   if (EMBEDDABLE_SOURCE_SET.has(normalized)) return "permitted";
-  if (normalized === "tmdb") return "excluded_tmdb";
+  if (normalized === "tmdb") {
+    return policy.tmdbEmbeddingEnabled ? "permitted" : "excluded_tmdb";
+  }
   return "excluded_unknown";
 }
 
 /**
- * Partition rows carrying a `source` into those that may be embedded and those
- * excluded by policy, preserving input order. Generic over any row shape that
- * exposes a `source` field so both the CLI core and the eval harness can share
- * one decision.
+ * Partition rows carrying a `source` into those that may be embedded under
+ * `policy` and those excluded by it, preserving input order. Generic over any
+ * row shape that exposes a `source` field so both the CLI core and the eval
+ * harness can share one decision.
  */
 export function partitionEmbeddableRows<
   T extends { source: string | null | undefined },
->(rows: readonly T[]): { embeddable: T[]; excluded: T[] } {
+>(
+  rows: readonly T[],
+  policy: EmbeddingSourcePolicy = DEFAULT_EMBEDDING_SOURCE_POLICY,
+): { embeddable: T[]; excluded: T[] } {
   const embeddable: T[] = [];
   const excluded: T[] = [];
   for (const row of rows) {
-    (isSourceEmbeddable(row.source) ? embeddable : excluded).push(row);
+    (isSourceEmbeddable(row.source, policy) ? embeddable : excluded).push(row);
   }
   return { embeddable, excluded };
 }
