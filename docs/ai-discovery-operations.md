@@ -340,6 +340,66 @@ Unset (or set falsey) `EXTERNAL_CATALOG_ENABLED` → `/explore` reverts to
 local-only immediately; imports are rejected. The alias table and RPC remain in
 place (harmless when the flag is off). No data migration is needed to disable.
 
+## Periodic provider-metadata refresh (implemented locally; activation pending)
+
+A bounded, resumable refresh worker keeps already-imported provider-owned rows
+fresh and invalidates stale embeddings. It is **implemented and locally
+verified**; hosted activation is owner-controlled and **pending**
+(`TMDB_ENABLED` stays `false` in production). The full activation, disable, and
+recovery procedure is in
+[`docs/tmdb-activation-rollout.md`](tmdb-activation-rollout.md); the scheduler
+itself is the applyable, owner-gated workflow in the
+[scheduler handoff](ci/catalog-refresh-scheduler-handoff.md).
+
+### What the worker does
+
+- Selects **due** provider-owned rows (`provider_checked_at` null or older than
+  the freshness window — a **7-day engineering default**, not a TMDB interval),
+  oldest-checked-first, in deterministic bounded batches with explicit timeouts,
+  bounded concurrency, per-run limits, and bounded retries/backoff honoring
+  `429`/`Retry-After`.
+- Drives the `service_role`-only RPCs `refresh_external_media(...)`,
+  `mark_external_media_refresh_failed(...)`, and
+  `mark_external_media_removed(...)`. A **successful check advances freshness
+  without churning** content hashes or embeddings when nothing changed; a failed
+  request never marks a row refreshed.
+- On a genuine content change, refreshes the canonical document and invalidates
+  the stale embedding (guarded by a content-hash mismatch) so an older-hash
+  vector is never served as current; only eligible missing/stale embeddings are
+  regenerated via the existing guarded `npm run embed:catalog` backfill.
+
+### Operating it
+
+```bash
+# Read-only backlog preview (provider reads only; no DB/embedding writes).
+node scripts/refresh-catalog.mjs --dry-run \
+  --allow-remote --confirm-project-ref=<ref> \
+  --provider tmdb --freshness-days 7
+
+# Live bounded refresh (retains the remote-write guard).
+node scripts/refresh-catalog.mjs \
+  --allow-remote --confirm-project-ref=<ref> \
+  --provider tmdb --limit 200 --concurrency 4 --freshness-days 7
+```
+
+The structured, redacted summary reports **checked / changed / unchanged /
+unavailable / failed / remaining due** — never secrets or raw provider payloads.
+`remaining due` is the overdue backlog; a persistently growing backlog means the
+schedule is not keeping up (raise `--limit` or investigate failures), and a
+sustained `failed`/`unavailable` count points at provider/credential issues.
+
+### Disabling independently
+
+- **Schedule only:** set `CATALOG_REFRESH_ENABLED` to anything but `true`;
+  manual TMDB import via the app flags is unaffected.
+- **Provider requests entirely:** turn off `TMDB_ENABLED` (and/or
+  `EXTERNAL_CATALOG_ENABLED`). The refresh CLI is fail-closed — a disabled
+  provider makes no request and the scheduled run is a clean no-op.
+- **Already-imported titles survive disabling:** slugs, aliases, canonical ids,
+  and every user reference stay intact and keep resolving; metadata just goes
+  stale until re-enabled. Disabling never retracts metadata already delivered to
+  browsers and never deletes user records.
+
 ## Privacy boundaries and retention
 
 - **Never** in telemetry or analytics: raw/normalized **query text**, media

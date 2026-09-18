@@ -24,12 +24,22 @@ and import (materialize) movies/TV from **TMDB** and books from **Open Library**
 into the real catalog. This ingestion layer is server-only, and its federated
 Explore discovery + canonical on-demand materialization is now **wired and
 production-verified** (Open Library enabled; TMDB gated off). The **local**
-curated catalog migration owns **28** titles, while **hosted production**
-contains **29** — the 28 curated titles plus the imported Open Library Work
-`OL893414W`, which resolves to the canonical **Dune** title. The app still
-builds and runs with **no** Supabase or provider environment variables set. The
-architecture is designed so the remaining pieces can drop in without rewriting
-the UI.
+curated catalog migration owns **28** titles, while the **2026-09-01 hosted
+production observation** recorded **29** — the 28 curated titles plus the
+imported Open Library Work `OL893414W`, which resolves to the canonical **Dune**
+title (a point-in-time figure; importing TMDB titles after activation will
+change it). The app still builds and runs with **no** Supabase or provider
+environment variables set. The architecture is designed so the remaining pieces
+can drop in without rewriting the UI.
+
+**TMDB activation readiness & periodic refresh (implemented locally, not yet
+activated in production).** Provider gating/attribution are reconciled to the
+documented activation requirements, and a bounded, resumable periodic
+metadata-refresh worker (`scripts/refresh-catalog.mjs`) keeps imported
+provider-owned rows fresh and invalidates stale embeddings, behind the existing
+remote-write guard and an owner-gated scheduler. `TMDB_ENABLED` remains
+**false** in hosted production; activation is the owner-controlled procedure in
+[`docs/tmdb-activation-rollout.md`](docs/tmdb-activation-rollout.md).
 
 ---
 
@@ -284,7 +294,7 @@ security/grant checks and production list behavior — including private-list
 non-disclosure, immutable-slug edits, and the authoritative post-delete redirect
 to `/lists` (the former list URL correctly becomes not-found; commit `53eac02`
 fixed the client-navigation race) have been confirmed. Migrations for the
-favorites loop (**18th**), AI Discovery (**19th–22nd**), and the relevance
+favorites loop (**18th**), AI Discovery (**19th��22nd**), and the relevance
 cutoff (**23rd**), the Catalog Platform v1A provider ingestion (**24th**), and
 the v1B canonical-identity migration (**25th**) are now **applied to hosted
 Supabase** as well: all **25** migrations through `20260815120600` are recorded
