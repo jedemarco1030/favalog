@@ -108,7 +108,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: |
-          node scripts/refresh-catalog.mjs \
+          npm run refresh:catalog -- \
             ${{ inputs.dry_run && '--dry-run' || '' }} \
             --allow-remote \
             --confirm-project-ref="${{ secrets.SUPABASE_PROJECT_REF }}" \
@@ -206,7 +206,7 @@ anything, run the refresh CLI in dry-run mode against the hosted project (owner
 credentials, read-only):
 
 ```bash
-node scripts/refresh-catalog.mjs --dry-run \
+npm run refresh:catalog -- --dry-run \
   --allow-remote --confirm-project-ref=<ref> \
   --provider tmdb --freshness-days 7
 ```

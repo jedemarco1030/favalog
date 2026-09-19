@@ -105,7 +105,7 @@ would regenerate types against the old ambiguous overloads.
 +        run: |
 +          set -euo pipefail
 +          tmpfile="$(mktemp)"
-+          supabase gen types typescript --local --schema public > "$tmpfile"
++          npx supabase gen types typescript --local --schema public > "$tmpfile"
 +          test -s "$tmpfile" \
 +            || { echo "::error::Generated types output was empty."; exit 1; }
 +          mv "$tmpfile" lib/database.types.ts

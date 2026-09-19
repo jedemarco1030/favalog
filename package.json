@@ -34,9 +34,10 @@
     "supabase:reset": "supabase db reset",
     "supabase:types": "supabase gen types typescript --local --schema public > lib/database.types.ts",
     "db:test": "supabase test db",
-    "embed:catalog": "node scripts/embed-catalog.mjs",
-    "eval:search": "node scripts/eval-search.mjs",
-    "catalog": "node scripts/catalog-import.mjs",
+    "embed:catalog": "tsx scripts/embed-catalog.mjs",
+    "eval:search": "tsx scripts/eval-search.mjs",
+    "catalog": "tsx scripts/catalog-import.mjs",
+    "refresh:catalog": "tsx scripts/refresh-catalog.mjs",
     "prepare": "husky"
   },
   "dependencies": {
@@ -74,6 +75,7 @@
     "storybook": "^10.5.6",
     "supabase": "^2.111.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.13",
     "typescript": "^5",
     "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^4.1.10"
