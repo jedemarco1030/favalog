@@ -372,12 +372,12 @@ itself is the applyable, owner-gated workflow in the
 
 ```bash
 # Read-only backlog preview (provider reads only; no DB/embedding writes).
-node scripts/refresh-catalog.mjs --dry-run \
+npm run refresh:catalog -- --dry-run \
   --allow-remote --confirm-project-ref=<ref> \
   --provider tmdb --freshness-days 7
 
 # Live bounded refresh (retains the remote-write guard).
-node scripts/refresh-catalog.mjs \
+npm run refresh:catalog -- \
   --allow-remote --confirm-project-ref=<ref> \
   --provider tmdb --limit 200 --concurrency 4 --freshness-days 7
 ```

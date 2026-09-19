@@ -76,8 +76,29 @@ jobs:
   database:
     name: Supabase schema & RLS tests
     runs-on: ubuntu-latest
+    # Identify generated-type artifacts by the SOURCE commit — the real branch
+    # head, NEVER the ephemeral pull_request merge commit. On pull_request,
+    # `github.sha` is that throwaway merge commit; `pull_request.head.sha` is the
+    # branch head where the regenerated file must ultimately be committed. On
+    # push, both are the pushed commit.
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
+      # Check out the SOURCE commit itself, not the default merge ref. Migrations
+      # and generated types must reflect the exact code under review, and the
+      # artifact must be reproducible from `SOURCE_SHA`.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      # Fail loudly unless the checkout is EXACTLY the source commit, so a
+      # mislabelled artifact can never be produced from a merge or other commit.
+      - name: Assert checkout is at source commit
+        run: |
+          HEAD_SHA="$(git rev-parse HEAD)"
+          echo "HEAD=$HEAD_SHA SOURCE_SHA=$SOURCE_SHA"
+          test "$HEAD_SHA" = "$SOURCE_SHA" \
+          || { echo "::error::Checkout $HEAD_SHA != SOURCE_SHA $SOURCE_SHA"; exit 1; }
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -94,15 +115,58 @@ jobs:
       - name: Run database tests (pgTAP)
         run: npm run db:test
 
-      # Drift guard (secret-free): regenerate types from the local stack and
-      # fail if the committed `lib/database.types.ts` is out of date with the
-      # migrations. This also flags the initial hand-authored placeholder as
-      # needing a real generation. No remote credentials are involved.
+      # Regenerate types from the freshly-migrated local stack at SOURCE_SHA,
+      # BEFORE any drift comparison. Generate into a TEMP file first, require a
+      # successful command AND nonempty output, then atomically replace the
+      # committed file. `set -o pipefail` + the redirect mean a failed generation
+      # exits nonzero and leaves `database.types.ts` untouched, so a broken or
+      # empty file is never uploaded or compared. No remote credentials.
+      - name: Generate database types
+        id: gen_types
+        run: |
+          set -euo pipefail
+          tmpfile="$(mktemp)"
+          supabase gen types typescript --local --schema public > "$tmpfile"
+          test -s "$tmpfile" \
+            || { echo "::error::Generated types output was empty."; exit 1; }
+          mv "$tmpfile" lib/database.types.ts
+
+      # Upload the generated file BEFORE the drift check so it stays downloadable
+      # even when drift fails — but ONLY when generation actually succeeded, so a
+      # failed or empty generation can never masquerade as a valid artifact.
+      # Named by SOURCE_SHA so retrieval is unambiguous and verifiable.
+      - name: Upload generated database types
+        if: ${{ steps.gen_types.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-types-${{ env.SOURCE_SHA }}
+          path: lib/database.types.ts
+          if-no-files-found: error
+          retention-days: 7
+
+      # Record the artifact name, source commit, and retrieval instructions in
+      # the job summary so the file can be found and applied from a browser.
+      - name: Publish types artifact instructions to job summary
+        if: ${{ steps.gen_types.outcome == 'success' }}
+        run: |
+          {
+            echo "### Generated \`lib/database.types.ts\` artifact"
+            echo
+            echo "- Artifact: \`database-types-${SOURCE_SHA}\`"
+            echo "- Source commit: \`${SOURCE_SHA}\`"
+            echo "- Branch: \`${GITHUB_REF_NAME}\`"
+            echo
+            echo "Download it from the **Artifacts** section of this run, unzip \`database.types.ts\`, and commit it to \`lib/database.types.ts\` at the source commit above. Re-running CI on the resulting commit must clear this drift check."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Drift guard (secret-free): fail if the committed `lib/database.types.ts`
+      # is out of date with the migrations. PRESERVED as a hard failure until the
+      # regenerated file (uploaded above) is committed. Pure comparison now —
+      # generation happens in the step above. No remote credentials.
       - name: Check generated types are up to date
         run: |
-          npm run supabase:types
           git diff --exit-code -- lib/database.types.ts \
-            || { echo "::error::lib/database.types.ts is out of date. Run 'npm run supabase:types' and commit the result."; exit 1; }
+            || { echo "::error::lib/database.types.ts is out of date. Download the 'database-types-${SOURCE_SHA}' artifact from this run and commit it to lib/database.types.ts (see job summary)."; exit 1; }
 
       - name: Stop local Supabase stack
         if: ${{ always() }}
