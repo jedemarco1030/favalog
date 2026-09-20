@@ -29,6 +29,11 @@ function makeMediaRow(overrides: Partial<MediaItemRow> = {}): MediaItemRow {
     content_hash: null,
     normalization_version: null,
     synced_at: null,
+    provider_checked_at: null,
+    provider_removed_at: null,
+    last_refresh_error: null,
+    last_refresh_error_at: null,
+    refresh_failure_count: 0,
     search_tsv: null,
     ...overrides,
   };
