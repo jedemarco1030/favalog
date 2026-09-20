@@ -156,12 +156,12 @@ confirm the second pass changes nothing:
 
 ```bash
 # Read-only preview (provider reads only; no DB or embedding writes)
-node scripts/refresh-catalog.mjs --dry-run \
+npm run refresh:catalog -- --dry-run \
   --allow-remote --confirm-project-ref=<ref> \
   --provider tmdb --freshness-days 7
 
 # Live bounded refresh (oldest-checked-first, bounded batch + concurrency)
-node scripts/refresh-catalog.mjs \
+npm run refresh:catalog -- \
   --allow-remote --confirm-project-ref=<ref> \
   --provider tmdb --limit 200 --concurrency 4 --freshness-days 7
 ```

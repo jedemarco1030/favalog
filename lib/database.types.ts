@@ -264,8 +264,13 @@ export type Database = {
           genres: string[]
           id: string
           kind: Database["public"]["Enums"]["media_kind"]
+          last_refresh_error: string | null
+          last_refresh_error_at: string | null
           normalization_version: string | null
           poster_url: string | null
+          provider_checked_at: string | null
+          provider_removed_at: string | null
+          refresh_failure_count: number
           search_tsv: unknown
           slug: string
           source: string
@@ -286,8 +291,13 @@ export type Database = {
           genres?: string[]
           id?: string
           kind: Database["public"]["Enums"]["media_kind"]
+          last_refresh_error?: string | null
+          last_refresh_error_at?: string | null
           normalization_version?: string | null
           poster_url?: string | null
+          provider_checked_at?: string | null
+          provider_removed_at?: string | null
+          refresh_failure_count?: number
           search_tsv?: unknown
           slug: string
           source?: string
@@ -308,8 +318,13 @@ export type Database = {
           genres?: string[]
           id?: string
           kind?: Database["public"]["Enums"]["media_kind"]
+          last_refresh_error?: string | null
+          last_refresh_error_at?: string | null
           normalization_version?: string | null
           poster_url?: string | null
+          provider_checked_at?: string | null
+          provider_removed_at?: string | null
+          refresh_failure_count?: number
           search_tsv?: unknown
           slug?: string
           source?: string
@@ -587,6 +602,23 @@ export type Database = {
         }
         Returns: Json
       }
+      mark_external_media_refresh_failed: {
+        Args: {
+          p_error: string
+          p_external_id: string
+          p_kind: Database["public"]["Enums"]["media_kind"]
+          p_source: string
+        }
+        Returns: Json
+      }
+      mark_external_media_removed: {
+        Args: {
+          p_external_id: string
+          p_kind: Database["public"]["Enums"]["media_kind"]
+          p_source: string
+        }
+        Returns: Json
+      }
       materialize_external_media: {
         Args: {
           p_average_rating: number
@@ -634,6 +666,26 @@ export type Database = {
           p_title: string
         }
         Returns: unknown
+      }
+      refresh_external_media: {
+        Args: {
+          p_average_rating: number
+          p_backdrop_url: string
+          p_content_hash: string
+          p_details: Json
+          p_expected_content_hash?: string
+          p_external_id: string
+          p_genres: string[]
+          p_kind: Database["public"]["Enums"]["media_kind"]
+          p_normalization_version: string
+          p_poster_url: string
+          p_source: string
+          p_subtitle: string
+          p_synopsis: string
+          p_title: string
+          p_year: number
+        }
+        Returns: Json
       }
       remove_list_item: {
         Args: { p_list_id: string; p_media_slug: string }

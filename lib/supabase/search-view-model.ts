@@ -85,6 +85,13 @@ export function mapSearchRowToMediaItem(row: SearchRpcRow): MediaItem {
     content_hash: null,
     normalization_version: null,
     synced_at: null,
+    // Refresh-lifecycle columns are operational only and never projected by
+    // the search RPCs; synthesize inert defaults for the shared mapper.
+    provider_checked_at: null,
+    provider_removed_at: null,
+    last_refresh_error: null,
+    last_refresh_error_at: null,
+    refresh_failure_count: 0,
     // The generated tsvector is not part of the projection; the mapper ignores it.
     search_tsv: null as unknown as MediaItemRow["search_tsv"],
   };
