@@ -129,7 +129,7 @@ jobs:
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          node scripts/embed-catalog.mjs \
+          npm run embed:catalog -- \
             --allow-remote \
             --confirm-project-ref="${{ secrets.SUPABASE_PROJECT_REF }}" \
             --limit 200
