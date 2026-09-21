@@ -1,7 +1,10 @@
 # TMDB activation & scheduled metadata refresh — owner-controlled rollout runbook
 
-- **Status:** Activation readiness implemented and locally verifiable; **production
-  activation pending** (owner-controlled).
+- **Status (updated 2026-09-21):** TMDB discovery/import is **owner-confirmed in
+  hosted production**; the scheduled metadata-refresh workflow is **not yet
+  installed on `main`** and its runs remain **unverified/pending**
+  (owner- and maintainer-controlled). See
+  [Rollout progress observed on 2026-09-21](#rollout-progress-observed-on-2026-09-21).
 - **Scope:** The exact, ordered procedure to activate TMDB movie/TV discovery
   and import in production, keep imported metadata fresh with the bounded
   periodic refresh worker, and regenerate affected embeddings — without deleting
@@ -34,7 +37,40 @@ embedding writes.
 3. **Production activation is still pending.** `TMDB_ENABLED` remains **false**
    in hosted production. No hosted secret has been set, no hosted mutation has
    been performed, nothing has been deployed, and the schedule is inert. Turning
-   any of this on is exclusively the steps below.
+   any of this on is exclusively the steps below. **Update (2026-09-21):** the
+   owner has since completed discovery/import activation in hosted production
+   (see [Rollout progress observed on 2026-09-21](#rollout-progress-observed-on-2026-09-21));
+   the **scheduled refresh** remains inert because its workflow is not yet
+   installed on `main`. The earlier text in this item is retained as history.
+
+## Rollout progress observed on 2026-09-21
+
+Evidence recorded on **2026-09-21**, mapped to this runbook's steps.
+Owner-confirmed UI behavior is kept distinct from verified workflow/processing
+results, and no counts were re-measured on this date.
+
+- **Steps 3–5 (secrets, TMDB enablement, import & attribution) — owner-confirmed.**
+  The owner reports setup is complete, the TMDB provider variables
+  (`TMDB_API_READ_TOKEN`, `TMDB_EMBEDDING_ENABLED`, `TMDB_ENABLED`) are
+  configured, TMDB titles appear in production, movies and TV shows can be added
+  to lists, and title pages open without errors. These are owner-confirmed UI
+  observations, not independently re-measured here.
+- **Step 6 (embedding backfill & retrieval) — not independently verified.**
+  Compatible-embedding counts were not re-measured on this date; the historical
+  2026-09-01 figure (29 documents) remains the last measured value and is not
+  restated as current.
+- **Step 7 (bounded refresh + idempotent repeat) — pending.** No refresh CLI run
+  evidence is available.
+- **Step 8 (schedule activation) — pending / blocked.** A read-only GitHub
+  Actions inspection against `main` (`5fc96e0a`) found the `catalog-refresh`
+  workflow is **not present on `main`** (only `CI` is registered) and **no
+  `workflow_dispatch` or `schedule` run has ever executed**. Scheduling is not
+  enabled, and no run summary demonstrating actual processing exists yet.
+
+**Remaining blocker:** a `workflows`-scoped maintainer must add
+`.github/workflows/catalog-refresh.yml` (per the
+[scheduler handoff](ci/catalog-refresh-scheduler-handoff.md)) before any manual
+rehearsal or scheduled run can be exercised and verified.
 
 ## Historical vs. currently measured counts
 

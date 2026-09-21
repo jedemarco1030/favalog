@@ -1,0 +1,111 @@
+name: Catalog metadata refresh
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Read-only preview (provider reads only; NO database or embedding writes)"
+        type: boolean
+        default: true
+      limit:
+        description: "Max due rows to process this run (1..500). Set to 1 to exercise a single newly-imported record."
+        type: string
+        default: "200"
+  schedule:
+    # Daily, off-peak, and deliberately off the top of the hour to avoid
+    # contention. Cron is UTC. This is an ENGINEERING default (daily checks for
+    # a 7-day freshness target), NOT a TMDB-prescribed interval.
+    - cron: "17 4 * * *"
+
+# Overlap prevention: never let two refresh runs proceed concurrently. We do
+# NOT cancel an in-flight run — a partial refresh is safe and resumable, and
+# cancelling mid-batch wastes the provider reads already spent.
+concurrency:
+  group: catalog-refresh
+  cancel-in-progress: false
+
+# Least privilege: the workflow only reads the repository to run the CLIs.
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "22"
+  # Manual dispatch defaults to a read-only preview (dry_run input default true);
+  # any non-dispatch trigger (the schedule) is ALWAYS live.
+  DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
+  # Bounded batch size. Dispatch may narrow it (e.g. "1"); the schedule and any
+  # dispatch that leaves the field at its default use 200. The CLI re-clamps to
+  # [1, 500] server-side; a caller can only narrow, never widen.
+  REFRESH_LIMIT: ${{ (github.event_name == 'workflow_dispatch' && inputs.limit) || '200' }}
+
+jobs:
+  refresh:
+    name: Bounded refresh + stale-embedding backfill
+    runs-on: ubuntu-latest
+    # SPLIT ACTIVATION GATE.
+    #  - Manual `workflow_dispatch` ALWAYS runs, so an operator can rehearse a
+    #    read-only preview or exercise ONE live refresh WITHOUT enabling
+    #    scheduled writes.
+    #  - The daily `schedule` runs ONLY when the owner has set the repository
+    #    (or environment) variable CATALOG_REFRESH_ENABLED to the string "true".
+    #    Until then every scheduled run resolves to a no-op here.
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.CATALOG_REFRESH_ENABLED == 'true' }}
+    # Bind the protected secrets to a named environment so they can carry
+    # required reviewers / branch protections if desired.
+    environment: catalog-refresh
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Observability only: makes the resolved mode obvious in the run log.
+      - name: Report run mode
+        run: 'echo "event=${{ github.event_name }} dry_run=${{ env.DRY_RUN }} limit=${{ env.REFRESH_LIMIT }}"'
+
+      # STEP 1 — bounded provider refresh of already-imported TMDB rows.
+      # Provider + external-catalog activation is set INLINE here because GitHub
+      # Actions does NOT inherit Vercel project environment variables. Fail-closed
+      # if the token is absent. The remote-write guard requires BOTH --allow-remote
+      # and a matching --confirm-project-ref; --dry-run stays write-free regardless.
+      - name: Bounded provider refresh
+        env:
+          EXTERNAL_CATALOG_ENABLED: "true"
+          TMDB_ENABLED: "true"
+          TMDB_API_READ_TOKEN: ${{ secrets.TMDB_API_READ_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          npm run refresh:catalog -- \
+            ${{ env.DRY_RUN == 'true' && '--dry-run' || '' }} \
+            --allow-remote \
+            --confirm-project-ref="${{ secrets.SUPABASE_PROJECT_REF }}" \
+            --provider tmdb \
+            --limit "${{ env.REFRESH_LIMIT }}" \
+            --concurrency 4 \
+            --freshness-days 7
+
+      # STEP 2 — bounded regeneration of missing/stale eligible embeddings.
+      # SKIPPED ENTIRELY on a dry run: a dry run performs NO database writes and
+      # NO embedding generation. TMDB_EMBEDDING_ENABLED is set inline (Vercel env
+      # is not inherited) and must be "true" for TMDB rows to be embedding-eligible
+      # (Section 1 control); leave it unset to keep TMDB rows out of embeddings.
+      - name: Bounded stale-embedding backfill
+        if: ${{ env.DRY_RUN != 'true' }}
+        env:
+          TMDB_EMBEDDING_ENABLED: "true"
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          npm run embed:catalog -- \
+            --allow-remote \
+            --confirm-project-ref="${{ secrets.SUPABASE_PROJECT_REF }}" \
+            --limit 200
