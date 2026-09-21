@@ -109,6 +109,8 @@ describe("mapFeedRow — diary items", () => {
       title: "A desert epic",
       excerpt: "Villeneuve builds a world you can feel in your teeth.",
       containsSpoilers: true,
+      likeCount: 0,
+      viewerHasLiked: false,
     });
   });
 
@@ -193,6 +195,8 @@ describe("mapFeedRow — standalone reviews", () => {
       title: "Second thoughts",
       excerpt: "Still thinking about the ending.",
       containsSpoilers: false,
+      likeCount: 0,
+      viewerHasLiked: false,
     });
   });
 

@@ -312,7 +312,6 @@ the locally implemented Phase 4B.2 feed:
 
 - TMDB activation and the owner-controlled refresh implementation for cached
   metadata and embeddings; `TMDB_ENABLED` remains **false**.
-- Likes on reviews or lists.
 - Notifications.
 - Moderation.
 - Games.

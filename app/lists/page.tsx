@@ -169,6 +169,7 @@ export default async function ListsPage() {
         community={community}
         createReturnTo={createReturnTo}
         createSignInHref={signInHref}
+        like={likeContext}
       />
 
       <section aria-labelledby="curated-heading" className="mt-16">

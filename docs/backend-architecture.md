@@ -52,9 +52,9 @@
 > "No matches yet" state). The remote-write guard remains the required process
 > for any future production re-embedding (see ADR 0003). The
 > remaining product surfaces (catalog browsing, community reviews) still run on
-> the typed mock-data layer (`@/lib/data`), and **reordering, curator notes, list
-> likes, follower-aware visibility, direct favorite-removal from the profile, and
-> follows are deferred**. The generated types
+> the typed mock-data layer (`@/lib/data`), and **reordering, curator notes,
+> direct favorite-removal from the profile, and follows UI polish are deferred**
+> (review and list likes are now real and persisted). The generated types
 > (`lib/database.types.ts`) are real and drift-checked; the local catalog
 > migration owns all **28** curated titles (hosted production additionally
 > contains the imported Open Library Work `OL893414W`, for **29** titles);
@@ -209,12 +209,18 @@ To avoid representing the same rating inconsistently:
 - A **standalone** review (no `diary_entry_id`) may carry its own `rating`, so
   an opinion can exist without a formal log event.
 
-## Likes / activity — deferred by design
+## Likes / activity
 
-- **Likes.** The UI shows presentation-only like counts on reviews and lists.
-  No `review_likes` / `list_likes` tables are added yet; those counts remain
-  mock values until a dedicated persistence task, at which point they can be
-  modeled securely (owner-scoped rows + a derived count).
+- **Likes.** Review and list likes are **real and persisted** (`review_likes` /
+  `list_likes` tables, migration `20260815121200`). Each like is an owner-scoped
+  row (`UNIQUE (user_id, review_id)` / `(user_id, list_id)`, cascade on target
+  and user delete). Toggling goes through `SECURITY INVOKER` set RPCs so RLS
+  naturally hides inaccessible targets (no existence disclosure). Displayed
+  counts and the viewer's `viewerHasLiked` flag come from `SECURITY DEFINER`
+  batch-read RPCs that return only `{count, viewer_has_liked}` — never liker
+  identities — and replicate the target's accessibility predicate explicitly.
+  Self-likes are permitted by contract. Surfaced on every real review and list
+  (title page, profile, following feed, `/lists`, `/list/[slug]`).
 - **Activity.** No generic `activity` table is created, and none was added for
   the following feed. The feed and profile activity are **derived at read
   time** from diary entries, reviews, and follows (see
@@ -420,8 +426,8 @@ review always stores `rating = null`; the diary entry owns the rating
   query error → safe error state (no silent mock fallback).
 - `/profile/[username]`: mock demo usernames render full mock profiles; other
   usernames resolve to a real profile with derived activity; unknown →
-  `notFound()`. A real profile never inherits mock data, and real reviews show
-  no fabricated like counts.
+  `notFound()`. A real profile never inherits mock data, and real reviews carry
+  real, persisted like counts (never fabricated).
 
 ## Persistent list lifecycle (create / add / remove / edit / delete) and reads
 
@@ -593,7 +599,8 @@ rendering. New UI lives under `components/lists/`:
 - **Detail & removal.** `real-list-detail.tsx` + `real-list-items.tsx` render a
   real `/list/[slug]`; `remove-list-item-dialog.tsx` is the owner-only per-item
   removal confirmation (naming both title and list); `share-list-button.tsx`
-  preserves Share without any Like control.
+  preserves Share, and the persistent list Like control is the separate
+  `components/likes/like-button.tsx`.
 - **Edit & delete list.** Owner-only controls on real `/list/[slug]` via
   `real-list-owner-actions.tsx`: `edit-list-dialog.tsx` + `edit-list-form.tsx`
   (prefilled, action-injected; successful edit keeps the user on the immutable
@@ -604,15 +611,16 @@ rendering. New UI lives under `components/lists/`:
   form. These controls never show to signed-out visitors, non-owners, or
   mock-list viewers. Share behavior is unchanged.
 
-### Ordering, likes, notes — deferred
+### Ordering, notes — deferred
 
 Title membership still supports **append** and **remove** only (new titles
 append; removal compacts). Ranked lists display their stored order as a ranking;
 unranked lists still preserve deterministic order; toggling ranked/unranked does
-not reorder items. **Drag-and-drop / arbitrary reordering, curator-note
-creation/editing, list likes, and follower-aware visibility remain deferred.**
-List metadata editing and whole-list deletion are implemented (see above). Real
-lists carry no persisted like count (honestly absent, never faked).
+not reorder items. **Drag-and-drop / arbitrary reordering and curator-note
+creation/editing remain deferred.** List metadata editing and whole-list
+deletion are implemented (see above). List likes are now real and persisted (see
+[Likes / activity](#likes--activity)); a real list derives its like count from
+that table (never faked).
 
 ### Mock vs. real list boundary
 
@@ -746,7 +754,7 @@ optimistic state.
 Favorites support **add** and **remove** (from the title page) only. **Arbitrary
 favorite reordering and a direct favorite-removal control on the profile**
 (removal is from the title page this phase) **remain deferred**, alongside
-follows, followers-only list visibility, likes, and notifications.
+notifications. (Review and list likes are now real — see "Likes / activity".)
 
 ### Mock vs. real favorites boundary
 
@@ -1603,8 +1611,9 @@ of the full mock catalog):
   (The persistent favorites **add / remove** loop from the title page now exists
   — see "Persistent favorites loop" above; its migration `20260814160300` is
   applied to hosted Supabase.)
-- Follows UI, and real likes persistence for reviews **and** lists (and any
-  dedicated activity/event table).
+- A dedicated activity/event table. (Real likes persistence for reviews **and**
+  lists now exists — see "Likes / activity" above; migration `20260815121200`,
+  with derived counts via batch RPCs.)
 - Migrating the remaining product surfaces (catalog browsing, community
   reviews) off mock data to Supabase-backed fetchers.
 - Real media-catalog provider integration. (Foundation exists — see
