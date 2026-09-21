@@ -20,6 +20,8 @@ import type { ProfileFavoritesResult } from "@/lib/supabase/favorites";
 import type { ProfileSocialStateResult } from "@/lib/supabase/follows";
 import { FollowButton } from "./follow-button";
 import { setFollowAction } from "@/app/profile/[username]/actions";
+import { LikeButton } from "@/components/likes/like-button";
+import { setLikeAction } from "@/components/likes/like-actions";
 
 const joinedFormatter = new Intl.DateTimeFormat("en", {
   month: "long",
@@ -79,6 +81,16 @@ export function RealProfile({
 }: RealProfileProps) {
   const { stats, recentlyWatched, recentlyRead, reviews } = activity;
   const firstName = profile.displayName.split(" ")[0] || profile.displayName;
+
+  // Like controls need to know whether a real, signed-in viewer is present. The
+  // viewer is authenticated when this is their own profile or when the social
+  // read resolved them as a signed-in "viewer"; anyone else sees a sign-in
+  // affordance instead of a dead toggle. The write path re-checks onboarding.
+  const profileReturnTo = `/profile/${profile.username}`;
+  const signInHref = `/auth/sign-in?returnTo=${encodeURIComponent(profileReturnTo)}`;
+  const viewerIsAuthenticated =
+    isCurrentUser ||
+    (social.status === "ok" && social.viewerState.kind === "viewer");
 
   // The list count derives only from permitted real rows (RLS-scoped).
   const listCount = lists.status === "ok" ? lists.lists.length : null;
@@ -294,14 +306,30 @@ export function RealProfile({
                   >
                     {review.body}
                   </p>
-                  <footer className="mt-1 text-xs text-foreground/50">
+                  <footer className="mt-1 flex items-center justify-between gap-3 text-xs text-foreground/50">
                     <Link
                       href={`/title/${review.media.slug}`}
-                      className="inline-flex items-center gap-2 rounded outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent"
+                      className="inline-flex min-w-0 items-center gap-2 rounded outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent"
                     >
                       <MediaTypeBadge kind={review.media.kind} />
                       <span className="truncate">{review.media.title}</span>
                     </Link>
+                    <LikeButton
+                      targetType="review"
+                      targetId={review.id}
+                      label={
+                        review.title
+                          ? `${profile.displayName}'s review "${review.title}"`
+                          : `${profile.displayName}'s review`
+                      }
+                      initialLikeCount={review.likeCount}
+                      initialViewerHasLiked={review.viewerHasLiked}
+                      isAuthenticated={viewerIsAuthenticated}
+                      signInHref={signInHref}
+                      returnTo={profileReturnTo}
+                      action={setLikeAction}
+                      className="shrink-0"
+                    />
                   </footer>
                 </article>
               </li>

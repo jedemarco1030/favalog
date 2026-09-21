@@ -3,6 +3,7 @@ import "server-only";
 import { createClient } from "./server";
 import { isSupabaseConfigured } from "./env";
 import { mapMediaRowToDomain, type MediaItemRow } from "./mappers";
+import { getReviewLikeStates, EMPTY_LIKE_STATE } from "./likes";
 import {
   deriveProfileStats,
   effectiveReviewRating,
@@ -35,6 +36,10 @@ export interface RealProfileReviewView {
   /** Effective rating (from the linked diary entry when present). */
   rating?: number;
   media: Pick<MediaItem, "slug" | "title" | "kind">;
+  /** Real like count for this review. */
+  likeCount: number;
+  /** Whether the current viewer has liked this review. */
+  viewerHasLiked: boolean;
 }
 
 export interface RealProfileActivity {
@@ -108,10 +113,17 @@ export async function getRealProfileActivity(
   if (reviewError) return { status: "error" };
 
   const reviewRows = (reviewData ?? []) as unknown as ReviewActivityRow[];
+
+  // Fold in real like state with a SINGLE batched aggregation for all of this
+  // profile's review ids — never a per-row query (no N+1) and never a
+  // fabricated count. Missing ids default to a zero/false state.
+  const likeStates = await getReviewLikeStates(reviewRows.map((row) => row.id));
+
   const reviews: RealProfileReviewView[] = reviewRows.map((row) => {
     const diary = Array.isArray(row.diary_entries)
       ? row.diary_entries[0]
       : row.diary_entries;
+    const like = likeStates.get(row.id) ?? EMPTY_LIKE_STATE;
     return {
       id: row.id,
       title: row.title ?? undefined,
@@ -124,6 +136,8 @@ export async function getRealProfileActivity(
         title: row.media_items.title,
         kind: row.media_items.kind,
       },
+      likeCount: like.likeCount,
+      viewerHasLiked: like.viewerHasLiked,
     };
   });
 

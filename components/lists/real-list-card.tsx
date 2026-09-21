@@ -10,7 +10,23 @@ import type {
   ListSummaryView,
   ListOwnerView,
 } from "@/lib/supabase/list-view-model";
+import { LikeButton, type LikeAction } from "@/components/likes/like-button";
 import { cn } from "@/lib/cn";
+
+/**
+ * Everything the card needs to render a real Like control for this list.
+ * Supplied by a server surface that has already batched the like state and
+ * resolved the viewer's auth; omitted on surfaces that don't show likes (e.g.
+ * the owner's own management list), where a like toggle adds no value.
+ */
+export interface ListLikeControl {
+  likeCount: number;
+  viewerHasLiked: boolean;
+  isAuthenticated: boolean;
+  signInHref: string;
+  returnTo: string;
+  action: LikeAction;
+}
 
 interface RealListCardProps {
   list: ListSummaryView;
@@ -22,6 +38,8 @@ interface RealListCardProps {
    * clearly identified. Community/public surfaces can leave it off.
    */
   showVisibility?: boolean;
+  /** When present, a real Like control is shown for the list. */
+  like?: ListLikeControl;
   className?: string;
 }
 
@@ -39,6 +57,7 @@ export function RealListCard({
   list,
   owner,
   showVisibility = false,
+  like,
   className,
 }: RealListCardProps) {
   const href = `/list/${list.slug}`;
@@ -125,15 +144,32 @@ export function RealListCard({
         </p>
       )}
 
-      <div className="mt-auto flex items-center gap-2 pt-1 text-xs text-foreground/50 tabular-nums">
-        <span>{itemCountLabel(list.itemCount)}</span>
-        {updated && (
-          <>
-            <span aria-hidden="true">·</span>
-            <span className="normal-case">
-              Updated <time dateTime={list.updatedAt}>{updated}</time>
-            </span>
-          </>
+      <div className="mt-auto flex items-center justify-between gap-3 pt-1 text-xs text-foreground/50 tabular-nums">
+        <div className="flex min-w-0 items-center gap-2">
+          <span>{itemCountLabel(list.itemCount)}</span>
+          {updated && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span className="normal-case">
+                Updated <time dateTime={list.updatedAt}>{updated}</time>
+              </span>
+            </>
+          )}
+        </div>
+        {like && (
+          <div className="relative z-10 shrink-0">
+            <LikeButton
+              targetType="list"
+              targetId={list.id}
+              label={`the list "${list.title}"`}
+              initialLikeCount={like.likeCount}
+              initialViewerHasLiked={like.viewerHasLiked}
+              isAuthenticated={like.isAuthenticated}
+              signInHref={like.signInHref}
+              returnTo={like.returnTo}
+              action={like.action}
+            />
+          </div>
         )}
       </div>
     </article>

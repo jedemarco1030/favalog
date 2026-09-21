@@ -2,7 +2,24 @@ import { AlertTriangle } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RealListCard } from "@/components/lists/real-list-card";
 import { CreateListLauncher } from "@/components/lists/create-list-launcher";
+import type { LikeAction } from "@/components/likes/like-button";
+import type { LikeState } from "@/lib/supabase/likes";
+import { EMPTY_LIKE_STATE } from "@/lib/supabase/likes";
 import type { MyListsResult, PublicListsResult } from "@/lib/supabase/lists";
+
+/**
+ * Everything the sections need to render real Like controls on their cards:
+ * the batched like states (keyed by list id), the viewer's auth, safe
+ * sign-in/return targets, and the injected set-like action. Absent (e.g. no-env
+ * builds) means no like controls are shown.
+ */
+export interface ListsSectionsLikeContext {
+  states: Map<string, LikeState>;
+  isAuthenticated: boolean;
+  signInHref: string;
+  returnTo: string;
+  action: LikeAction;
+}
 
 interface RealListsSectionsProps {
   /** The signed-in viewer's own lists, or null when signed out. */
@@ -12,6 +29,8 @@ interface RealListsSectionsProps {
   /** Safe, same-origin `returnTo` for the inline create affordance. */
   createReturnTo: string;
   createSignInHref: string;
+  /** When present, real Like controls are shown on the list cards. */
+  like?: ListsSectionsLikeContext;
 }
 
 const GRID_CLASS = "grid gap-6 sm:grid-cols-2 lg:grid-cols-3";
@@ -44,7 +63,20 @@ export function RealListsSections({
   community,
   createReturnTo,
   createSignInHref,
+  like,
 }: RealListsSectionsProps) {
+  /** Build a per-card like control from the batched state, or `undefined`. */
+  const likeFor = (listId: string) =>
+    like
+      ? {
+          ...(like.states.get(listId) ?? EMPTY_LIKE_STATE),
+          isAuthenticated: like.isAuthenticated,
+          signInHref: like.signInHref,
+          returnTo: like.returnTo,
+          action: like.action,
+        }
+      : undefined;
+
   return (
     <div className="flex flex-col gap-12">
       {myLists && myLists.status !== "unavailable" && (
@@ -60,7 +92,11 @@ export function RealListsSections({
               <ul role="list" className={GRID_CLASS}>
                 {myLists.lists.map((list) => (
                   <li key={list.id}>
-                    <RealListCard list={list} showVisibility />
+                    <RealListCard
+                      list={list}
+                      showVisibility
+                      like={likeFor(list.id)}
+                    />
                   </li>
                 ))}
               </ul>
@@ -96,7 +132,11 @@ export function RealListsSections({
               <ul role="list" className={GRID_CLASS}>
                 {community.lists.map((list) => (
                   <li key={list.id}>
-                    <RealListCard list={list} owner={list.owner} />
+                    <RealListCard
+                      list={list}
+                      owner={list.owner}
+                      like={likeFor(list.id)}
+                    />
                   </li>
                 ))}
               </ul>

@@ -14,6 +14,7 @@ import {
 import { MediaDetails } from "@/components/media/media-details";
 import { RatingBreakdown } from "@/components/media/rating-breakdown";
 import { ReviewCard } from "@/components/reviews/review-card";
+import { RealReviewCard } from "@/components/reviews/real-review-card";
 import {
   getMediaBySlug,
   getRatingDistribution,
@@ -28,6 +29,8 @@ import { getRealMediaBySlug } from "@/lib/supabase/media";
 import { getMyLatestLogForSlug } from "@/lib/supabase/diary";
 import { getMyListsWithMembership } from "@/lib/supabase/lists";
 import { getMyFavoriteState } from "@/lib/supabase/favorites";
+import { getRealReviewsForMedia } from "@/lib/supabase/reviews";
+import { setLikeAction } from "@/components/likes/like-actions";
 import { siteConfig } from "@/lib/site-config";
 
 interface TitlePageProps {
@@ -92,6 +95,17 @@ export default async function TitlePage({ params }: TitlePageProps) {
   const distribution = getRatingDistribution(item.id);
   const titleReviews = getReviewsForMedia(item.id);
   const related = getRelatedMedia(item.id, 6);
+
+  // Community reviews: when Supabase is configured this surface reads REAL
+  // reviews (with real, persistent like state) and never the mock layer — a
+  // configured production surface must not fall back to mock likes. The mock
+  // `titleReviews` above are used only as the no-env demo fallback below.
+  const usingRealReviews = isAuthAvailable();
+  const realReviewsResult = usingRealReviews
+    ? await getRealReviewsForMedia(item.slug)
+    : null;
+  const realReviews =
+    realReviewsResult?.status === "ok" ? realReviewsResult.reviews : [];
 
   // Personal, per-viewer state. Community reviews/ratings above stay on the
   // mock layer this phase; this is the viewer's OWN most-recent log (or null
@@ -182,12 +196,38 @@ export default async function TitlePage({ params }: TitlePageProps) {
                 as="h2"
                 title="Popular reviews"
                 description={
-                  titleReviews.length > 0
+                  (usingRealReviews
+                    ? realReviews.length
+                    : titleReviews.length) > 0
                     ? "What the community is saying."
                     : undefined
                 }
               />
-              {titleReviews.length > 0 ? (
+              {usingRealReviews ? (
+                realReviews.length > 0 ? (
+                  <ul className="flex flex-col gap-4">
+                    {realReviews.map((review) => (
+                      <li key={review.id}>
+                        <RealReviewCard
+                          review={review}
+                          isAuthenticated={Boolean(viewer)}
+                          signInHref={signInHref}
+                          returnTo={returnTo}
+                          likeAction={setLikeAction}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <EmptyState
+                    icon={MessageSquare}
+                    title="No reviews yet"
+                    description={`Be the first to share what you thought of this ${mediaKindLabel(
+                      item.kind,
+                    ).toLowerCase()}.`}
+                  />
+                )
+              ) : titleReviews.length > 0 ? (
                 <ul className="flex flex-col gap-4">
                   {titleReviews.map((review) => {
                     const author = getUserById(review.userId);
