@@ -12,6 +12,8 @@ import {
 import { RealListItems } from "@/components/lists/real-list-items";
 import { RealListOwnerActions } from "@/components/lists/real-list-owner-actions";
 import { ShareListButton } from "@/components/lists/share-list-button";
+import { LikeButton } from "@/components/likes/like-button";
+import type { ListLikeControl } from "@/components/lists/real-list-card";
 import {
   deleteListAction,
   editListAction,
@@ -22,6 +24,8 @@ import type { MediaKind } from "@/lib/types";
 
 interface RealListDetailProps {
   list: ListDetailView;
+  /** When present, a real Like control is shown for the list. */
+  like?: ListLikeControl;
 }
 
 /** Collection-level media hint, e.g. "Mixed media" / "Films". */
@@ -52,7 +56,7 @@ function mediaSummary(kinds: MediaKind[]): string {
  * no badge. Only the owner sees per-item remove controls. Share is preserved;
  * there is no mock Like toggle and no fake zero-like counter.
  */
-export function RealListDetail({ list }: RealListDetailProps) {
+export function RealListDetail({ list, like }: RealListDetailProps) {
   const kinds = list.items.map((item) => item.kind);
   const updated = formatUpdatedAt(list.updatedAt);
   const returnTo = `/list/${list.slug}`;
@@ -157,6 +161,19 @@ export function RealListDetail({ list }: RealListDetailProps) {
           </p>
 
           <div className="flex flex-wrap items-center gap-3">
+            {like && (
+              <LikeButton
+                targetType="list"
+                targetId={list.id}
+                label={`the list "${list.title}"`}
+                initialLikeCount={like.likeCount}
+                initialViewerHasLiked={like.viewerHasLiked}
+                isAuthenticated={like.isAuthenticated}
+                signInHref={like.signInHref}
+                returnTo={like.returnTo}
+                action={like.action}
+              />
+            )}
             <ShareListButton />
             {list.isOwner && (
               <RealListOwnerActions

@@ -11,6 +11,7 @@ import {
 import { getCurrentUser } from "@/lib/auth/data";
 import { getFollowingFeedPage } from "@/lib/supabase/feed";
 import { getMyFollowingCount } from "@/lib/supabase/follows";
+import { setLikeAction } from "@/components/likes/like-actions";
 import { loadMoreFeedAction } from "./actions";
 
 export const metadata: Metadata = {
@@ -79,6 +80,8 @@ async function FeedBody({
   // empty accumulated state instead of reusing the previous viewer's pages.
   const viewer = await getCurrentUser();
 
+  // The feed is a followers-only surface, so every viewer here is signed in;
+  // the like control still passes the auth flags explicitly for consistency.
   return (
     <FeedList
       key={viewer?.id ?? "anonymous"}
@@ -86,6 +89,12 @@ async function FeedBody({
       initialCursor={page.nextCursor}
       initialHasMore={page.hasMore}
       loadMore={loadMoreFeedAction}
+      like={{
+        isAuthenticated: viewer !== null,
+        signInHref: "/sign-in?returnTo=%2Ffeed",
+        returnTo: "/feed",
+        action: setLikeAction,
+      }}
     />
   );
 }

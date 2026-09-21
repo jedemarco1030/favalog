@@ -16,6 +16,9 @@ import {
   getUserById,
 } from "@/lib/data";
 import { getRealListBySlug } from "@/lib/supabase/lists";
+import { getListLikeStates, EMPTY_LIKE_STATE } from "@/lib/supabase/likes";
+import { getCurrentUser } from "@/lib/auth/data";
+import { setLikeAction } from "@/components/likes/like-actions";
 import { siteConfig } from "@/lib/site-config";
 
 interface ListPageProps {
@@ -108,7 +111,26 @@ export default async function ListPage({ params }: ListPageProps) {
   // disclosing whether a private list exists. Unknown everywhere => notFound().
   const real = await getRealListBySlug(slug);
   if (real.status === "ok") {
-    return <RealListDetail list={real.list} />;
+    const { list: realList } = real;
+    const returnTo = `/list/${realList.slug}`;
+    const signInHref = `/auth/sign-in?returnTo=${encodeURIComponent(returnTo)}`;
+    const viewer = await getCurrentUser();
+    const likeStates = await getListLikeStates([realList.id]);
+    const likeState = likeStates.get(realList.id) ?? EMPTY_LIKE_STATE;
+
+    return (
+      <RealListDetail
+        list={realList}
+        like={{
+          likeCount: likeState.likeCount,
+          viewerHasLiked: likeState.viewerHasLiked,
+          isAuthenticated: viewer !== null,
+          signInHref,
+          returnTo,
+          action: setLikeAction,
+        }}
+      />
+    );
   }
 
   const list = getListBySlug(slug);

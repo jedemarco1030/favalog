@@ -386,6 +386,37 @@ export async function seedPublicList(
   }
 }
 
+/** A list visibility, matching the `list_visibility` enum. */
+export type SeedListVisibility = "public" | "followers" | "private";
+
+/**
+ * Seed a single list of any visibility for a fixture user. Generalizes
+ * `seedPublicList` so a suite can provision the public / followers-only mix a
+ * like-visibility journey needs without going through the create-list UI.
+ */
+export async function seedList(
+  email: string,
+  list: {
+    slug: string;
+    title: string;
+    description?: string;
+    visibility: SeedListVisibility;
+  },
+): Promise<void> {
+  const admin = createAdminClient();
+  const userId = await getFixtureUserId(email);
+  const { error } = await admin.from("lists").insert({
+    user_id: userId,
+    slug: list.slug,
+    title: list.title,
+    description: list.description ?? null,
+    visibility: list.visibility,
+  });
+  if (error) {
+    throw new Error(`[e2e fixtures] List seed failed: ${error.message}`);
+  }
+}
+
 /**
  * Delete a user's diary entries for one title at the DATABASE level, bypassing
  * the application RPC (which also removes the linked review). This is how the

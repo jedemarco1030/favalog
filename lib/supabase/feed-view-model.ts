@@ -58,6 +58,10 @@ export interface FeedActivityView {
     title?: string;
     excerpt: string;
     containsSpoilers: boolean;
+    /** Server-truth like aggregate, folded in after mapping by the reader. */
+    likeCount: number;
+    /** Whether the current viewer has liked this review (server truth). */
+    viewerHasLiked: boolean;
   };
 }
 
@@ -190,6 +194,11 @@ export function mapFeedRow(row: FeedActivityRow): FeedActivityView | null {
             ...(reviewTitle ? { title: reviewTitle } : {}),
             excerpt: excerptOf(reviewBody),
             containsSpoilers: row.contains_spoilers === true,
+            // The following feed RPC carries no like data; the reader folds in
+            // server-truth like state after mapping. Default to a zero/false
+            // state so an un-enriched view is still honest, never invented.
+            likeCount: 0,
+            viewerHasLiked: false,
           },
         }
       : {}),

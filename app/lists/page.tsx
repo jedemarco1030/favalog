@@ -22,6 +22,9 @@ import {
   getPublicLists,
   type MyListsResult,
 } from "@/lib/supabase/lists";
+import { getListLikeStates } from "@/lib/supabase/likes";
+import { setLikeAction } from "@/components/likes/like-actions";
+import type { ListsSectionsLikeContext } from "@/components/lists/real-lists-sections";
 
 export const metadata: Metadata = {
   title: "Lists",
@@ -55,6 +58,24 @@ export default async function ListsPage() {
 
   const createReturnTo = "/lists";
   const signInHref = `/auth/sign-in?returnTo=${encodeURIComponent(createReturnTo)}`;
+
+  // Batched like states for every real list shown across both sections — one
+  // aggregation, no per-card query. Inaccessible ids are simply omitted.
+  const realListIds = [
+    ...(myLists?.status === "ok" ? myLists.lists.map((l) => l.id) : []),
+    ...(community.status === "ok" ? community.lists.map((l) => l.id) : []),
+  ];
+  const likeContext: ListsSectionsLikeContext | undefined =
+    realListIds.length > 0
+      ? {
+          states: await getListLikeStates(realListIds),
+          isAuthenticated: viewer !== null,
+          signInHref,
+          returnTo: createReturnTo,
+          action: setLikeAction,
+        }
+      : undefined;
+
   const launcherVariant = !authAvailable
     ? "unavailable"
     : viewer
@@ -148,6 +169,7 @@ export default async function ListsPage() {
         community={community}
         createReturnTo={createReturnTo}
         createSignInHref={signInHref}
+        like={likeContext}
       />
 
       <section aria-labelledby="curated-heading" className="mt-16">

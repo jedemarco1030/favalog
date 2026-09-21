@@ -43,6 +43,8 @@ export const diaryWithReviewItem: FeedActivityView = {
     title: "Patient and devastating",
     excerpt: "It takes its time, and every page of that time is earned.",
     containsSpoilers: false,
+    likeCount: 3,
+    viewerHasLiked: false,
   },
 };
 
@@ -63,6 +65,8 @@ export const standaloneReviewItem: FeedActivityView = {
     id: "55555555-5555-5555-5555-555555555555",
     excerpt: "The finale recontextualises the whole first season.",
     containsSpoilers: true,
+    likeCount: 12,
+    viewerHasLiked: true,
   },
 };
 

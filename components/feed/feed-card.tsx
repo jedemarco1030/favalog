@@ -4,14 +4,30 @@ import { MediaTypeBadge } from "@/components/media/media-type-badge";
 import { ProfileAvatar } from "@/components/user/profile-avatar";
 import { StarRating } from "@/components/ui/star-rating";
 import { SpoilerExcerpt } from "@/components/feed/spoiler-excerpt";
+import { LikeButton, type LikeAction } from "@/components/likes/like-button";
 import type {
   FeedAction,
   FeedActivityView,
 } from "@/lib/supabase/feed-view-model";
 import { cn } from "@/lib/cn";
 
+/**
+ * Viewer/auth context for the feed's review like controls. Static for a feed
+ * session (the returnTo is always `/feed`), so it is passed once to the list
+ * and shared by every card. Absent (e.g. a no-env build) means no like control
+ * is rendered — the card still shows all its real activity.
+ */
+export interface FeedLikeContext {
+  isAuthenticated: boolean;
+  signInHref: string;
+  returnTo: string;
+  action: LikeAction;
+}
+
 interface FeedCardProps {
   item: FeedActivityView;
+  /** When present, a real Like control is shown for an item's review. */
+  like?: FeedLikeContext;
   className?: string;
 }
 
@@ -49,10 +65,13 @@ function formatDate(value: string): string {
  * There are no nested anchors, no dead controls, and never a link into another
  * user's private diary.
  */
-export function FeedCard({ item, className }: FeedCardProps) {
+export function FeedCard({ item, like, className }: FeedCardProps) {
   const { actor, media, review } = item;
   const createdLabel = formatDate(item.createdAt);
   const loggedLabel = item.loggedAt ? formatDate(item.loggedAt) : "";
+  const reviewLikeLabel = review?.title
+    ? `${actor.displayName}'s review "${review.title}"`
+    : `${actor.displayName}'s review of ${media.title}`;
 
   return (
     <article
@@ -116,12 +135,27 @@ export function FeedCard({ item, className }: FeedCardProps) {
               containsSpoilers={review.containsSpoilers}
               mediaTitle={media.title}
             />
-            <Link
-              href={`/profile/${actor.username}#reviews`}
-              className="self-start rounded text-xs font-medium text-accent underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent"
-            >
-              Read {actor.displayName}&rsquo;s reviews
-            </Link>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Link
+                href={`/profile/${actor.username}#reviews`}
+                className="self-start rounded text-xs font-medium text-accent underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                Read {actor.displayName}&rsquo;s reviews
+              </Link>
+              {like && (
+                <LikeButton
+                  targetType="review"
+                  targetId={review.id}
+                  label={reviewLikeLabel}
+                  initialLikeCount={review.likeCount}
+                  initialViewerHasLiked={review.viewerHasLiked}
+                  isAuthenticated={like.isAuthenticated}
+                  signInHref={like.signInHref}
+                  returnTo={like.returnTo}
+                  action={like.action}
+                />
+              )}
+            </div>
           </div>
         )}
 

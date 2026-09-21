@@ -2,7 +2,7 @@
 
 import { useCallback, useState, useTransition } from "react";
 import { Loader2 } from "lucide-react";
-import { FeedCard } from "@/components/feed/feed-card";
+import { FeedCard, type FeedLikeContext } from "@/components/feed/feed-card";
 import type {
   LoadMoreFeedAction,
   LoadMoreFeedResult,
@@ -19,6 +19,8 @@ interface FeedListProps {
   initialHasMore: boolean;
   /** The "load the next page" Server Action, injected (never imported here). */
   loadMore: LoadMoreFeedAction;
+  /** When present, real Like controls are shown on review-bearing cards. */
+  like?: FeedLikeContext;
   className?: string;
 }
 

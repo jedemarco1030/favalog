@@ -63,6 +63,8 @@ export const LongContent: Story = {
           "A patient, devastating book that I will be thinking about for a very long time",
         excerpt:
           "It takes its time, and every page of that time is earned — the kind of slow accumulation that only reveals what it was building towards in the final thirty pages, by which point it is far too late to put it down…",
+        likeCount: 0,
+        viewerHasLiked: false,
       },
     },
   },

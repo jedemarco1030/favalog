@@ -539,6 +539,22 @@ export type Database = {
           source: string
         }[]
       }
+      get_list_like_states: {
+        Args: { p_list_ids: string[] }
+        Returns: {
+          like_count: number
+          list_id: string
+          viewer_has_liked: boolean
+        }[]
+      }
+      get_review_like_states: {
+        Args: { p_review_ids: string[] }
+        Returns: {
+          like_count: number
+          review_id: string
+          viewer_has_liked: boolean
+        }[]
+      }
       hybrid_search: {
         Args: {
           p_dimensions: number
@@ -724,6 +740,14 @@ export type Database = {
       }
       set_follow: {
         Args: { p_is_follow: boolean; p_target_username: string }
+        Returns: Json
+      }
+      set_list_like: {
+        Args: { p_is_liked: boolean; p_list_id: string }
+        Returns: Json
+      }
+      set_review_like: {
+        Args: { p_is_liked: boolean; p_review_id: string }
         Returns: Json
       }
       update_diary_entry: {

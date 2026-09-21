@@ -46,18 +46,21 @@ const NO_ENV_PORT = 3100;
 const FIXTURES_PORT = 3200;
 const FIXTURES_PROD_PORT = 3300;
 const SOCIAL_PORT = 3400;
+const LIKES_PORT = 3500;
 const FIXTURE_SERVER_PORT = 5599;
 const configuredBaseURL = `http://localhost:${CONFIGURED_PORT}`;
 const noEnvBaseURL = `http://localhost:${NO_ENV_PORT}`;
 const fixturesBaseURL = `http://localhost:${FIXTURES_PORT}`;
 const fixturesProdBaseURL = `http://localhost:${FIXTURES_PROD_PORT}`;
 const socialBaseURL = `http://localhost:${SOCIAL_PORT}`;
+const likesBaseURL = `http://localhost:${LIKES_PORT}`;
 const isCI = !!process.env.CI;
 const suite = process.env.E2E_SUITE;
 const isNoEnvSuite = suite === "no-env";
 const isFixturesSuite = suite === "fixtures";
 const isFixturesProdRejectSuite = suite === "fixtures-prod-reject";
 const isSocialSuite = suite === "social";
+const isLikesSuite = suite === "likes";
 
 // The fixture-backed suites drive the REAL provider adapters against a local
 // fixture HTTP server via the loopback-guarded transport seam, and provision an
@@ -150,6 +153,14 @@ const socialProjects = [
   },
 ];
 
+const likesProjects = [
+  {
+    name: "likes",
+    grep: /@likes\b/,
+    use: { ...devices["Desktop Chrome"], baseURL: likesBaseURL },
+  },
+];
+
 const configuredProjects = [
   {
     // Every existing spec (auth, diary, lists, favorites, …). These are
@@ -196,7 +207,9 @@ export default defineConfig({
         ? fixturesProdRejectProjects
         : isSocialSuite
           ? socialProjects
-          : configuredProjects,
+          : isLikesSuite
+            ? likesProjects
+            : configuredProjects,
   webServer: isNoEnvSuite
     ? {
         // The no-env build must already exist (produced with the public Supabase
@@ -247,10 +260,18 @@ export default defineConfig({
               timeout: 120_000,
               env: { SEMANTIC_SEARCH_ENABLED: "false" },
             }
-          : {
-              command: `npm run start -- --port ${CONFIGURED_PORT}`,
-              url: configuredBaseURL,
-              reuseExistingServer: !isCI,
-              timeout: 120_000,
-            },
+          : isLikesSuite
+            ? {
+                command: `npm run start -- --port ${LIKES_PORT}`,
+                url: likesBaseURL,
+                reuseExistingServer: !isCI,
+                timeout: 120_000,
+                env: { SEMANTIC_SEARCH_ENABLED: "false" },
+              }
+            : {
+                command: `npm run start -- --port ${CONFIGURED_PORT}`,
+                url: configuredBaseURL,
+                reuseExistingServer: !isCI,
+                timeout: 120_000,
+              },
 });

@@ -16,7 +16,7 @@
  *
  * There is deliberately NO flag that permits a hosted target.
  *
- * Usage: node scripts/run-e2e-local.mjs <configured|social|fixtures|fixtures-prod-reject>
+ * Usage: node scripts/run-e2e-local.mjs <configured|social|likes|fixtures|fixtures-prod-reject>
  *        [...extra playwright args]
  *
  * Any extra arguments are forwarded verbatim to `playwright test`, so a single
@@ -35,13 +35,14 @@ const suite = process.argv[2];
 const ALLOWED = new Set([
   "configured",
   "social",
+  "likes",
   "fixtures",
   "fixtures-prod-reject",
 ]);
 if (!ALLOWED.has(suite)) {
   console.error(
     "Usage: node scripts/run-e2e-local.mjs " +
-      "<configured|social|fixtures|fixtures-prod-reject>",
+      "<configured|social|likes|fixtures|fixtures-prod-reject>",
   );
   process.exit(2);
 }

@@ -36,6 +36,7 @@ import { isSupabaseConfigured } from "./env";
 import { createClient } from "./server";
 import { classifyFollowingFeedError, type DbError } from "./feed-errors";
 import { decodeFeedCursor, encodeFeedCursor } from "./feed-cursor";
+import { getReviewLikeStates } from "./likes";
 import {
   mapFeedRows,
   type FeedActivityRow,
@@ -116,6 +117,36 @@ async function defaultGetViewer(): Promise<{ id: string } | null> {
   return user ? { id: user.id } : null;
 }
 
+/**
+ * Fold server-truth like state into every review-bearing item of a mapped
+ * page, in one batched aggregation. Items without a review are returned
+ * unchanged; a review whose id is absent from the batch (e.g. a degraded read)
+ * keeps its already-defaulted zero/false state, so the feed never crashes and
+ * never invents a count.
+ */
+async function withReviewLikeStates(
+  items: FeedActivityView[],
+): Promise<FeedActivityView[]> {
+  const reviewIds = items.flatMap((item) =>
+    item.review ? [item.review.id] : [],
+  );
+  if (reviewIds.length === 0) return items;
+
+  const states = await getReviewLikeStates(reviewIds);
+  return items.map((item) => {
+    if (!item.review) return item;
+    const state = states.get(item.review.id);
+    return {
+      ...item,
+      review: {
+        ...item.review,
+        likeCount: state?.likeCount ?? 0,
+        viewerHasLiked: state?.viewerHasLiked ?? false,
+      },
+    };
+  });
+}
+
 /** Clamp an untrusted page size into `1..FEED_MAX_PAGE_SIZE`. */
 export function clampFeedLimit(limit: number | null | undefined): number {
   if (typeof limit !== "number" || !Number.isFinite(limit)) {
@@ -188,7 +219,7 @@ export async function getFollowingFeedPage(
 
   return {
     status: "ok",
-    items: mapFeedRows(pageRows),
+    items: await withReviewLikeStates(mapFeedRows(pageRows)),
     nextCursor,
     // Without a usable cursor we cannot honestly promise another page.
     hasMore: nextCursor !== null,
