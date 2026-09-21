@@ -68,6 +68,44 @@ in hosted production and no provider flags, hosted secrets, or schedules are
 changed by this work. Turning it on is the owner-controlled procedure in
 [`docs/tmdb-activation-rollout.md`](tmdb-activation-rollout.md).
 
+## TMDB activation milestone — owner-confirmed production behavior (2026-09-21)
+
+On **2026-09-21** the owner confirmed, from hosted production, that TMDB
+activation setup is complete and the user-facing behavior below works. These are
+**owner-confirmed UI observations**, deliberately kept distinct from the
+workflow/processing evidence recorded further down:
+
+- TMDB movie and TV titles appear in production discovery/search.
+- Movies and TV shows can be added to lists.
+- Title pages (`/title/[slug]`) open without errors.
+
+The TMDB provider environment variables (`TMDB_API_READ_TOKEN`,
+`TMDB_EMBEDDING_ENABLED`, `TMDB_ENABLED`) are present in the project
+environment. For **discovery and import specifically**, this supersedes the
+earlier "`TMDB_ENABLED` remains false" baseline; earlier dated statements are
+retained as history rather than rewritten.
+
+**Scheduled-refresh workflow verification — pending (2026-09-21).** A read-only
+GitHub Actions inspection on this date, against `main` (`5fc96e0a`), found:
+
+- The `catalog-refresh` workflow **does not exist on `main`**. The only
+  registered workflow is `CI` (`.github/workflows/ci.yml`); a
+  `workflows`-scoped maintainer has not yet added
+  `.github/workflows/catalog-refresh.yml`.
+- Consequently **no manual (`workflow_dispatch`) refresh/embedding run and no
+  scheduled run have ever executed**, so there is no run summary demonstrating
+  actual processing (checked/changed/unchanged) — only the absence of runs.
+- Scheduling is therefore **not enabled**, and the manual-refresh, scheduled-run,
+  and "actual processing" verifications remain **pending** until the workflow is
+  installed and exercised per the
+  [scheduler handoff](ci/catalog-refresh-scheduler-handoff.md) and
+  [rollout runbook](tmdb-activation-rollout.md).
+
+Catalog and compatible-embedding counts were **not** re-measured on 2026-09-21;
+the historical **2026-09-01** figures (29 titles / 29 compatible embedding
+documents) stand as the last measured observation and are not restated as
+current.
+
 ## TMDB activation readiness & periodic metadata refresh (implemented locally)
 
 **Status: implemented locally and verifiable on seeded local Supabase with
