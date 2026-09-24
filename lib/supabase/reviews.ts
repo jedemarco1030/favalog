@@ -87,7 +87,7 @@ export async function getRealReviewsForMedia(
   const { data, error } = await supabase
     .from("reviews")
     .select(
-      "id, title, body, created_at, contains_spoilers, rating, profiles!inner (username, display_name, avatar_url), diary_entries (rating)",
+      "id, title, body, created_at, contains_spoilers, rating, profiles!reviews_user_id_fkey!inner (username, display_name, avatar_url), diary_entries (rating)",
     )
     .eq("media_id", mediaId)
     .order("created_at", { ascending: false });

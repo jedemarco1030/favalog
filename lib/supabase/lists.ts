@@ -611,7 +611,7 @@ export async function getPublicLists(limit = 12): Promise<PublicListsResult> {
   const { data, error } = await supabase
     .from("lists")
     .select(
-      "id, slug, title, description, visibility, is_ranked, updated_at, list_items(count), profiles(username, display_name, avatar_url)",
+      "id, slug, title, description, visibility, is_ranked, updated_at, list_items(count), profiles!lists_user_id_fkey(username, display_name, avatar_url)",
     )
     .eq("visibility", "public")
     .order("updated_at", { ascending: false })
@@ -672,7 +672,7 @@ export async function getRealListBySlug(slug: string): Promise<RealListResult> {
   const { data, error } = await supabase
     .from("lists")
     .select(
-      "id, user_id, slug, title, description, visibility, is_ranked, updated_at, profiles(username, display_name, avatar_url), list_items(media_id, position, media_items!inner(slug, title, year, kind, poster_url))",
+      "id, user_id, slug, title, description, visibility, is_ranked, updated_at, profiles!lists_user_id_fkey(username, display_name, avatar_url), list_items(media_id, position, media_items!inner(slug, title, year, kind, poster_url))",
     )
     .eq("slug", slug)
     .maybeSingle();
