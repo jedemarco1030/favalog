@@ -166,7 +166,7 @@ const configuredProjects = [
     // Every existing spec (auth, diary, lists, favorites, …). These are
     // written to be local-safe and run against the configured server.
     name: "default",
-    grepInvert: /@configured|@no-env|@fixtures|@prodreject|@social/,
+    grepInvert: /@configured|@no-env|@fixtures|@prodreject|@social|@likes/,
     use: { ...devices["Desktop Chrome"], baseURL: configuredBaseURL },
   },
   {

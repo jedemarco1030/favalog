@@ -45,6 +45,15 @@ values ('review', gen_random_uuid()),
        ('list_followers', gen_random_uuid()),
        ('list_private', gen_random_uuid());
 
+-- The assertions below resolve these fixture ids inline (e.g.
+-- `(select id from ids where name = 'review')`) WHILE the session role is
+-- switched to `anon` / `authenticated`. A temporary table is owned by the setup
+-- role and is not readable by those roles by default, so the first cross-role
+-- read would abort the entire script with "permission denied for table ids"
+-- before any plan is emitted. Grant SELECT explicitly so the fixture ids stay
+-- readable under every role this test assumes.
+grant select on ids to anon, authenticated;
+
 insert into public.reviews (id, user_id, media_id, title, body)
 select (select id from ids where name = 'review'),
        '11111111-1111-1111-1111-111111111111',
