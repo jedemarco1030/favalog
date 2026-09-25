@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   availableExternalProviders,
@@ -9,6 +9,22 @@ import {
   isTmdbEnabled,
   shouldOfferExternalCatalog,
 } from "./feature-flag";
+
+// Real provider credentials/flags in the developer's env would otherwise leak
+// into these default-state assertions; each test stubs what it needs.
+beforeEach(() => {
+  for (const key of [
+    "EXTERNAL_CATALOG_ENABLED",
+    "TMDB_ENABLED",
+    "TMDB_API_READ_TOKEN",
+    "OPEN_LIBRARY_ENABLED",
+    "OPEN_LIBRARY_CONTACT_EMAIL",
+    "RAWG_ENABLED",
+    "RAWG_API_KEY",
+  ]) {
+    vi.stubEnv(key, "");
+  }
+});
 
 afterEach(() => {
   vi.unstubAllEnvs();
