@@ -125,7 +125,7 @@ export const PIPELINE_RETRY_MAX_MS = 8000 as const;
 export type SearchMode = "hybrid" | "keyword" | "keyword_fallback";
 
 /** The allow-listed media-kind filter values Explore/search accept. */
-export type SearchKindFilter = "all" | "movie" | "tv" | "book";
+export type SearchKindFilter = "all" | "movie" | "tv" | "book" | "game";
 
 /**
  * Read the server-only kill switch for semantic retrieval.

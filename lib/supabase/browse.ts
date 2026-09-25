@@ -61,7 +61,7 @@ import {
 } from "./browse-view-model";
 
 /** A concrete media kind, or `null` for no media-type narrowing. */
-type DbKind = "movie" | "tv" | "book" | null;
+type DbKind = "movie" | "tv" | "book" | "game" | null;
 
 /** A coarse database error shape (never exposes internal details). */
 type DbError = { message?: string } | null;

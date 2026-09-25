@@ -238,10 +238,10 @@ function ExternalSections({
 }): ReactNode {
   const hasTmdb = providers.includes("tmdb");
   const hasOpenLibrary = providers.includes("openlibrary");
-  const showMoviesTv = hasTmdb && filter !== "book";
+  const showMoviesTv = hasTmdb && filter !== "book" && filter !== "game";
   const showBooks = hasOpenLibrary && (filter === "all" || filter === "book");
-  // Games have no dedicated Explore filter yet, so they appear under "All".
-  const showGames = providers.includes("rawg") && filter === "all";
+  const showGames =
+    providers.includes("rawg") && (filter === "all" || filter === "game");
 
   const tmdbHeading =
     filter === "movie"

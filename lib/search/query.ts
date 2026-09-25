@@ -49,6 +49,7 @@ const VALID_KIND_FILTERS: ReadonlySet<SearchKindFilter> = new Set([
   "movie",
   "tv",
   "book",
+  "game",
 ]);
 
 /**
@@ -73,6 +74,6 @@ export function parseKindFilter(raw: unknown): SearchKindFilter {
  */
 export function kindFilterToKind(
   filter: SearchKindFilter,
-): "movie" | "tv" | "book" | null {
+): Exclude<SearchKindFilter, "all"> | null {
   return filter === "all" ? null : filter;
 }
