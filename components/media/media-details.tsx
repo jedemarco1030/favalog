@@ -61,6 +61,27 @@ function detailsFor(item: MediaItem): DetailRow[] {
         rows.push({ label: "Genres", value: item.genres.join(", ") });
       }
       break;
+    case "game":
+      if (item.developers.length) {
+        rows.push({
+          label: item.developers.length > 1 ? "Developers" : "Developer",
+          value: item.developers.join(", "),
+        });
+      }
+      if (item.publishers.length) {
+        rows.push({
+          label: item.publishers.length > 1 ? "Publishers" : "Publisher",
+          value: item.publishers.join(", "),
+        });
+      }
+      rows.push({ label: "Released", value: String(item.year) });
+      if (item.platforms.length) {
+        rows.push({ label: "Platforms", value: item.platforms.join(", ") });
+      }
+      if (item.genres.length) {
+        rows.push({ label: "Genres", value: item.genres.join(", ") });
+      }
+      break;
   }
   return rows;
 }

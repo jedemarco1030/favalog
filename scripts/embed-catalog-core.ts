@@ -385,7 +385,7 @@ export interface MediaRow {
    * enter the OpenAI pipeline (see `lib/search/embedding-source-policy.ts`).
    */
   source: string | null;
-  kind: "movie" | "tv" | "book";
+  kind: "movie" | "tv" | "book" | "game";
   title: string;
   subtitle: string | null;
   synopsis: string | null;

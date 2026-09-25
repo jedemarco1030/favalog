@@ -36,6 +36,7 @@ const KIND_LABEL: Record<MediaItem["kind"], string> = {
   movie: "Movie",
   tv: "TV series",
   book: "Book",
+  game: "Video game",
 };
 
 /** Collapse all runs of whitespace to a single space and trim the ends. */
@@ -100,6 +101,15 @@ export function buildCanonicalDocument(item: MediaItem): string {
         const publisher = normalizeText(item.publisher);
         if (publisher) lines.push(`Publisher: ${publisher}`);
       }
+      break;
+    }
+    case "game": {
+      const developers = normalizeList(item.developers);
+      if (developers) lines.push(`Developers: ${developers}`);
+      const publishers = normalizeList(item.publishers);
+      if (publishers) lines.push(`Publishers: ${publishers}`);
+      const platforms = normalizeList(item.platforms);
+      if (platforms) lines.push(`Platforms: ${platforms}`);
       break;
     }
   }

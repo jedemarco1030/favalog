@@ -6,7 +6,7 @@
  * changes to the consuming UI code.
  */
 
-export type MediaKind = "movie" | "tv" | "book";
+export type MediaKind = "movie" | "tv" | "book" | "game";
 
 /**
  * The shared shape every trackable title in Favalog conforms to.
@@ -59,7 +59,22 @@ export interface Book extends MediaItemBase {
   publisher?: string;
 }
 
-export type MediaItem = Movie | TVShow | Book;
+export interface Game extends MediaItemBase {
+  kind: "game";
+  /** Platform names, e.g. "PC", "PlayStation 5". Bounded by the normalizer. */
+  platforms: string[];
+  developers: string[];
+  publishers: string[];
+}
+
+export type MediaItem = Movie | TVShow | Book | Game;
+
+/**
+ * Personal play status for a game. Distinct from diary entries (what you did
+ * on a date) and ratings (what you thought); neither implies a status.
+ */
+export type GamePlayStatus =
+  "backlog" | "playing" | "completed" | "paused" | "dropped";
 
 export interface User {
   id: string;

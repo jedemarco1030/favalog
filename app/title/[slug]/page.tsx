@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { MediaKind } from "@/lib/types";
 import { notFound } from "next/navigation";
 import { MessageSquare } from "lucide-react";
 import { Container } from "@/components/ui/container";
@@ -286,8 +287,10 @@ export default async function TitlePage({ params }: TitlePageProps) {
   );
 }
 
-function detailsDescription(kind: "movie" | "tv" | "book"): string {
+function detailsDescription(kind: MediaKind): string {
   switch (kind) {
+    case "game":
+      return "Developers, publishers, and platforms.";
     case "movie":
       return "Credits, runtime, and cast.";
     case "tv":
