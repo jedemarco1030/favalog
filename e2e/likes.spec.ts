@@ -239,6 +239,23 @@ test.describe.serial("@likes review and list likes", () => {
           name: `Follow ${SOCIAL_USER_A.displayName}`,
         }),
       ).toBeVisible();
+      // Wait for the PERSISTED server truth, not just the returned action
+      // state (same guard as feed.spec.ts): a freshly rendered profile must
+      // show the unfollowed state before revocation is asserted, otherwise the
+      // 404 check races the write instead of testing follower-only access.
+      await expect
+        .poll(
+          async () => {
+            await pageB.reload();
+            return pageB
+              .getByRole("button", {
+                name: `Follow ${SOCIAL_USER_A.displayName}`,
+              })
+              .count();
+          },
+          { timeout: 20_000 },
+        )
+        .toBe(1);
 
       // Followers-only list detail is a 404 again.
       const followersAfter = await pageB.goto(`/list/${FOLLOWERS_LIST.slug}`);
