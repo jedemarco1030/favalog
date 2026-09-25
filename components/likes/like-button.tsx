@@ -116,7 +116,7 @@ export function LikeButton({
       >
         <Heart className="size-4" aria-hidden="true" />
         <span className="tabular-nums">{countLabel}</span>
-        <span className="sr-only">{likesWord}</span>
+        <span className="sr-only">{` ${likesWord}`}</span>
       </Link>
     );
   }
@@ -163,7 +163,7 @@ export function LikeButton({
             />
           )}
           <span className="tabular-nums">{countLabel}</span>
-          <span className="sr-only">{likesWord}</span>
+          <span className="sr-only">{` ${likesWord}`}</span>
         </button>
       </form>
 
