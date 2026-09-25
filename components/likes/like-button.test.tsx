@@ -88,6 +88,16 @@ describe("LikeButton", () => {
     expect(button).toHaveTextContent("4");
   });
 
+  it("separates the count from its singular/plural word so it reads as a phrase", () => {
+    const action = vi.fn(async () => ({ status: "idle" }) as LikeFormState);
+    const { unmount } = renderButton(action, { initialLikeCount: 1 });
+    expect(screen.getByRole("button")).toHaveTextContent(/^1 like$/);
+    unmount();
+
+    renderButton(action, { initialLikeCount: 2, isAuthenticated: false });
+    expect(screen.getByRole("link")).toHaveTextContent(/^2 likes$/);
+  });
+
   it("routes an expired session through the safe sign-in redirect", async () => {
     const user = userEvent.setup();
     const action = vi.fn(
