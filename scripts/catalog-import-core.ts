@@ -90,8 +90,8 @@ export const USAGE = [
   "  import   Trusted materialization of one external id into the catalog.",
   "",
   "Options:",
-  "  --provider <tmdb|openlibrary>",
-  "  --kind <movie|tv|book>",
+  "  --provider <tmdb|openlibrary|rawg>",
+  "  --kind <movie|tv|book|game>",
   "  --query <text>                 (search)",
   "  --external-id <id>             (inspect|import)",
   "  --page <n>                     (search)",
@@ -242,8 +242,14 @@ async function runSearch(
   deps: CatalogCliDeps,
 ): Promise<number> {
   const provider = args.provider as ExternalProvider | undefined;
-  if (provider !== "tmdb" && provider !== "openlibrary") {
-    deps.logger.error("[catalog] search requires --provider tmdb|openlibrary");
+  if (
+    provider !== "tmdb" &&
+    provider !== "openlibrary" &&
+    provider !== "rawg"
+  ) {
+    deps.logger.error(
+      "[catalog] search requires --provider tmdb|openlibrary|rawg",
+    );
     return 1;
   }
   if (!args.query) {

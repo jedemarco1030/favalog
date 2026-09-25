@@ -128,6 +128,23 @@ describe("validateExternalId", () => {
       false,
     );
   });
+
+  it("accepts a positive-integer RAWG game id", () => {
+    const result = validateExternalId("rawg", "game", " 274755 ");
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe("274755");
+  });
+
+  it("rejects a malformed RAWG id", () => {
+    expect(validateExternalId("rawg", "game", "hades").ok).toBe(false);
+    expect(validateExternalId("rawg", "game", "0").ok).toBe(false);
+    expect(validateExternalId("rawg", "game", "-5").ok).toBe(false);
+    expect(validateExternalId("rawg", "game", "").ok).toBe(false);
+  });
+
+  it("rejects a RAWG non-game combination", () => {
+    expect(validateExternalId("rawg", "movie", "274755").ok).toBe(false);
+  });
 });
 
 describe("externalKeyFor", () => {
@@ -141,6 +158,28 @@ describe("externalKeyFor", () => {
 
   it("stores an Open Library Work id unchanged", () => {
     expect(externalKeyFor("openlibrary", "book", "OL45804W")).toBe("OL45804W");
+  });
+
+  it("stores a RAWG game id unchanged", () => {
+    expect(externalKeyFor("rawg", "game", "274755")).toBe("274755");
+  });
+});
+
+describe("validateMaterializeInput for RAWG", () => {
+  it("accepts a well-formed RAWG game identity", () => {
+    const result = validateMaterializeInput({
+      provider: "rawg",
+      kind: "game",
+      externalId: "274755",
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toEqual({
+        provider: "rawg",
+        kind: "game",
+        externalId: "274755",
+      });
+    }
   });
 });
 
