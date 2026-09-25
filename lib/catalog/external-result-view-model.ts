@@ -28,6 +28,7 @@ import type { MediaKind } from "@/lib/types";
 export const PROVIDER_LABEL: Record<ExternalProvider, string> = {
   tmdb: "TMDB",
   openlibrary: "Open Library",
+  rawg: "RAWG",
 };
 
 /** Whether the external candidate is already a Favalog title or can be imported. */

@@ -29,10 +29,11 @@ describe("parseMediaKind", () => {
     expect(parseMediaKind("movie")).toBe("movie");
     expect(parseMediaKind("tv")).toBe("tv");
     expect(parseMediaKind("book")).toBe("book");
+    expect(parseMediaKind("game")).toBe("game");
   });
 
   it("returns null for unknown / missing input", () => {
-    expect(parseMediaKind("game")).toBeNull();
+    expect(parseMediaKind("podcast")).toBeNull();
     expect(parseMediaKind("")).toBeNull();
     expect(parseMediaKind(undefined)).toBeNull();
   });
@@ -157,11 +158,28 @@ describe("validateMaterializeInput", () => {
   it("rejects an unknown media kind", () => {
     const result = validateMaterializeInput({
       provider: "tmdb",
-      kind: "game",
+      kind: "podcast",
       externalId: "1",
     });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toMatch(/unknown media kind/i);
+  });
+
+  it("rejects TMDB for games and RAWG for non-games", () => {
+    expect(
+      validateMaterializeInput({
+        provider: "tmdb",
+        kind: "game",
+        externalId: "1",
+      }).ok,
+    ).toBe(false);
+    expect(
+      validateMaterializeInput({
+        provider: "rawg",
+        kind: "movie",
+        externalId: "1",
+      }).ok,
+    ).toBe(false);
   });
 
   it("rejects a provider that does not serve the kind", () => {

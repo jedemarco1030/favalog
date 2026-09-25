@@ -38,9 +38,10 @@ describe("provider configuration predicates", () => {
 });
 
 describe("createServerProviderRegistry", () => {
-  it("registers the real TMDB and Open Library providers", () => {
+  it("registers the real TMDB, Open Library, and RAWG providers", () => {
     const registry = createServerProviderRegistry();
-    expect(registry.ids().sort()).toEqual(["openlibrary", "tmdb"]);
+    expect(registry.ids().sort()).toEqual(["openlibrary", "rawg", "tmdb"]);
+    expect(registry.get("rawg").kinds).toEqual(["game"]);
     expect(registry.has("tmdb")).toBe(true);
     expect(registry.has("openlibrary")).toBe(true);
     expect(registry.get("tmdb").kinds).toEqual(["movie", "tv"]);

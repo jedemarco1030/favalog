@@ -191,9 +191,9 @@ export function createOpenLibraryProvider(
     async search(
       opts: CatalogSearchOptions,
     ): Promise<ProviderPage<CatalogSearchCandidate>> {
-      // Open Library only serves books; a movie/tv-only filter yields nothing.
+      // Open Library only serves books; any other single-kind filter yields nothing.
       const kind = opts.kind ?? "all";
-      if (kind === "movie" || kind === "tv") {
+      if (kind !== "all" && kind !== "book") {
         return { items: [], page: clampPage(opts.page), hasMore: false };
       }
 

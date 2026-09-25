@@ -22,16 +22,23 @@ export type Validated<T> =
 export const PROVIDER_KINDS: Record<ExternalProvider, readonly MediaKind[]> = {
   tmdb: ["movie", "tv"],
   openlibrary: ["book"],
+  rawg: ["game"],
 };
 
 /** All valid provider ids. */
 const PROVIDERS: ReadonlySet<string> = new Set<ExternalProvider>([
   "tmdb",
   "openlibrary",
+  "rawg",
 ]);
 
 /** All valid media kinds. */
-const KINDS: ReadonlySet<string> = new Set<MediaKind>(["movie", "tv", "book"]);
+const KINDS: ReadonlySet<string> = new Set<MediaKind>([
+  "movie",
+  "tv",
+  "book",
+  "game",
+]);
 
 /** Narrow an arbitrary string to a known provider id, or `null`. */
 export function parseProvider(

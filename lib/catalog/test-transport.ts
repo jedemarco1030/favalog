@@ -32,6 +32,13 @@ export const TEST_TRANSPORT_ENABLE_ENV = "CATALOG_TEST_TRANSPORT" as const;
 export const TMDB_TEST_BASE_URL_ENV = "CATALOG_TEST_TMDB_BASE_URL" as const;
 export const OPENLIBRARY_TEST_BASE_URL_ENV =
   "CATALOG_TEST_OPENLIBRARY_BASE_URL" as const;
+export const RAWG_TEST_BASE_URL_ENV = "CATALOG_TEST_RAWG_BASE_URL" as const;
+
+const TEST_BASE_URL_ENV = {
+  tmdb: TMDB_TEST_BASE_URL_ENV,
+  openlibrary: OPENLIBRARY_TEST_BASE_URL_ENV,
+  rawg: RAWG_TEST_BASE_URL_ENV,
+} as const;
 
 type EnvLike = Record<string, string | undefined>;
 
@@ -78,14 +85,11 @@ export function isLoopbackHttpUrl(raw: string): boolean {
  * it can be concatenated with adapter paths exactly like the real base constant.
  */
 export function resolveTestProviderBaseUrl(
-  provider: "tmdb" | "openlibrary",
+  provider: "tmdb" | "openlibrary" | "rawg",
   env: EnvLike = process.env,
 ): string | undefined {
   if (!isTestTransportEnabled(env)) return undefined;
-  const key =
-    provider === "tmdb"
-      ? TMDB_TEST_BASE_URL_ENV
-      : OPENLIBRARY_TEST_BASE_URL_ENV;
+  const key = TEST_BASE_URL_ENV[provider];
   const raw = env[key]?.trim();
   if (!raw) return undefined;
   if (!isLoopbackHttpUrl(raw)) return undefined;

@@ -10,6 +10,7 @@
 
 import { providerError } from "./errors.ts";
 import { createOpenLibraryProvider } from "./openlibrary/client.ts";
+import { createRawgProvider } from "./rawg/client.ts";
 import { resolveTestProviderBaseUrl } from "./test-transport.ts";
 import { createTmdbProvider } from "./tmdb/client.ts";
 import type { CatalogProvider, ExternalProvider } from "./types";
@@ -68,5 +69,6 @@ export function createServerProviderRegistry(): ProviderRegistry {
     createOpenLibraryProvider({
       baseUrl: resolveTestProviderBaseUrl("openlibrary"),
     }),
+    createRawgProvider({ baseUrl: resolveTestProviderBaseUrl("rawg") }),
   ]);
 }

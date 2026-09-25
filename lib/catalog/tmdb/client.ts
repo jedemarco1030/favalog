@@ -233,6 +233,10 @@ export function createTmdbProvider(
       const query = validated.value;
       const page = clampPage(opts.page);
       const kind = opts.kind ?? "all";
+      // TMDB serves only movies + TV; a book/game-only filter yields nothing.
+      if (kind === "book" || kind === "game") {
+        return { items: [], page, hasMore: false };
+      }
       const token = requireToken("search");
 
       return observed("search", async () => {
