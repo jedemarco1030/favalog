@@ -21,6 +21,15 @@ interface MediaCardProps {
    * within a Client Component.
    */
   onSelect?: () => void;
+  /**
+   * `landscape` renders wide 16:9 artwork (backdrop first) for the poster
+   * variant — the natural shape of game artwork. Defaults to `poster`.
+   */
+  artwork?: "poster" | "landscape";
+  /** Optional short line (e.g. a release label) replacing the plain year. */
+  meta?: string;
+  /** Tailwind sizes hint for the artwork image. */
+  sizes?: string;
 }
 
 /**
@@ -37,6 +46,9 @@ export function MediaCard({
   className,
   priority = false,
   onSelect,
+  artwork = "poster",
+  meta,
+  sizes,
 }: MediaCardProps) {
   const href = `/title/${item.slug}`;
 
@@ -85,21 +97,30 @@ export function MediaCard({
         href={href}
         onClick={onSelect}
         className="flex flex-col gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        aria-label={`${item.title} (${mediaKindLabel(item.kind)}, ${item.year})`}
+        aria-label={`${item.title} (${mediaKindLabel(item.kind)}, ${meta ?? item.year})`}
       >
         <div className="overflow-hidden rounded-lg transition duration-300 group-hover:ring-accent/40">
           <MediaPoster
-            item={item}
+            item={
+              artwork === "landscape"
+                ? {
+                    title: item.title,
+                    posterUrl: item.backdropUrl || item.posterUrl,
+                  }
+                : item
+            }
+            ratio={artwork === "landscape" ? "16/9" : "2/3"}
+            sizes={sizes}
             decorative
             priority={priority}
-            className="transition-transform duration-500 group-hover:scale-[1.03]"
+            className="transition-transform duration-500 motion-safe:group-hover:scale-[1.03]"
           />
         </div>
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-foreground/50">
             <span>{mediaKindLabel(item.kind)}</span>
             <span aria-hidden="true">·</span>
-            <span className="tabular-nums">{item.year}</span>
+            <span className="tabular-nums">{meta ?? item.year}</span>
           </div>
           <h3 className="font-display text-base leading-snug text-foreground">
             {item.title}

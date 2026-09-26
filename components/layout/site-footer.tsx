@@ -14,7 +14,7 @@ export function SiteFooter() {
         <div className="flex flex-col gap-2">
           <Logo />
           <p className="max-w-sm text-foreground/50">
-            Everything you watch and read. One place to remember it.
+            Everything you watch, read, and play. One place to remember it.
           </p>
         </div>
         <nav aria-label="Footer">
