@@ -26,7 +26,11 @@ import {
 import { mediaKindLabel } from "@/components/media/media-type-badge";
 import { isAuthAvailable } from "@/lib/auth/capability";
 import { getCurrentUser } from "@/lib/auth/data";
-import { getRealMediaBySlug } from "@/lib/supabase/media";
+import {
+  getRealMediaBySlug,
+  getRealMediaWithProviderBySlug,
+} from "@/lib/supabase/media";
+import { ProviderAttribution } from "@/components/media/provider-attribution";
 import { getMyLatestLogForSlug } from "@/lib/supabase/diary";
 import { getMyListsWithMembership } from "@/lib/supabase/lists";
 import { getMyFavoriteState } from "@/lib/supabase/favorites";
@@ -90,8 +94,13 @@ export default async function TitlePage({ params }: TitlePageProps) {
   // freshly MATERIALIZED external title (Catalog Platform v1B) — which exists
   // only in `media_items` — resolves at its canonical route with the existing
   // Log / Rate / Review / Favorite / Add-to-list actions working unchanged.
-  const item = getMediaBySlug(slug) ?? (await getRealMediaBySlug(slug));
+  const mockItem = getMediaBySlug(slug);
+  const realMedia = mockItem
+    ? null
+    : await getRealMediaWithProviderBySlug(slug);
+  const item = mockItem ?? realMedia?.item;
   if (!item) notFound();
+  const sourceProvider = realMedia?.provider ?? null;
 
   const distribution = getRatingDistribution(item.id);
   const titleReviews = getReviewsForMedia(item.id);
@@ -190,6 +199,12 @@ export default async function TitlePage({ params }: TitlePageProps) {
                 description={detailsDescription(item.kind)}
               />
               <MediaDetails item={item} />
+              {sourceProvider && (
+                <ProviderAttribution
+                  provider={sourceProvider}
+                  className="mt-6"
+                />
+              )}
             </section>
 
             <section>
