@@ -745,3 +745,49 @@ describe("runEmbedCatalog — provider embedding policy", () => {
     expect(slugs).toEqual(["curated-title", "ol-title"]);
   });
 });
+
+const RAWG_ROW = rowWith(
+  "00000000-0000-0000-0000-0000000000f1",
+  "rawg-title",
+  "rawg",
+);
+
+describe("runEmbedCatalog — RAWG embedding control", () => {
+  it("excludes RAWG rows by default", async () => {
+    const h = createHarness({
+      env: { SUPABASE_URL: LOCAL_URL, SUPABASE_SECRET_KEY: SERVICE_KEY },
+      mediaRows: [FAVALOG_ROW, RAWG_ROW],
+    });
+    expect(await runEmbedCatalog(["--fake"], h.deps)).toBe(0);
+    const slugs = (h.captured.records ?? []).map((r) => r.slug);
+    expect(slugs).toEqual(["curated-title"]);
+  });
+
+  it("embeds RAWG rows with synthetic vectors when RAWG_EMBEDDING_ENABLED is set", async () => {
+    const h = createHarness({
+      env: {
+        SUPABASE_URL: LOCAL_URL,
+        SUPABASE_SECRET_KEY: SERVICE_KEY,
+        RAWG_EMBEDDING_ENABLED: "true",
+      },
+      mediaRows: [FAVALOG_ROW, RAWG_ROW],
+    });
+    expect(await runEmbedCatalog(["--fake"], h.deps)).toBe(0);
+    const slugs = (h.captured.records ?? []).map((r) => r.slug);
+    expect(slugs).toEqual(["curated-title", "rawg-title"]);
+  });
+
+  it("never selects RAWG rows for a live run before permission is documented", async () => {
+    const h = createHarness({
+      env: {
+        SUPABASE_URL: LOCAL_URL,
+        SUPABASE_SECRET_KEY: SERVICE_KEY,
+        RAWG_EMBEDDING_ENABLED: "true",
+      },
+      mediaRows: [FAVALOG_ROW, RAWG_ROW],
+    });
+    await runEmbedCatalog(["--dry-run"], h.deps);
+    const slugs = (h.captured.records ?? []).map((r) => r.slug);
+    expect(slugs).not.toContain("rawg-title");
+  });
+});

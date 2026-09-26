@@ -100,3 +100,37 @@ describe("partitionEmbeddableRows", () => {
     expect(excluded.map((r) => r.id)).toEqual(["4"]);
   });
 });
+
+describe("RAWG embedding control", () => {
+  it("excludes RAWG by default", () => {
+    expect(isSourceEmbeddable("rawg")).toBe(false);
+    expect(classifyEmbeddingSource("rawg")).toBe("excluded_rawg");
+  });
+
+  it("does not admit RAWG when only TMDB embedding is enabled", () => {
+    expect(isSourceEmbeddable("rawg", TMDB_ON)).toBe(false);
+  });
+
+  it("keeps live RAWG submission locked even when the control is on", () => {
+    const policy: EmbeddingSourcePolicy = {
+      tmdbEmbeddingEnabled: false,
+      rawgEmbeddingEnabled: true,
+    };
+    expect(classifyEmbeddingSource("rawg", policy)).toBe(
+      "excluded_rawg_live_permission_pending",
+    );
+    expect(
+      isSourceEmbeddable("rawg", { ...policy, liveSubmission: true }),
+    ).toBe(false);
+  });
+
+  it("permits RAWG for a synthetic run when the control is on", () => {
+    expect(
+      isSourceEmbeddable(" RAWG ", {
+        tmdbEmbeddingEnabled: false,
+        rawgEmbeddingEnabled: true,
+        liveSubmission: false,
+      }),
+    ).toBe(true);
+  });
+});

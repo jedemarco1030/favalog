@@ -29,7 +29,10 @@ import {
   CANONICAL_DOCUMENT_VERSION,
   canonicalDocumentFor,
 } from "../lib/search/canonical-document.ts";
-import { isTmdbEmbeddingEnabled } from "../lib/catalog/feature-flag.ts";
+import {
+  isRawgEmbeddingEnabled,
+  isTmdbEmbeddingEnabled,
+} from "../lib/catalog/feature-flag.ts";
 import {
   classifyEmbeddingSource,
   type EmbeddingSourcePolicy,
@@ -600,6 +603,8 @@ export async function runEmbedCatalog(
   // so no re-embedding command can embed a policy-excluded row.
   const policy: EmbeddingSourcePolicy = {
     tmdbEmbeddingEnabled: isTmdbEmbeddingEnabled(env),
+    rawgEmbeddingEnabled: isRawgEmbeddingEnabled(env),
+    liveSubmission: !args.fake,
   };
   const allRows = (rows as MediaRow[]) ?? [];
   const { embeddable, excluded } = partitionEmbeddableRows(allRows, policy);
@@ -615,7 +620,9 @@ export async function runEmbedCatalog(
     logger.log(
       `[embed-catalog] Provider policy excluded ${excluded.length} row(s) from ` +
         `embedding (${summary}). Unknown sources are never embedded; TMDB is ` +
-        `embedded only when TMDB_EMBEDDING_ENABLED is set.`,
+        `embedded only when TMDB_EMBEDDING_ENABLED is set; RAWG only when ` +
+        `RAWG_EMBEDDING_ENABLED is set, and only with --fake until live RAWG ` +
+        `embedding permission is documented.`,
     );
   }
 

@@ -51,6 +51,7 @@ import {
   type FallbackReason,
   type SearchLogFields,
 } from "@/lib/search/log";
+import { balanceAcrossKinds } from "@/lib/search/cross-media-balance";
 import { isSupabaseConfigured } from "./env";
 import { createClient } from "./server";
 import {
@@ -284,7 +285,8 @@ export async function searchCatalog(
     }
   }
 
-  const items = mapSearchRowsToMediaItems(rows).slice(0, limit);
+  const ranked = mapSearchRowsToMediaItems(rows).slice(0, limit);
+  const items = kind === "all" ? balanceAcrossKinds(ranked, query) : ranked;
 
   log(
     buildSearchLog({

@@ -98,6 +98,20 @@ export function isTmdbEmbeddingEnabled(
 }
 
 /**
+ * Explicit, server-only control for whether RAWG-sourced rows may enter the
+ * embedding pipeline (`RAWG_EMBEDDING_ENABLED`). Defaults to disabled and is
+ * independent of `RAWG_ENABLED`. Even when on, live submission stays locked by
+ * `RAWG_LIVE_EMBEDDING_PERMISSION_DOCUMENTED` in the embedding source policy.
+ */
+export function isRawgEmbeddingEnabled(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  const raw = env.RAWG_EMBEDDING_ENABLED?.trim().toLowerCase();
+  if (raw === undefined || raw === "") return false;
+  return TRUTHY_TOKENS.has(raw);
+}
+
+/**
  * Explicit, server-only Open Library PROVIDER enablement flag
  * (`OPEN_LIBRARY_ENABLED`).
  *
