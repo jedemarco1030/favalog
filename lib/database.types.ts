@@ -1014,7 +1014,13 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      game_play_status: ["backlog", "playing", "completed", "paused", "dropped"],
+      game_play_status: [
+        "backlog",
+        "playing",
+        "completed",
+        "paused",
+        "dropped",
+      ],
       list_visibility: ["public", "followers", "private"],
       media_kind: ["movie", "tv", "book", "game"],
     },
