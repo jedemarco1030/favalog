@@ -69,7 +69,7 @@ export function OnboardingForm({
         multiline
         defaultValue={state.values?.bio}
         error={state.fieldErrors?.bio}
-        hint={`A short line about what you watch and read. Up to ${BIO_MAX_LENGTH} characters.`}
+        hint={`A short line about what you watch, read, and play. Up to ${BIO_MAX_LENGTH} characters.`}
       />
       <AuthField
         id="location"
