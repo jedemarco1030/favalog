@@ -22,6 +22,7 @@ import type { SearchOutcome } from "@/lib/supabase/search-view-model";
 import { browseCatalog } from "@/lib/supabase/browse";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { availableExternalProviders } from "@/lib/catalog/feature-flag";
+import type { ExternalProvider } from "@/lib/catalog/types";
 import { isAuthAvailable } from "@/lib/auth/capability";
 import { getCurrentUser } from "@/lib/auth/data";
 
@@ -227,7 +228,7 @@ function ExternalSections({
   signInHref,
   returnTo,
 }: {
-  providers: readonly ("tmdb" | "openlibrary")[];
+  providers: readonly ExternalProvider[];
   query: string;
   filter: SearchKindFilter;
   localSlugs: string[];
@@ -237,8 +238,10 @@ function ExternalSections({
 }): ReactNode {
   const hasTmdb = providers.includes("tmdb");
   const hasOpenLibrary = providers.includes("openlibrary");
-  const showMoviesTv = hasTmdb && filter !== "book";
+  const showMoviesTv = hasTmdb && filter !== "book" && filter !== "game";
   const showBooks = hasOpenLibrary && (filter === "all" || filter === "book");
+  const showGames =
+    providers.includes("rawg") && (filter === "all" || filter === "game");
 
   const tmdbHeading =
     filter === "movie"
@@ -270,6 +273,20 @@ function ExternalSections({
             heading="More books"
             query={query}
             kind="book"
+            localSlugs={localSlugs}
+            isAuthenticated={isAuthenticated}
+            signInHref={signInHref}
+            returnTo={returnTo}
+          />
+        </Suspense>
+      )}
+      {showGames && (
+        <Suspense fallback={<SectionSkeleton heading="More games" />}>
+          <ExternalResultsSection
+            provider="rawg"
+            heading="More games"
+            query={query}
+            kind="game"
             localSlugs={localSlugs}
             isAuthenticated={isAuthenticated}
             signInHref={signInHref}

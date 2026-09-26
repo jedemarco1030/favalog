@@ -50,6 +50,7 @@ export function deriveProfileStats(
     movie: new Set(),
     tv: new Set(),
     book: new Set(),
+    game: new Set(),
   };
   let ratingSum = 0;
   let ratingCount = 0;

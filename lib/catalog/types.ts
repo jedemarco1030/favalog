@@ -20,7 +20,7 @@ import type { MediaKind } from "@/lib/types";
  * TMDB serves movies + TV; Open Library serves books. The union is closed so a
  * new provider is a deliberate, audited addition rather than an open string.
  */
-export type ExternalProvider = "tmdb" | "openlibrary";
+export type ExternalProvider = "tmdb" | "openlibrary" | "rawg";
 
 /**
  * A stable, provider-native reference to exactly one external record.
@@ -90,6 +90,14 @@ export interface NormalizedBookDetails {
   publisher?: string;
 }
 
+/** Kind-specific normalized detail for a video game. */
+export interface NormalizedGameDetails {
+  kind: "game";
+  platforms: string[];
+  developers: string[];
+  publishers: string[];
+}
+
 /** Shared normalized fields, mirroring `MediaItemBase` minus Favalog-assigned identity. */
 interface NormalizedMediaBase {
   /** The stable external reference this record was normalized from. */
@@ -119,7 +127,12 @@ interface NormalizedMediaBase {
  * normalizer; no unbounded provider content reaches this shape.
  */
 export type NormalizedMediaItem = NormalizedMediaBase &
-  (NormalizedMovieDetails | NormalizedTVDetails | NormalizedBookDetails);
+  (
+    | NormalizedMovieDetails
+    | NormalizedTVDetails
+    | NormalizedBookDetails
+    | NormalizedGameDetails
+  );
 
 /**
  * One page of provider search results plus the coarse pagination metadata the

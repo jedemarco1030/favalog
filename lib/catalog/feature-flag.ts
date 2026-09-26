@@ -20,6 +20,7 @@
  */
 
 import { isOpenLibraryConfigured } from "./openlibrary/config";
+import { isRawgConfigured } from "./rawg/config";
 import { isTmdbConfigured } from "./tmdb/config";
 import type { ExternalProvider } from "./types";
 
@@ -97,6 +98,20 @@ export function isTmdbEmbeddingEnabled(
 }
 
 /**
+ * Explicit, server-only control for whether RAWG-sourced rows may enter the
+ * embedding pipeline (`RAWG_EMBEDDING_ENABLED`). Defaults to disabled and is
+ * independent of `RAWG_ENABLED`. Even when on, live submission stays locked by
+ * `RAWG_LIVE_EMBEDDING_PERMISSION_DOCUMENTED` in the embedding source policy.
+ */
+export function isRawgEmbeddingEnabled(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  const raw = env.RAWG_EMBEDDING_ENABLED?.trim().toLowerCase();
+  if (raw === undefined || raw === "") return false;
+  return TRUTHY_TOKENS.has(raw);
+}
+
+/**
  * Explicit, server-only Open Library PROVIDER enablement flag
  * (`OPEN_LIBRARY_ENABLED`).
  *
@@ -117,8 +132,28 @@ export function isOpenLibraryEnabled(): boolean {
  * the single place the per-provider production controls live so TMDB and Open
  * Library can be enabled independently.
  */
+/**
+ * Explicit, server-only RAWG PROVIDER enablement flag (`RAWG_ENABLED`).
+ *
+ * DEFAULTS TO DISABLED: RAWG's free tier requires visible attribution and its
+ * commercial use needs a paid plan, so an operator must opt in deliberately
+ * with a truthy token. Returns only a boolean.
+ */
+export function isRawgEnabled(): boolean {
+  const raw = process.env.RAWG_ENABLED?.trim().toLowerCase();
+  if (raw === undefined || raw === "") return false;
+  return TRUTHY_TOKENS.has(raw);
+}
+
 export function isExternalProviderEnabled(provider: ExternalProvider): boolean {
-  return provider === "tmdb" ? isTmdbEnabled() : isOpenLibraryEnabled();
+  switch (provider) {
+    case "tmdb":
+      return isTmdbEnabled();
+    case "openlibrary":
+      return isOpenLibraryEnabled();
+    case "rawg":
+      return isRawgEnabled();
+  }
 }
 
 /**
@@ -137,6 +172,7 @@ export function availableExternalProviders(): ExternalProvider[] {
   if (isOpenLibraryEnabled() && isOpenLibraryConfigured()) {
     providers.push("openlibrary");
   }
+  if (isRawgEnabled() && isRawgConfigured()) providers.push("rawg");
   return providers;
 }
 

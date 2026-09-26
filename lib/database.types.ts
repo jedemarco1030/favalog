@@ -129,6 +129,45 @@ export type Database = {
           },
         ]
       }
+      game_statuses: {
+        Row: {
+          created_at: string
+          media_id: string
+          status: Database["public"]["Enums"]["game_play_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          media_id: string
+          status: Database["public"]["Enums"]["game_play_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          media_id?: string
+          status?: Database["public"]["Enums"]["game_play_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_statuses_media_id_fkey"
+            columns: ["media_id"]
+            isOneToOne: false
+            referencedRelation: "media_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "game_statuses_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       list_items: {
         Row: {
           created_at: string
@@ -840,8 +879,14 @@ export type Database = {
       }
     }
     Enums: {
+      game_play_status:
+        | "backlog"
+        | "playing"
+        | "completed"
+        | "paused"
+        | "dropped"
       list_visibility: "public" | "followers" | "private"
-      media_kind: "movie" | "tv" | "book"
+      media_kind: "movie" | "tv" | "book" | "game"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -969,8 +1014,15 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      game_play_status: [
+        "backlog",
+        "playing",
+        "completed",
+        "paused",
+        "dropped",
+      ],
       list_visibility: ["public", "followers", "private"],
-      media_kind: ["movie", "tv", "book"],
+      media_kind: ["movie", "tv", "book", "game"],
     },
   },
 } as const

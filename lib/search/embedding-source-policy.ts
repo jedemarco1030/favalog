@@ -47,7 +47,18 @@ export const EMBEDDABLE_SOURCES = ["favalog", "openlibrary"] as const;
  * explicitly enabled. `tmdb` is excluded by default and admitted solely when the
  * operator sets {@link EmbeddingSourcePolicy.tmdbEmbeddingEnabled}.
  */
-export const PROVIDER_GATED_EMBEDDABLE_SOURCES = ["tmdb"] as const;
+export const PROVIDER_GATED_EMBEDDABLE_SOURCES = ["tmdb", "rawg"] as const;
+
+/**
+ * Whether the owner has documented permission to submit RAWG-derived content to
+ * a LIVE (third-party) embedding provider. RAWG's terms permit personal use with
+ * attribution, but embedding/caching clarification is unresolved, and TMDB's
+ * staff clarification does NOT extend to RAWG. Until this is flipped in a
+ * reviewed change that cites the documented permission, RAWG rows may only be
+ * embedded with synthetic (fake) vectors, even when `RAWG_EMBEDDING_ENABLED` is
+ * on. This is a code-level lock on purpose: an env var alone cannot enable it.
+ */
+export const RAWG_LIVE_EMBEDDING_PERMISSION_DOCUMENTED = false;
 
 export type EmbeddableSource = (typeof EMBEDDABLE_SOURCES)[number];
 
@@ -62,6 +73,16 @@ export interface EmbeddingSourcePolicy {
    * `false` everywhere; only an operator's explicit opt-in flips it on.
    */
   tmdbEmbeddingEnabled: boolean;
+  /**
+   * Whether RAWG-sourced rows (`source = 'rawg'`) may be embedded. Independent
+   * of the RAWG provider flag. Omitted means disabled.
+   */
+  rawgEmbeddingEnabled?: boolean;
+  /**
+   * Whether this run submits content to a LIVE embedding provider. Omitted is
+   * treated as live (fail closed). Only a synthetic/fake run sets `false`.
+   */
+  liveSubmission?: boolean;
 }
 
 /**
@@ -99,17 +120,23 @@ export function isSourceEmbeddable(
 ): boolean {
   const normalized = normalizeSource(source);
   if (EMBEDDABLE_SOURCE_SET.has(normalized)) return true;
-  if (normalized === "tmdb") return policy.tmdbEmbeddingEnabled === true;
-  return false;
+  return classifyEmbeddingSource(normalized, policy) === "permitted";
 }
 
 /**
  * Machine-readable reason a source was excluded from embedding (safe to log;
  * never contains user content). `permitted` means the row IS embeddable.
  * `excluded_tmdb` means the row is TMDB and the TMDB embedding control is off.
+ * `excluded_rawg` means the RAWG embedding control is off;
+ * `excluded_rawg_live_permission_pending` means it is on, but this run would
+ * submit to a live provider before RAWG embedding permission is documented.
  */
 export type EmbeddingSourceDecision =
-  "permitted" | "excluded_tmdb" | "excluded_unknown";
+  | "permitted"
+  | "excluded_tmdb"
+  | "excluded_rawg"
+  | "excluded_rawg_live_permission_pending"
+  | "excluded_unknown";
 
 /**
  * Explain the policy decision for one source. Used only for safe, aggregate
@@ -123,7 +150,15 @@ export function classifyEmbeddingSource(
   const normalized = normalizeSource(source);
   if (EMBEDDABLE_SOURCE_SET.has(normalized)) return "permitted";
   if (normalized === "tmdb") {
-    return policy.tmdbEmbeddingEnabled ? "permitted" : "excluded_tmdb";
+    return policy.tmdbEmbeddingEnabled === true ? "permitted" : "excluded_tmdb";
+  }
+  if (normalized === "rawg") {
+    if (policy.rawgEmbeddingEnabled !== true) return "excluded_rawg";
+    const live = policy.liveSubmission !== false;
+    if (live && !RAWG_LIVE_EMBEDDING_PERMISSION_DOCUMENTED) {
+      return "excluded_rawg_live_permission_pending";
+    }
+    return "permitted";
   }
   return "excluded_unknown";
 }

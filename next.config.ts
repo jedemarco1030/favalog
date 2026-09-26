@@ -20,6 +20,8 @@ const nextConfig: NextConfig = {
         hostname: "covers.openlibrary.org",
         pathname: "/b/**",
       },
+      // RAWG game artwork (games).
+      { protocol: "https", hostname: "media.rawg.io", pathname: "/media/**" },
     ],
   },
 };

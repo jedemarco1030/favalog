@@ -22,16 +22,23 @@ export type Validated<T> =
 export const PROVIDER_KINDS: Record<ExternalProvider, readonly MediaKind[]> = {
   tmdb: ["movie", "tv"],
   openlibrary: ["book"],
+  rawg: ["game"],
 };
 
 /** All valid provider ids. */
 const PROVIDERS: ReadonlySet<string> = new Set<ExternalProvider>([
   "tmdb",
   "openlibrary",
+  "rawg",
 ]);
 
 /** All valid media kinds. */
-const KINDS: ReadonlySet<string> = new Set<MediaKind>(["movie", "tv", "book"]);
+const KINDS: ReadonlySet<string> = new Set<MediaKind>([
+  "movie",
+  "tv",
+  "book",
+  "game",
+]);
 
 /** Narrow an arbitrary string to a known provider id, or `null`. */
 export function parseProvider(
@@ -84,6 +91,7 @@ export function clampPage(page: number | undefined): number {
  *   - Open Library Work ids match `OL\d+W` (e.g. `OL45804W`). The trailing `W`
  *     distinguishes a Work from an Edition (`M`) or Author (`A`); Favalog uses
  *     the Work as the canonical book identity.
+ *   - RAWG game ids are positive integers, globally unique across RAWG.
  */
 export function validateExternalId(
   provider: ExternalProvider,
@@ -100,8 +108,17 @@ export function validateExternalId(
     return { ok: true, value: id };
   }
 
-  // openlibrary
-  if (kind === "book") {
+  if (provider === "rawg") {
+    if (kind !== "game") {
+      return { ok: false, error: "unsupported provider/kind combination" };
+    }
+    if (!/^[1-9]\d*$/.test(id)) {
+      return { ok: false, error: "RAWG externalId must be a positive integer" };
+    }
+    return { ok: true, value: id };
+  }
+
+  if (provider === "openlibrary" && kind === "book") {
     if (!/^OL\d+W$/.test(id)) {
       return {
         ok: false,

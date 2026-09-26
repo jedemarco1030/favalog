@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { BookOpen, Film, Tv } from "lucide-react";
+import { BookOpen, Film, Gamepad2, Tv } from "lucide-react";
 import type { LucideProps } from "lucide-react";
 import type { ComponentType } from "react";
 import type { MediaKind } from "@/lib/types";
@@ -20,6 +20,7 @@ const KIND_ICON: Record<MediaKind, ComponentType<LucideProps>> = {
   movie: Film,
   tv: Tv,
   book: BookOpen,
+  game: Gamepad2,
 };
 
 /**

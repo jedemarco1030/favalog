@@ -29,7 +29,7 @@ import { CANONICAL_BOOK_GENRES } from "@/lib/catalog/openlibrary/genres";
 import { normalizeGenreKey } from "./query";
 
 /** A concrete media kind, or `null` for no media-type narrowing (browse "All"). */
-export type BrowseKind = "movie" | "tv" | "book" | null;
+export type BrowseKind = "movie" | "tv" | "book" | "game" | null;
 
 /**
  * The closed, user-facing vocabulary of movie/TV (screen) genres. It is the
@@ -77,6 +77,29 @@ export const SCREEN_GENRES = [
 /** The closed book browse vocabulary — the canonical Favalog book taxonomy. */
 export const BOOK_GENRES = CANONICAL_BOOK_GENRES;
 
+/** The closed game browse vocabulary — RAWG's published genre taxonomy. */
+export const GAME_GENRES = [
+  "Action",
+  "Adventure",
+  "Arcade",
+  "Board Games",
+  "Card",
+  "Casual",
+  "Educational",
+  "Family",
+  "Fighting",
+  "Indie",
+  "Massively Multiplayer",
+  "Platformer",
+  "Puzzle",
+  "Racing",
+  "RPG",
+  "Shooter",
+  "Simulation",
+  "Sports",
+  "Strategy",
+] as const;
+
 /**
  * Build a normalized-key → canonical-display lookup for a set of canonical
  * genres. The key is the case/whitespace-insensitive comparison key so a stored
@@ -95,15 +118,22 @@ function toVocabularyMap(
 
 const SCREEN_MAP = toVocabularyMap(SCREEN_GENRES);
 const BOOK_MAP = toVocabularyMap(BOOK_GENRES);
+const GAME_MAP = toVocabularyMap(GAME_GENRES);
 // Browse "All": the union of every kind's canonical vocabulary. Screen entries
 // are inserted first so a shared key keeps a stable, deterministic display.
-const ALL_MAP = toVocabularyMap([...SCREEN_GENRES, ...BOOK_GENRES]);
+const ALL_MAP = toVocabularyMap([
+  ...SCREEN_GENRES,
+  ...BOOK_GENRES,
+  ...GAME_GENRES,
+]);
 
 /** The normalized-key → canonical-display vocabulary for a browse kind. */
 function vocabularyFor(kind: BrowseKind): ReadonlyMap<string, string> {
   switch (kind) {
     case "book":
       return BOOK_MAP;
+    case "game":
+      return GAME_MAP;
     case "movie":
     case "tv":
       return SCREEN_MAP;

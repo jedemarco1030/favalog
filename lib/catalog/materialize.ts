@@ -95,6 +95,12 @@ export function buildDetails(
         pageCount: item.pageCount,
         ...(item.publisher ? { publisher: item.publisher } : {}),
       };
+    case "game":
+      return {
+        platforms: item.platforms,
+        developers: item.developers,
+        publishers: item.publishers,
+      };
   }
 }
 

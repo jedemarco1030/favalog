@@ -29,10 +29,11 @@ describe("parseMediaKind", () => {
     expect(parseMediaKind("movie")).toBe("movie");
     expect(parseMediaKind("tv")).toBe("tv");
     expect(parseMediaKind("book")).toBe("book");
+    expect(parseMediaKind("game")).toBe("game");
   });
 
   it("returns null for unknown / missing input", () => {
-    expect(parseMediaKind("game")).toBeNull();
+    expect(parseMediaKind("podcast")).toBeNull();
     expect(parseMediaKind("")).toBeNull();
     expect(parseMediaKind(undefined)).toBeNull();
   });
@@ -127,6 +128,23 @@ describe("validateExternalId", () => {
       false,
     );
   });
+
+  it("accepts a positive-integer RAWG game id", () => {
+    const result = validateExternalId("rawg", "game", " 274755 ");
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe("274755");
+  });
+
+  it("rejects a malformed RAWG id", () => {
+    expect(validateExternalId("rawg", "game", "hades").ok).toBe(false);
+    expect(validateExternalId("rawg", "game", "0").ok).toBe(false);
+    expect(validateExternalId("rawg", "game", "-5").ok).toBe(false);
+    expect(validateExternalId("rawg", "game", "").ok).toBe(false);
+  });
+
+  it("rejects a RAWG non-game combination", () => {
+    expect(validateExternalId("rawg", "movie", "274755").ok).toBe(false);
+  });
 });
 
 describe("externalKeyFor", () => {
@@ -140,6 +158,28 @@ describe("externalKeyFor", () => {
 
   it("stores an Open Library Work id unchanged", () => {
     expect(externalKeyFor("openlibrary", "book", "OL45804W")).toBe("OL45804W");
+  });
+
+  it("stores a RAWG game id unchanged", () => {
+    expect(externalKeyFor("rawg", "game", "274755")).toBe("274755");
+  });
+});
+
+describe("validateMaterializeInput for RAWG", () => {
+  it("accepts a well-formed RAWG game identity", () => {
+    const result = validateMaterializeInput({
+      provider: "rawg",
+      kind: "game",
+      externalId: "274755",
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toEqual({
+        provider: "rawg",
+        kind: "game",
+        externalId: "274755",
+      });
+    }
   });
 });
 
@@ -157,11 +197,28 @@ describe("validateMaterializeInput", () => {
   it("rejects an unknown media kind", () => {
     const result = validateMaterializeInput({
       provider: "tmdb",
-      kind: "game",
+      kind: "podcast",
       externalId: "1",
     });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toMatch(/unknown media kind/i);
+  });
+
+  it("rejects TMDB for games and RAWG for non-games", () => {
+    expect(
+      validateMaterializeInput({
+        provider: "tmdb",
+        kind: "game",
+        externalId: "1",
+      }).ok,
+    ).toBe(false);
+    expect(
+      validateMaterializeInput({
+        provider: "rawg",
+        kind: "movie",
+        externalId: "1",
+      }).ok,
+    ).toBe(false);
   });
 
   it("rejects a provider that does not serve the kind", () => {

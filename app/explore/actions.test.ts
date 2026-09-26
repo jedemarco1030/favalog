@@ -31,7 +31,7 @@ const shouldOfferExternalCatalog = vi.fn();
 const isExternalProviderAvailable = vi.fn();
 vi.mock("@/lib/catalog/feature-flag", () => ({
   shouldOfferExternalCatalog: () => shouldOfferExternalCatalog(),
-  isExternalProviderAvailable: (provider: "tmdb" | "openlibrary") =>
+  isExternalProviderAvailable: (provider: "tmdb" | "openlibrary" | "rawg") =>
     isExternalProviderAvailable(provider),
 }));
 

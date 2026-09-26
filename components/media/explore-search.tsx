@@ -31,6 +31,7 @@ const FILTER_OPTIONS: readonly FilterOption[] = [
   { value: "movie", label: "Movies" },
   { value: "tv", label: "TV" },
   { value: "book", label: "Books" },
+  { value: "game", label: "Games" },
 ] as const;
 
 interface ExploreSearchProps {

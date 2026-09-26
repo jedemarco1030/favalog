@@ -10,6 +10,7 @@ const KIND_LABEL: Record<MediaKind, string> = {
   movie: "Film",
   tv: "Series",
   book: "Book",
+  game: "Game",
 };
 
 /**

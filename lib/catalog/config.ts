@@ -50,6 +50,10 @@ export const MAX_GENRES = 12 as const;
 export const MAX_CAST = 12 as const;
 export const MAX_CREATORS = 8 as const;
 export const MAX_AUTHORS = 8 as const;
+/** Max platforms kept for a game (RAWG lists every port). */
+export const MAX_PLATFORMS = 12 as const;
+/** Max developers / publishers kept for a game. */
+export const MAX_STUDIOS = 8 as const;
 
 // --- Request reliability ----------------------------------------------------
 

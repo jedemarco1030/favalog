@@ -52,6 +52,23 @@ export function ProviderAttribution({
     );
   }
 
+  if (provider === "rawg") {
+    return (
+      <p className={cn("text-xs text-foreground/50", className)}>
+        Game data from{" "}
+        <a
+          href="https://rawg.io"
+          target="_blank"
+          rel="noreferrer noopener"
+          className="underline underline-offset-2 outline-none hover:text-foreground/70 focus-visible:ring-2 focus-visible:ring-accent"
+        >
+          RAWG
+        </a>
+        .
+      </p>
+    );
+  }
+
   return (
     <p className={cn("text-xs text-foreground/50", className)}>
       Book data from{" "}

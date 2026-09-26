@@ -18,6 +18,7 @@ import type { Database, Json } from "@/lib/database.types";
 import type {
   Book,
   DiaryEntry,
+  Game,
   MediaItem,
   Movie,
   Profile,
@@ -139,6 +140,16 @@ export function mapMediaRowToDomain(row: MediaItemRow): MediaItem {
           : undefined,
       };
       return book;
+    }
+    case "game": {
+      const game: Game = {
+        ...base,
+        kind: "game",
+        platforms: readStringArray(details.platforms),
+        developers: readStringArray(details.developers),
+        publishers: readStringArray(details.publishers),
+      };
+      return game;
     }
     default: {
       // Exhaustiveness guard: `kind` is a bounded enum, but a row from a future

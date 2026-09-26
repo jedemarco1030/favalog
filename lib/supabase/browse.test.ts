@@ -65,7 +65,9 @@ type PageResult = {
 
 function makeClient(allRows: MediaItemRow[]) {
   const fetchGenres = vi.fn(
-    async (kind: "movie" | "tv" | "book" | null): Promise<GenresResult> => ({
+    async (
+      kind: "movie" | "tv" | "book" | "game" | null,
+    ): Promise<GenresResult> => ({
       data: allRows
         .filter((r) => kind === null || r.kind === kind)
         .map((r) => ({ genres: r.genres })),
@@ -75,7 +77,7 @@ function makeClient(allRows: MediaItemRow[]) {
 
   const fetchPage = vi.fn(
     async (input: {
-      kind: "movie" | "tv" | "book" | null;
+      kind: "movie" | "tv" | "book" | "game" | null;
       genre: string | null;
       sort: string;
       from: number;

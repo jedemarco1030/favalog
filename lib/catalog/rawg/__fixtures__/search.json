@@ -1,0 +1,38 @@
+{
+  "count": 42,
+  "next": "https://api.rawg.io/api/games?page=2&search=witcher",
+  "results": [
+    {
+      "id": 3328,
+      "slug": "the-witcher-3-wild-hunt",
+      "name": "The Witcher 3: Wild Hunt",
+      "released": "2015-05-18",
+      "tba": false,
+      "background_image": "https://media.rawg.io/media/games/618/618c2031a07bbff6b4f611f10b6bcdbc.jpg",
+      "rating": 4.65,
+      "genres": [{ "name": "Action" }, { "name": "RPG" }],
+      "platforms": [{ "platform": { "name": "PC" } }]
+    },
+    {
+      "id": 10035,
+      "slug": "the-witcher",
+      "name": "The Witcher",
+      "released": "2007-10-24",
+      "tba": false,
+      "background_image": "http://evil.example.com/tracker.jpg",
+      "rating": 3.9
+    },
+    {
+      "slug": "missing-id",
+      "name": "No Id Game"
+    },
+    {
+      "id": 777001,
+      "slug": "witcher-next",
+      "name": "Untitled Witcher Project",
+      "released": null,
+      "tba": true,
+      "background_image": null
+    }
+  ]
+}

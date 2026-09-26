@@ -16,10 +16,18 @@ import "server-only";
  * safe to `null` (never throws) so a no-env build keeps rendering on mock data.
  */
 
+import type { ExternalProvider } from "@/lib/catalog/types";
+import { providerFromSource } from "@/lib/catalog/source-provider";
 import type { MediaItem } from "@/lib/types";
 import { isSupabaseConfigured } from "./env";
 import { mapMediaRowToDomain, type MediaItemRow } from "./mappers";
 import { createClient } from "./server";
+
+export interface RealMediaWithProvider {
+  item: MediaItem;
+  /** The external provider owed attribution, or `null` for curated rows. */
+  provider: ExternalProvider | null;
+}
 
 /**
  * Resolve a single catalog title by its immutable slug from Supabase, or `null`
@@ -29,6 +37,16 @@ import { createClient } from "./server";
 export async function getRealMediaBySlug(
   slug: string,
 ): Promise<MediaItem | null> {
+  return (await getRealMediaWithProviderBySlug(slug))?.item ?? null;
+}
+
+/**
+ * Same single read as {@link getRealMediaBySlug}, also returning the row's
+ * provenance so the title page can render the provider's required attribution.
+ */
+export async function getRealMediaWithProviderBySlug(
+  slug: string,
+): Promise<RealMediaWithProvider | null> {
   const trimmed = typeof slug === "string" ? slug.trim() : "";
   if (trimmed === "" || !isSupabaseConfigured()) return null;
 
@@ -48,7 +66,11 @@ export async function getRealMediaBySlug(
   if (error || !data) return null;
 
   try {
-    return mapMediaRowToDomain(data as MediaItemRow);
+    const row = data as MediaItemRow;
+    return {
+      item: mapMediaRowToDomain(row),
+      provider: providerFromSource(row.source),
+    };
   } catch {
     // A malformed row (e.g. an unmapped future kind) should not crash the page.
     return null;
