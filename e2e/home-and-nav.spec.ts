@@ -9,7 +9,7 @@ test.describe("Home and navigation", () => {
     await expect(
       page.getByRole("heading", {
         level: 1,
-        name: /Everything you watch and\s*read\./i,
+        name: /Everything you watch, read, and\s*play\./i,
       }),
     ).toBeVisible();
 

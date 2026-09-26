@@ -32,10 +32,10 @@ function resolveSiteUrl(): string {
 export const siteConfig = {
   name: "Favalog",
   /** Primary MVP tagline. Keep usage sparing — hero + footer, not every page. */
-  tagline: "Everything you watch and read. One place to remember it.",
+  tagline: "Everything you watch, read, and play. One place to remember it.",
   /** Longer-term tagline for once games, music, and more are in scope. */
   futureTagline: "Your life, through what you love.",
   shortDescription:
-    "Favalog is a social home for everything you watch and read. Track movies, TV, and books, rate them, review them, and remember them.",
+    "Favalog is a social home for everything you watch, read, and play. Track movies, TV, books, and games, rate them, review them, and remember them.",
   url: resolveSiteUrl(),
 } as const;

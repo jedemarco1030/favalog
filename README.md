@@ -1,6 +1,6 @@
 # Favalog
 
-> **Everything you watch and read. One place to remember it.**
+> **Everything you watch, read, and play. One place to remember it.**
 
 Favalog is a social entertainment platform where people track, rate, review,
 organize, and discover the movies, TV, and books they love. Long-term, a

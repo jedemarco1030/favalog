@@ -32,7 +32,7 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
   title: {
-    default: `${siteConfig.name} — Everything you watch and read`,
+    default: `${siteConfig.name} — Everything you watch, read, and play`,
     template: `%s · ${siteConfig.name}`,
   },
   description: siteConfig.shortDescription,
@@ -42,16 +42,16 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     url: siteConfig.url,
-    title: `${siteConfig.name} — Everything you watch and read`,
+    title: `${siteConfig.name} — Everything you watch, read, and play`,
     description:
-      "One social home for everything you watch and read. Movies, TV, and books.",
+      "One social home for everything you watch, read, and play. Movies, TV, books, and games.",
     siteName: siteConfig.name,
   },
   twitter: {
     card: "summary_large_image",
-    title: `${siteConfig.name} — Everything you watch and read`,
+    title: `${siteConfig.name} — Everything you watch, read, and play`,
     description:
-      "One social home for everything you watch and read. Movies, TV, and books.",
+      "One social home for everything you watch, read, and play. Movies, TV, books, and games.",
   },
 };
 

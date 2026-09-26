@@ -32,7 +32,7 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
   return (
     <AuthFormShell
       title="Start your Favalog"
-      subtitle="One home for everything you watch and read."
+      subtitle="One home for everything you watch, read, and play."
       footer={
         <>
           <p>

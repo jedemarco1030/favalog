@@ -44,14 +44,27 @@ export function MediaPoster({
         className,
       )}
     >
-      <Image
-        src={item.posterUrl}
-        alt={decorative ? "" : `${item.title} cover`}
-        fill
-        sizes={sizes}
-        priority={priority}
-        className="object-cover"
-      />
+      {item.posterUrl ? (
+        <Image
+          src={item.posterUrl}
+          alt={decorative ? "" : `${item.title} cover`}
+          fill
+          sizes={sizes}
+          priority={priority}
+          className="object-cover"
+        />
+      ) : (
+        <div
+          role={decorative ? undefined : "img"}
+          aria-label={decorative ? undefined : `${item.title} (no artwork)`}
+          aria-hidden={decorative ? true : undefined}
+          className="absolute inset-0 flex items-end bg-surface-2 p-3"
+        >
+          <span className="line-clamp-4 text-balance font-display text-sm leading-snug text-foreground/60">
+            {item.title}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
