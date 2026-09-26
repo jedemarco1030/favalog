@@ -1,6 +1,6 @@
 # Favalog product roadmap
 
-> Living document. Last reconciled: 2026-09-13, against the verified production
+> Living document. Last reconciled: 2026-09-25, against the verified production
 > state below. Update this file whenever a phase ships, a capability becomes
 > production-verified, or the agreed sequence changes. When a statement is only
 > true at a point in time, keep it and date it rather than deleting the history.
@@ -205,6 +205,13 @@ applied to hosted Supabase and NOT production-verified.** Migration
 database only; the hosted rollout is owner-controlled and has not been
 performed.
 
+> **Update (2026-09-25):** the statement above is retained as 2026-09-13
+> history. A read-only migration-ledger check on 2026-09-25 found the hosted
+> database had every migration through `20260815121300` applied, including
+> `20260815120900_following_feed.sql` and the likes migrations. The owner treats
+> follows, the following feed, likes, and list authorization as
+> production-verified, and Phase 4C must preserve them.
+
 What is implemented:
 
 - `public.get_following_feed(...)` — a `SECURITY INVOKER` RPC with a pinned
@@ -248,13 +255,81 @@ Home preview → `/feed` → pagination without duplicates → edit → delete �
 unfollow → revocation across pages → no leakage when signed out or on another
 account).
 
+## Phase 4C.1 — Video-game tracking via RAWG (implemented; partially hosted)
+
+This is an intentional reprioritization: video games and the artwork-led Home
+(4C.2) come before the invited beta, and notifications remain the next social
+increment afterward. **Video-game tracking** (games as a catalog media type) is
+a separate milestone from **entertainment mini-games** (Phase 3 below), which
+remain deferred.
+
+Favalog now covers four media types: movies, TV, books, and video games. That
+is the current scope, not every possible form of media.
+
+What is implemented:
+
+- `game` is a first-class value of `public.media_kind`, with its own domain
+  subtype (`Game` in `lib/types.ts`), game-appropriate statuses, a closed RAWG
+  genre vocabulary, and landscape artwork handling. Cross-media UI narrows on
+  `kind` rather than duplicating movie/TV/book code.
+- A server-only RAWG adapter behind the provider-neutral `lib/catalog/`
+  contract: normalization, canonical identity (`rawg` + numeric game id in
+  `media_external_ids`), deduplication, external-id validation, disabled
+  behavior, error mapping, and refresh. Catalog writes still go only through the
+  `service_role` `materialize_media_item(...)` RPC.
+- Explore gets a Games filter for search and browse, plus a separate RAWG
+  external section. "All media" local results are interleaved across media
+  types, with no query-specific logic, so one type can't crowd out the others.
+- Title pages show source attribution for every provider, e.g. "Game data from
+  RAWG." linking to rawg.io, as RAWG's terms require.
+- The operator CLI (`scripts/catalog-import.mjs`) accepts `--provider rawg`.
+
+Status, kept separate:
+
+- **Implemented and unit/pgTAP-tested:** migrations `20260925120000` and
+  `20260925120100` are covered by `game_media_and_status.test.sql`. On
+  2026-09-25 the last full run on this branch passed 1,397 unit and component
+  tests, typecheck, and lint.
+- **Hosted:** on 2026-09-25, with explicit owner approval, both games
+  migrations were applied to the shared hosted database, and one title (Hades,
+  RAWG `274755`) was materialized there through the CLI. `RAWG_ENABLED` and
+  `RAWG_API_KEY` are set in the project environment.
+- **Preview-verified (2026-09-25):** the Games filter on `/explore` returned
+  the materialized game, and `/title/hades` rendered with RAWG attribution.
+- **Not production-verified:** the 4C.1 branch is not merged or deployed. A
+  production smoke check is still pending.
+
+### RAWG source permissions
+
+The owner supplied RAWG terms that permit personal use with attribution and
+describe limited commercial use. Earlier RAWG pricing text conflicted with
+that, and whether RAWG permits caching or embedding its content is still
+unresolved. TMDB's staff clarification about cached metadata and embeddings
+applies **only to TMDB** and is not permission for RAWG.
+
+Favalog therefore keeps two independent RAWG controls:
+
+- `RAWG_ENABLED` enables discovery and import (currently on).
+- `RAWG_EMBEDDING_ENABLED` allows RAWG rows into the embedding pipeline. It is
+  **off by default**, and is currently unset.
+
+Even with `RAWG_EMBEDDING_ENABLED` on, the source policy constant
+`RAWG_LIVE_EMBEDDING_PERMISSION_DOCUMENTED = false` refuses to send RAWG
+content to a live embedding provider. Only synthetic (`--fake`) vectors are
+allowed, which is how CI tests the pipeline. **Remaining activation
+dependency:** before any live RAWG embedding, the owner must document the
+applicable RAWG permission, and a reviewed change must flip that constant and
+cite the permission. Until then, games take part in keyword search but not
+semantic search.
+
 ## Remaining gaps
 
 - Community reviews still render from the `@/lib/data` mock layer rather than
   real Supabase reads. Home's activity is now real (Phase 4B.2), but there is
   no community-review system behind it.
-- Phase 4B.2 is local-only: migration `20260815120900` has not been applied to
-  hosted Supabase, so the following feed is not yet available in production.
+- Live RAWG embedding is blocked on documented permission (see above).
+- Phase 4C.2, the artwork-led Home (featured banner, release shelves, and
+  labeled discovery shelves), is not built yet.
 - Comments, blocking, private accounts, and follower directories remain
   deferred.
 - Growth, monetization, and portfolio-packaging work has not started.
@@ -266,7 +341,11 @@ account).
 2. **Social Graph and Network Loops** — follows, follower-aware visibility,
    likes, notifications, and the social feedback loops around the personal
    record.
-3. **Games** — lightweight entertainment-knowledge games layered on the catalog.
+   - **Phase 4C (reprioritized, before the invited beta):** 4C.1 video-game
+     tracking via RAWG and 4C.2 artwork-led Home. Notifications follow as the
+     next social increment.
+3. **Entertainment mini-games** — lightweight entertainment-knowledge games
+   layered on the catalog. This is distinct from video-game tracking (4C.1).
 4. **Personalized AI Discovery** — personalized, taste-aware recommendations
    built on the existing retrieval foundation.
 5. **Catalog and AI Operations** — scaling ingestion, embedding operations,
@@ -281,7 +360,7 @@ account).
 | --------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------- |
 | 1. Product Reality & Discovery UX | A visitor can genuinely browse and theme the real catalog, not just a demo. | A server-only browse DAL with stable ordering, bounded pagination, validated URL state, and a no-flash theme system. | Demonstrates production data plumbing, accessibility, and honest documentation. | A polished, editorial, light/dark-ready first impression.   |
 | 2. Social Graph & Network Loops   | People connect around their records and get feedback.                       | Real follows/likes/notifications with RLS and safe fan-out.                                                          | Shows social-system and authorization design.                                   | Positions Favalog as a social platform, not a solo tracker. |
-| 3. Games                          | A fun, sticky reason to return.                                             | Deterministic, catalog-backed game logic with fair scoring.                                                          | Demonstrates playful product thinking on real data.                             | Distinctive, memorable brand moments.                       |
+| 3. Entertainment mini-games       | A fun, sticky reason to return.                                             | Deterministic, catalog-backed game logic with fair scoring.                                                          | Demonstrates playful product thinking on real data.                             | Distinctive, memorable brand moments.                       |
 | 4. Personalized AI Discovery      | Recommendations that feel personally tuned.                                 | Taste modeling on top of the existing embedding/retrieval seam.                                                      | Shows applied ML/retrieval judgment with guardrails.                            | "Discovery that gets you" as a brand promise.               |
 | 5. Catalog & AI Operations        | A larger, fresher, more trustworthy catalog.                                | Robust ingestion/embedding ops, observability, provider governance.                                                  | Demonstrates operational maturity and compliance discipline.                    | Trust through accuracy and attribution.                     |
 | 6. Growth & Monetization          | A sustainable, growing product.                                             | Acquisition, retention, and billing infrastructure done safely.                                                      | Shows business and growth literacy.                                             | A credible, fundable brand story.                           |
@@ -310,11 +389,13 @@ the owner-controlled hosted rollout.
 The following remain deferred and are not implied by the Phase 4B.1 delivery or
 the locally implemented Phase 4B.2 feed:
 
-- TMDB activation and the owner-controlled refresh implementation for cached
-  metadata and embeddings; `TMDB_ENABLED` remains **false**.
-- Notifications.
+- Scheduled catalog refresh: the `catalog-refresh` workflow is not installed
+  (TMDB discovery and import were owner-confirmed active on 2026-09-21).
+- Live RAWG embedding, until permission is documented.
+- Notifications, email, and push.
 - Moderation.
-- Games.
+- Entertainment mini-games, which are separate from video-game tracking.
+- News aggregation, billing, achievements, and console sync.
 - Personalized discovery and recommendation algorithms.
 
 ## Success measures
