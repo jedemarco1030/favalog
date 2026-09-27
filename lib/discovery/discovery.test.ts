@@ -271,7 +271,9 @@ describe("merging across providers", () => {
     const lists = [
       [
         candidate("no-art"),
-        candidate("art", { backdropUrl: "https://x/y.jpg" }),
+        candidate("art", {
+          backdropUrl: "https://image.tmdb.org/t/p/w1280/y.jpg",
+        }),
       ],
     ];
     expect(pickDiscoveryFeatured(lists, 7)?.ref.externalId).toBe("art");

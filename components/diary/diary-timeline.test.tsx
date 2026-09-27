@@ -54,9 +54,15 @@ const entries: DiaryEntryView[] = [
 describe("DiaryTimeline", () => {
   it("renders every entry grouped by month by default", () => {
     render(<DiaryTimeline entries={entries} initialFilter="all" />);
-    expect(screen.getByText("Afterglow")).toBeInTheDocument();
-    expect(screen.getByText("The Small Hours")).toBeInTheDocument();
-    expect(screen.getByText("Night Ferry")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /^Afterglow \(/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /^The Small Hours \(/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /^Night Ferry \(/ }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "July 2026" }),
     ).toBeInTheDocument();
@@ -71,8 +77,12 @@ describe("DiaryTimeline", () => {
     const booksButton = screen.getByRole("button", { name: "Books" });
     await user.click(booksButton);
     expect(booksButton).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText("The Small Hours")).toBeInTheDocument();
-    expect(screen.queryByText("Afterglow")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /^The Small Hours \(/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /^Afterglow \(/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows a type-specific empty state when nothing matches", async () => {

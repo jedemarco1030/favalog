@@ -1,6 +1,39 @@
-import Image from "next/image";
 import type { MediaItem } from "@/lib/types";
 import { cn } from "@/lib/cn";
+import { displayableArtwork } from "@/lib/media/artwork";
+import { ArtworkImage } from "./artwork-image";
+
+/**
+ * The compact typographic stand-in used when a title has no real provider
+ * artwork (missing, a demo placeholder, or an image that failed to load).
+ */
+export function ArtworkFallback({
+  title,
+  decorative = false,
+  size = "sm",
+}: {
+  title: string;
+  decorative?: boolean;
+  size?: "sm" | "lg";
+}) {
+  return (
+    <div
+      role={decorative ? undefined : "img"}
+      aria-label={decorative ? undefined : `${title} (no artwork)`}
+      aria-hidden={decorative ? true : undefined}
+      className="absolute inset-0 flex items-end bg-surface-2 p-3"
+    >
+      <span
+        className={cn(
+          "line-clamp-4 text-balance font-display leading-snug text-foreground/60",
+          size === "lg" ? "text-lg" : "text-sm",
+        )}
+      >
+        {title}
+      </span>
+    </div>
+  );
+}
 
 interface MediaPosterProps {
   item: Pick<MediaItem, "title" | "posterUrl">;
@@ -36,6 +69,10 @@ export function MediaPoster({
   decorative = false,
   ratio = "2/3",
 }: MediaPosterProps) {
+  const artwork = displayableArtwork(item.posterUrl);
+  const fallback = (
+    <ArtworkFallback title={item.title} decorative={decorative} />
+  );
   return (
     <div
       className={cn(
@@ -44,26 +81,17 @@ export function MediaPoster({
         className,
       )}
     >
-      {item.posterUrl ? (
-        <Image
-          src={item.posterUrl}
+      {artwork ? (
+        <ArtworkImage
+          src={artwork}
           alt={decorative ? "" : `${item.title} cover`}
-          fill
           sizes={sizes}
           priority={priority}
           className="object-cover"
+          fallback={fallback}
         />
       ) : (
-        <div
-          role={decorative ? undefined : "img"}
-          aria-label={decorative ? undefined : `${item.title} (no artwork)`}
-          aria-hidden={decorative ? true : undefined}
-          className="absolute inset-0 flex items-end bg-surface-2 p-3"
-        >
-          <span className="line-clamp-4 text-balance font-display text-sm leading-snug text-foreground/60">
-            {item.title}
-          </span>
-        </div>
+        fallback
       )}
     </div>
   );

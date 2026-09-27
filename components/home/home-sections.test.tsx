@@ -1,14 +1,27 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { FeaturedBanner } from "@/components/home/featured-banner";
+import {
+  FeaturedBanner,
+  FeaturedTitleLink,
+} from "@/components/home/featured-banner";
 import { KindShelf } from "@/components/home/kind-shelf";
 import { HomeSources } from "@/components/home/home-sources";
 import { books, movies } from "@/lib/data";
 
 describe("FeaturedBanner", () => {
   it("names the title and links to its page with a kind-specific action", () => {
-    const item = { ...movies[0], backdropUrl: "/media/backdrops/example.svg" };
-    render(<FeaturedBanner item={item} eyebrow="Editor's pick" />);
+    const item = {
+      ...movies[0],
+      backdropUrl: "https://image.tmdb.org/t/p/w1280/example.jpg",
+    };
+    const { container } = render(
+      <FeaturedBanner
+        item={item}
+        eyebrow="Editor's pick"
+        cta={<FeaturedTitleLink item={item} />}
+      />,
+    );
+    expect(container.querySelector(".bg-gradient-to-t")).not.toBeNull();
     expect(
       screen.getByRole("heading", { level: 2, name: item.title }),
     ).toBeInTheDocument();
@@ -20,10 +33,29 @@ describe("FeaturedBanner", () => {
     ).toHaveAttribute("href", `/title/${item.slug}`);
   });
 
+  it("never stretches a placeholder backdrop into the full-bleed layout", () => {
+    const item = { ...movies[0], backdropUrl: "/media/backdrops/example.svg" };
+    const { container } = render(
+      <FeaturedBanner
+        item={item}
+        eyebrow="Recently added to Favalog"
+        cta={<FeaturedTitleLink item={item} />}
+      />,
+    );
+    expect(container.querySelector(".bg-gradient-to-t")).toBeNull();
+    expect(
+      screen.getByRole("heading", { level: 2, name: item.title }),
+    ).toBeInTheDocument();
+  });
+
   it("uses the poster layout when there is no backdrop", () => {
     const item = { ...books[0], backdropUrl: undefined };
     const { container } = render(
-      <FeaturedBanner item={item} eyebrow="From the catalog" />,
+      <FeaturedBanner
+        item={item}
+        eyebrow="From the catalog"
+        cta={<FeaturedTitleLink item={item} />}
+      />,
     );
     expect(
       screen.getByRole("link", { name: new RegExp(`View book`) }),

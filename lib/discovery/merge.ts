@@ -1,3 +1,4 @@
+import { hasProviderBackdrop } from "@/lib/media/artwork";
 import type { DiscoveryCandidate } from "./types";
 
 /**
@@ -60,7 +61,7 @@ export function pickDiscoveryFeatured(
 ): DiscoveryCandidate | null {
   const pool = interleave(
     lists.map((list) =>
-      list.filter((c) => c.backdropUrl).slice(0, FEATURED_POOL_PER_LIST),
+      list.filter(hasProviderBackdrop).slice(0, FEATURED_POOL_PER_LIST),
     ),
     Number.POSITIVE_INFINITY,
   );
