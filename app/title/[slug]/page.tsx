@@ -37,6 +37,8 @@ import { getMyFavoriteState } from "@/lib/supabase/favorites";
 import { getRealReviewsForMedia } from "@/lib/supabase/reviews";
 import { setLikeAction } from "@/components/likes/like-actions";
 import { siteConfig } from "@/lib/site-config";
+import { Suspense } from "react";
+import { RelatedTitles } from "@/components/discovery/related-titles";
 
 interface TitlePageProps {
   params: Promise<{ slug: string }>;
@@ -280,6 +282,21 @@ export default async function TitlePage({ params }: TitlePageProps) {
             )}
           </aside>
         </div>
+
+        {sourceProvider && realMedia?.externalId && (
+          <div className="mt-16">
+            <Suspense fallback={null}>
+              <RelatedTitles
+                externalRef={{
+                  provider: sourceProvider,
+                  kind: item.kind,
+                  externalId: realMedia.externalId,
+                }}
+                returnTo={returnTo}
+              />
+            </Suspense>
+          </div>
+        )}
 
         {related.length > 0 && (
           <section className="mt-16">
