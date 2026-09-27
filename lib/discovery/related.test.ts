@@ -122,6 +122,12 @@ describe("relatedHeading", () => {
       relatedHeading({ relation: "collection", name: "Dune Collection" }),
     ).toBe("In the Dune Collection");
     expect(
+      relatedHeading({
+        relation: "collection",
+        name: "The Avengers Collection",
+      }),
+    ).toBe("In The Avengers Collection");
+    expect(
       relatedHeading({ relation: "developer", name: "Supergiant Games" }),
     ).toBe("More games from Supergiant Games");
     expect(relatedHeading({ relation: "author", name: "Frank Herbert" })).toBe(
@@ -173,6 +179,35 @@ describe("getRelatedTitles", () => {
     expect(result?.name).toBe("Dune Collection");
     expect(result?.candidates.map((c) => c.title)).toEqual(["Dune"]);
     expect(String(fetchImpl.mock.calls[1][0])).toContain("/collection/726871");
+  });
+
+  it("accepts the stored movie:<id> external id format", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          belongs_to_collection: { id: 726871, name: "Dune Collection" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          parts: [
+            { id: 438631, title: "Dune", release_date: "2021-09-15" },
+            { id: 693134, title: "Dune: Part Two", release_date: "2024-02-27" },
+          ],
+        }),
+      );
+    const result = await getRelatedTitles(
+      { ...ref, externalId: "movie:693134" },
+      {
+        isAvailable: () => true,
+        fetchImpl,
+        cache: passThrough,
+        credentials: { tmdbToken: "token" },
+      },
+    );
+    expect(String(fetchImpl.mock.calls[0][0])).toContain("/movie/693134?");
+    expect(result?.candidates.map((c) => c.title)).toEqual(["Dune"]);
   });
 
   it("returns nothing for a title without a collection", async () => {

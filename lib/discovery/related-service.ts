@@ -14,6 +14,7 @@ import {
   authorIdFromWork,
   authorNameFromRecord,
   collectionFromTmdbMovie,
+  tmdbNumericId,
   developerFromRawgGame,
   normalizeOpenLibraryAuthorWorks,
   normalizeRawgDeveloperGames,
@@ -50,7 +51,7 @@ async function fetchRelated(
     const { data: movie } = await fetchProviderJson<unknown>({
       provider: "tmdb",
       operation: "related:movie",
-      url: tmdbMovieUrl(ref.externalId),
+      url: tmdbMovieUrl(tmdbNumericId(ref.externalId)),
       headers,
       fetchImpl,
     });
@@ -67,7 +68,7 @@ async function fetchRelated(
       relation: "collection",
       provider: "tmdb",
       name: collection.name,
-      candidates: normalizeTmdbCollection(data, ref.externalId),
+      candidates: normalizeTmdbCollection(data, tmdbNumericId(ref.externalId)),
     };
   }
 

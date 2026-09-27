@@ -44,7 +44,9 @@ export interface RelatedGroup {
 export function relatedHeading(group: Pick<RelatedGroup, "relation" | "name">) {
   switch (group.relation) {
     case "collection":
-      return `In the ${group.name}`;
+      return /^the\s/i.test(group.name)
+        ? `In ${group.name}`
+        : `In the ${group.name}`;
     case "developer":
       return `More games from ${group.name}`;
     case "author":
@@ -71,6 +73,12 @@ function ranked(candidates: Omit<DiscoveryCandidate, "rank">[]) {
 }
 
 // --- TMDB movie collections ---------------------------------------------------
+
+/** Stored TMDB external ids are `movie:<id>` / `tv:<id>`; the API wants the bare id. */
+export function tmdbNumericId(externalId: string): string {
+  const separator = externalId.indexOf(":");
+  return separator === -1 ? externalId : externalId.slice(separator + 1);
+}
 
 export function tmdbMovieUrl(movieId: string): string {
   return `${TMDB_API_BASE}/movie/${encodeURIComponent(movieId)}?language=${TMDB_LANGUAGE}`;
