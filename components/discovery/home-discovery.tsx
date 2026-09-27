@@ -78,7 +78,9 @@ function sourcesOf(pages: readonly DiscoveryPage[]): string {
   );
 }
 
-async function cardContext(returnTo: string): Promise<DiscoveryCardContext> {
+export async function cardContext(
+  returnTo: string,
+): Promise<DiscoveryCardContext> {
   return {
     lists: await getSaveListOptions(),
     returnTo,

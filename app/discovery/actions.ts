@@ -17,6 +17,7 @@ import { createServerCatalogMaterializer } from "@/lib/catalog/server-materializ
 import { validateMaterializeInput } from "@/lib/catalog/validation";
 import { isUuid } from "@/lib/supabase/list-input";
 import { addListItem } from "@/lib/supabase/lists";
+import { withSaveIntent } from "@/lib/discovery/save-intent";
 import {
   parseDiscoverySaveFormData,
   type DiscoverySaveState,
@@ -42,7 +43,15 @@ export async function saveDiscoveredTitleAction(
   formData: FormData,
 ): Promise<DiscoverySaveState> {
   const raw = parseDiscoverySaveFormData(formData);
-  const returnTo = getSafeRedirectPath(formData.get("returnTo"), "/");
+  const safeReturnTo = getSafeRedirectPath(formData.get("returnTo"), "/");
+  const identity = validateMaterializeInput({
+    provider: raw.provider,
+    kind: raw.kind,
+    externalId: raw.externalId,
+  });
+  const returnTo = identity.ok
+    ? withSaveIntent(safeReturnTo, identity.value)
+    : safeReturnTo;
 
   if (!shouldOfferExternalCatalog()) {
     return {
@@ -69,15 +78,10 @@ export async function saveDiscoveredTitleAction(
     };
   }
 
-  const validated = validateMaterializeInput({
-    provider: raw.provider,
-    kind: raw.kind,
-    externalId: raw.externalId,
-  });
-  if (!validated.ok || !isUuid(raw.listId)) {
+  if (!identity.ok || !isUuid(raw.listId)) {
     return { status: "error", message: "That title can't be saved right now." };
   }
-  const input = validated.value;
+  const input = identity.value;
 
   if (!isExternalProviderAvailable(input.provider)) {
     return {
