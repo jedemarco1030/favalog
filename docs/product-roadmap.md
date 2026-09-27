@@ -357,15 +357,51 @@ Status:
   timed out on navigation.
 - **Not hosted or production-verified.** This increment needs no migrations.
 
+## Phase 4D — Discovery completion (increment 2, implemented locally)
+
+This increment makes provider discovery the main way to browse Favalog:
+
+- **Artwork completeness.** A single classifier (`lib/media/artwork.ts`)
+  decides whether a title has real provider artwork. Posters and backdrops
+  that fail to load fall back to a designed placeholder instead of a broken
+  image. Demo seed rows (`source = 'favalog'`) never appear on promotional
+  surfaces.
+- **Discovery-led Home.** An artwork-led hero is chosen from provider
+  discovery. Date-based "New releases" and "Coming soon" shelves come next,
+  and local shelves are demoted below them and show only titles with
+  artwork.
+- **Explore overview.** With no query, the All view shows a balanced overview
+  of every media type, and each category leads with its discovery shelves.
+- **Saving intent.** Signing in from a Save control returns the viewer to the
+  same page with that card's picker reopened. A viewer with no lists can
+  create their first list inside the save dialog.
+- **Related titles.** Title pages show titles linked by an explicit provider
+  relationship: the TMDB collection, the RAWG developer, or the Open Library
+  author. Headings state the relationship. The feature follows the discovery
+  cache, flag, and failure rules, and the section hides whenever the provider
+  is unavailable.
+
+Status:
+
+- **Implemented and unit-tested** on `v0/phase-4d-2-discovery-complete`. The
+  full suite passes (1,473 tests), and typecheck, lint, and formatting are
+  clean.
+- **Server-render checked** via the dev server: the Home hero and shelves,
+  plus the related groups for Avengers: Endgame (collection), Hades
+  (developer), and Dune (author).
+- **Browser verification pending.** The sandbox has no browser runtime, so
+  the interactive save-intent return and inline list creation still need a
+  preview check.
+- **Not hosted or production-verified.** No migrations are required.
+
 ## Remaining gaps
 
 - Community reviews still render from the `@/lib/data` mock layer rather than
   real Supabase reads. Home's activity is now real (Phase 4B.2), but there is
   no community-review system behind it.
 - Live RAWG embedding is blocked on documented permission (see above).
-- Phase 4C.2 (the artwork-led Home) is merged. Phase 4D increment 1 (provider
-  discovery shelves and direct saving) still needs preview verification and
-  a merge.
+- Phase 4D increment 1 is merged. Increment 2 (discovery completion) needs
+  interactive preview verification of the save-intent flow, then a merge.
 - Comments, blocking, private accounts, and follower directories remain
   deferred.
 - Growth, monetization, and portfolio-packaging work has not started.
