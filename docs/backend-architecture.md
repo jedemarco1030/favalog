@@ -330,6 +330,56 @@ unique external identity, so a real provider (TMDB, Open Library, Google Books,
 …) can be ingested later **without a schema change** and **without** committing
 to any provider now.
 
+## Provider discovery shelves (Phase 4D)
+
+Home and the empty-query Explore view show provider-ranked shelves ("Trending",
+"Popular", "Recently released", "Coming soon", "Highest rated") for titles that
+may not exist in `media_items` yet. They live in the server-only
+`lib/discovery/` layer:
+
+- `shelves.ts` is the single source of shelf definitions. Each shelf has
+  exactly one provider and one provider-side ordering, so paging walks the
+  provider's own sorted result set and is never re-sorted locally. It also sets
+  a freshness window (6–24 h) and a page cap (`maxPages`, 5 for TMDB/RAWG, 2
+  for Open Library).
+- `windows.ts` computes UTC date windows: 45 days back for "recent" and 365 days
+  ahead for "upcoming". Games without a confirmed date are left out of "Coming
+  soon", and games without a Metascore are left out of "Highest rated".
+- `providers.ts` builds the requests and normalizes responses into the same
+  external-result shape Explore search already uses. `merge.ts` dedupes titles
+  already in the local catalog, so a card links to `/title/[slug]` when a
+  canonical row exists.
+- `service.ts` wraps each (shelf, page) fetch in the Next data cache under the
+  `discovery` tag, stale-while-revalidate. With that cache, provider traffic is
+  bounded by shelves × pages per freshness window, not by page views. A
+  provider failure or disabled flag degrades that shelf to nothing, and never
+  fails the page.
+
+Discovery is read-only: it never writes the catalog. Every write goes through
+the existing `service_role` `materialize_media_item(...)` RPC, and only when a
+signed-in user acts on a card.
+
+### Saving a discovered title
+
+`app/discovery/actions.ts` (`saveDiscoveredTitleAction`) materializes a title
+and adds it to one of the viewer's lists in a single step. The client sends
+only the provider identity, the target list id, and a return path. The action
+re-checks every gate on the server, in this order:
+
+1. The global external-catalog flag.
+2. The user, via the auth DAL.
+3. Profile completeness.
+4. Input validation (provider/kind/external id, UUID list id).
+5. The per-provider flag and admin-client configuration.
+
+Only then does it materialize. The list add uses the existing `addListItem`
+RPC wrapper, so list ownership is still enforced by RLS. An ambiguous
+materialization never adds anything. Return paths go through
+`getSafeRedirectPath`, and provider errors map to safe, generic messages.
+
+To force-refresh every shelf immediately, call `revalidateTag("discovery",
+"max")` from a server context.
+
 ## Generated types & the domain boundary
 
 - `lib/database.types.ts` is the **database** representation. It is produced by

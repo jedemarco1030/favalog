@@ -18,6 +18,11 @@ import { ReleaseShelf } from "@/components/home/release-shelf";
 import { KindShelf } from "@/components/home/kind-shelf";
 import { HomeSources } from "@/components/home/home-sources";
 import { ShelfSkeleton } from "@/components/home/shelf-skeleton";
+import { HomeDiscovery } from "@/components/discovery/home-discovery";
+import {
+  availableExternalProviders,
+  shouldOfferExternalCatalog,
+} from "@/lib/catalog/feature-flag";
 import {
   activity,
   books,
@@ -87,6 +92,7 @@ export default async function HomePage() {
   const now = new Date();
   const currentYear = now.getUTCFullYear();
   const dayIndex = utcDayIndex(now);
+  const discoveryOn = configured && shouldOfferExternalCatalog();
 
   return (
     <>
@@ -106,6 +112,11 @@ export default async function HomePage() {
             <Suspense fallback={<ShelfSkeleton label="releases" />}>
               <ReleaseSection currentYear={currentYear} />
             </Suspense>
+            {discoveryOn && (
+              <Suspense fallback={<ShelfSkeleton label="discovery" />}>
+                <HomeDiscovery />
+              </Suspense>
+            )}
             {KIND_SHELVES.map(({ kind, limit }) => (
               <Suspense
                 key={kind}
@@ -266,7 +277,9 @@ async function SourcesSection({ currentYear }: { currentYear: number }) {
     readReleaseWindow(releaseWindowStartYear(currentYear), RELEASE_READ_LIMIT),
     ...KIND_SHELVES.map(({ kind, limit }) => readRecentlyAdded(limit, kind)),
   ]);
-  const providers = new Set<ExternalProvider>();
+  const providers = new Set<ExternalProvider>(
+    shouldOfferExternalCatalog() ? availableExternalProviders() : [],
+  );
   for (const read of [featured, releases, ...shelves] as HomeRead[]) {
     if (read.status === "ok") read.providers.forEach((p) => providers.add(p));
   }

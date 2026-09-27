@@ -322,14 +322,50 @@ applicable RAWG permission, and a reviewed change must flip that constant and
 cite the permission. Until then, games take part in keyword search but not
 semantic search.
 
+## Phase 4D — Provider discovery and direct saving (increment 1, implemented locally)
+
+Home and Explore now surface titles beyond the local catalog. Shelves come
+from provider rankings, and the provider is always credited:
+
+- **Films and series (TMDB):** Trending, Popular, Recently released (last 45
+  days), Coming soon (films only, next year), and Highest rated (with a
+  minimum vote count: 500 for films, 300 for series).
+- **Games (RAWG):** Popular, Recently released, Coming soon (confirmed dates
+  only), and Highest rated (by Metascore; games without one are left out).
+- **Books (Open Library):** Trending this week.
+
+The labels describe what each provider actually ranks by, not an implied
+Favalog judgement. Each shelf pages through the provider's own ordering, with
+a page cap and a shared-cache freshness window, so provider traffic stays
+bounded no matter how many people visit. A provider being down or disabled
+hides only its shelves.
+
+A signed-in user can save a discovered title straight into one of their lists
+in one step. The server materializes the title through the existing RPC and
+then adds it to the list. Signed-out viewers are sent to sign in, and
+incomplete profiles to onboarding, each with a safe return path. Titles already
+in Favalog link directly to their `/title/[slug]` page.
+
+Status:
+
+- **Implemented and unit-tested** on `v0/phase-4d-discovery-saving`: 19
+  discovery-layer tests and 13 save-action tests. Typecheck and lint are clean.
+- **Server-render checked:** Home returns the film, series, game, and book
+  shelves, and `/explore?type=game&sort=upcoming` returns RAWG cards with
+  pagination, both via the dev server. Interactive browser verification (the
+  save flow and paging clicks) is still pending, because the sandbox browser
+  timed out on navigation.
+- **Not hosted or production-verified.** This increment needs no migrations.
+
 ## Remaining gaps
 
 - Community reviews still render from the `@/lib/data` mock layer rather than
   real Supabase reads. Home's activity is now real (Phase 4B.2), but there is
   no community-review system behind it.
 - Live RAWG embedding is blocked on documented permission (see above).
-- Phase 4C.2, the artwork-led Home (featured banner, release shelves, and
-  labeled discovery shelves), is not built yet.
+- Phase 4C.2 (the artwork-led Home) is merged. Phase 4D increment 1 (provider
+  discovery shelves and direct saving) still needs preview verification and
+  a merge.
 - Comments, blocking, private accounts, and follower directories remain
   deferred.
 - Growth, monetization, and portfolio-packaging work has not started.
