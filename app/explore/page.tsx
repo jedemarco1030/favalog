@@ -5,6 +5,7 @@ import { HorizontalMediaRow } from "@/components/media/horizontal-media-row";
 import { ExploreSearch } from "@/components/media/explore-search";
 import { ExternalResultsSection } from "@/components/media/external-results-section";
 import { CatalogBrowse } from "@/components/media/catalog-browse";
+import { DiscoveryBrowse } from "@/components/discovery/discovery-browse";
 import {
   getCriticallyAcclaimed,
   getHiddenGems,
@@ -21,7 +22,10 @@ import { searchCatalog } from "@/lib/supabase/search";
 import type { SearchOutcome } from "@/lib/supabase/search-view-model";
 import { browseCatalog } from "@/lib/supabase/browse";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
-import { availableExternalProviders } from "@/lib/catalog/feature-flag";
+import {
+  availableExternalProviders,
+  shouldOfferExternalCatalog,
+} from "@/lib/catalog/feature-flag";
 import type { ExternalProvider } from "@/lib/catalog/types";
 import { isAuthAvailable } from "@/lib/auth/capability";
 import { getCurrentUser } from "@/lib/auth/data";
@@ -37,6 +41,10 @@ function parseQuery(raw: string | string[] | undefined): string {
   return typeof value === "string" ? value : "";
 }
 
+function firstParam(raw: string | string[] | undefined): string | undefined {
+  return Array.isArray(raw) ? raw[0] : raw;
+}
+
 export default async function ExplorePage({
   searchParams,
 }: {
@@ -46,6 +54,8 @@ export default async function ExplorePage({
     sort?: string | string[];
     page?: string | string[];
     genre?: string | string[];
+    discover?: string | string[];
+    dpage?: string | string[];
   }>;
 }) {
   const params = await searchParams;
@@ -177,8 +187,24 @@ export default async function ExplorePage({
 
   // When Supabase is configured, the no-query view is the REAL catalog browser;
   // otherwise it is the clearly-labelled example shelves (no-env development).
+  const discoveryKind =
+    browseOutcome && initialFilter !== "all" && shouldOfferExternalCatalog()
+      ? initialFilter
+      : null;
+
   const defaultSections = browseOutcome ? (
-    <CatalogBrowse outcome={browseOutcome} />
+    <div className="flex flex-col gap-12">
+      <CatalogBrowse outcome={browseOutcome} />
+      {discoveryKind && (
+        <Suspense fallback={<SectionSkeleton heading="Discover" />}>
+          <DiscoveryBrowse
+            kind={discoveryKind}
+            rawSort={firstParam(params.discover)}
+            rawPage={firstParam(params.dpage)}
+          />
+        </Suspense>
+      )}
+    </div>
   ) : (
     editorialExampleSections
   );
