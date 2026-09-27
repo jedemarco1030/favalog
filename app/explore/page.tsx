@@ -6,6 +6,7 @@ import { ExploreSearch } from "@/components/media/explore-search";
 import { ExternalResultsSection } from "@/components/media/external-results-section";
 import { CatalogBrowse } from "@/components/media/catalog-browse";
 import { DiscoveryBrowse } from "@/components/discovery/discovery-browse";
+import { ExploreDiscoveryOverview } from "@/components/discovery/explore-discovery-overview";
 import {
   getCriticallyAcclaimed,
   getHiddenGems,
@@ -192,8 +193,18 @@ export default async function ExplorePage({
       ? initialFilter
       : null;
 
+  const showOverview =
+    browseOutcome !== null &&
+    initialFilter === "all" &&
+    shouldOfferExternalCatalog();
+
   const defaultSections = browseOutcome ? (
     <div className="flex flex-col gap-12">
+      {showOverview && (
+        <Suspense fallback={<SectionSkeleton heading="Discover" />}>
+          <ExploreDiscoveryOverview />
+        </Suspense>
+      )}
       <CatalogBrowse outcome={browseOutcome} />
       {discoveryKind && (
         <Suspense fallback={<SectionSkeleton heading="Discover" />}>

@@ -145,24 +145,29 @@ describe("saveDiscoveredTitleAction", () => {
     expect(materialize).not.toHaveBeenCalled();
   });
 
-  it("sends signed-out viewers to sign in with a safe return path", async () => {
+  it("sends signed-out viewers to sign in, preserving the save intent", async () => {
     getCurrentUser.mockResolvedValue(null);
 
     const result = await save();
 
     expect(result.status).toBe("unauthenticated");
     expect(result.redirectTo).toBe(
-      `/auth/sign-in?returnTo=${encodeURIComponent("/explore?kind=game")}`,
+      `/auth/sign-in?returnTo=${encodeURIComponent(
+        "/explore?kind=game&save=rawg%3Agame%3A3498",
+      )}`,
     );
     expect(materialize).not.toHaveBeenCalled();
   });
 
-  it("drops an off-site return path", async () => {
+  it("drops an off-site return path but keeps the intent on the home path", async () => {
     getCurrentUser.mockResolvedValue(null);
 
     const result = await save(form({ returnTo: "https://evil.example/x" }));
 
-    expect(result.redirectTo).toBe("/auth/sign-in");
+    expect(result.redirectTo).toBe(
+      `/auth/sign-in?returnTo=${encodeURIComponent("/?save=rawg%3Agame%3A3498")}`,
+    );
+    expect(result.redirectTo).not.toContain("evil.example");
   });
 
   it("sends viewers with an incomplete profile to onboarding", async () => {

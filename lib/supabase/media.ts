@@ -27,6 +27,8 @@ export interface RealMediaWithProvider {
   item: MediaItem;
   /** The external provider owed attribution, or `null` for curated rows. */
   provider: ExternalProvider | null;
+  /** The provider's own id for this title; set only when `provider` is. */
+  externalId: string | null;
 }
 
 /**
@@ -67,9 +69,15 @@ export async function getRealMediaWithProviderBySlug(
 
   try {
     const row = data as MediaItemRow;
+    const provider = providerFromSource(row.source);
+    const externalId =
+      provider && typeof row.external_id === "string" && row.external_id.trim()
+        ? row.external_id.trim()
+        : null;
     return {
       item: mapMediaRowToDomain(row),
-      provider: providerFromSource(row.source),
+      provider,
+      externalId,
     };
   } catch {
     // A malformed row (e.g. an unmapped future kind) should not crash the page.

@@ -2,9 +2,20 @@
 
 import Link from "next/link";
 import { useActionState, useEffect, useId, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useFormStatus } from "react-dom";
 import { Bookmark, Loader2, X } from "lucide-react";
+import { createListAction } from "@/app/lists/actions";
+import {
+  initialCreateListFormState,
+  type CreateListFormState,
+} from "@/app/lists/list-form";
+import {
+  SAVE_INTENT_PARAM,
+  saveIntentKey,
+  withSaveIntent,
+  withoutSaveIntent,
+} from "@/lib/discovery/save-intent";
 import {
   initialDiscoverySaveState,
   type DiscoverySaveState,
@@ -25,6 +36,11 @@ export type DiscoveryOpenAction = (
   formData: FormData,
 ) => Promise<MaterializeFormState>;
 
+export type DiscoveryCreateListAction = (
+  state: CreateListFormState,
+  formData: FormData,
+) => Promise<CreateListFormState>;
+
 export interface SaveListOption {
   id: string;
   title: string;
@@ -38,6 +54,8 @@ interface DiscoveryCardActionsProps {
   returnTo: string;
   openAction: DiscoveryOpenAction;
   saveAction: DiscoverySaveAction;
+  /** Creates a first list inside the save dialog; injectable for tests. */
+  createAction?: DiscoveryCreateListAction;
 }
 
 function IdentityFields({ identity }: { identity: ExternalRef }) {
@@ -99,19 +117,39 @@ export function DiscoveryCardActions({
   returnTo,
   openAction,
   saveAction,
+  createAction = createListAction,
 }: DiscoveryCardActionsProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const intentKey = saveIntentKey(identity);
+  const hasIntent = searchParams.get(SAVE_INTENT_PARAM) === intentKey;
   const [openState, openFormAction] = useActionState(
     openAction,
     initialMaterializeFormState,
   );
-  const [dialogOpen, setDialogOpen] = useState(false);
+  // A visitor returning from sign-in lands with this title's picker open.
+  const [dialogOpen, setDialogOpen] = useState(
+    () => lists !== null && hasIntent,
+  );
 
   useEffect(() => {
     if (openState.redirectTo) router.push(openState.redirectTo);
   }, [openState.redirectTo, router]);
 
-  const signInHref = `/auth/sign-in?returnTo=${encodeURIComponent(returnTo)}`;
+  const signInHref = `/auth/sign-in?returnTo=${encodeURIComponent(
+    withSaveIntent(returnTo, identity),
+  )}`;
+
+  function closeDialog() {
+    setDialogOpen(false);
+    if (hasIntent) {
+      router.replace(
+        `${pathname}${withoutSaveIntent(searchParams.toString())}`,
+        { scroll: false },
+      );
+    }
+  }
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -152,7 +190,8 @@ export function DiscoveryCardActions({
           lists={lists}
           returnTo={returnTo}
           saveAction={saveAction}
-          onClose={() => setDialogOpen(false)}
+          createAction={createAction}
+          onClose={closeDialog}
         />
       )}
     </div>
@@ -162,9 +201,10 @@ export function DiscoveryCardActions({
 function SaveDialog({
   identity,
   title,
-  lists,
+  lists: initialLists,
   returnTo,
   saveAction,
+  createAction,
   onClose,
 }: {
   identity: ExternalRef;
@@ -172,11 +212,14 @@ function SaveDialog({
   lists: SaveListOption[];
   returnTo: string;
   saveAction: DiscoverySaveAction;
+  createAction: DiscoveryCreateListAction;
   onClose: () => void;
 }) {
   const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const ids = useId();
+  const [createdList, setCreatedList] = useState<SaveListOption | null>(null);
+  const lists = createdList ? [createdList, ...initialLists] : initialLists;
   const [state, formAction, pending] = useActionState(
     saveAction,
     initialDiscoverySaveState,
@@ -254,16 +297,11 @@ function SaveDialog({
             </div>
           </div>
         ) : lists.length === 0 ? (
-          <p className="text-sm leading-relaxed text-foreground/70">
-            You don&apos;t have any lists yet.{" "}
-            <Link
-              href="/lists"
-              className="font-medium text-accent underline-offset-2 hover:underline"
-            >
-              Create a list
-            </Link>{" "}
-            and come back to save this title.
-          </p>
+          <FirstListForm
+            returnTo={withSaveIntent(returnTo, identity)}
+            createAction={createAction}
+            onCreated={setCreatedList}
+          />
         ) : (
           <form action={formAction} className="flex flex-col gap-4">
             <IdentityFields identity={identity} />
@@ -305,5 +343,69 @@ function SaveDialog({
         )}
       </div>
     </dialog>
+  );
+}
+
+function FirstListForm({
+  returnTo,
+  createAction,
+  onCreated,
+}: {
+  returnTo: string;
+  createAction: DiscoveryCreateListAction;
+  onCreated: (list: SaveListOption) => void;
+}) {
+  const router = useRouter();
+  const inputId = useId();
+  const [state, formAction] = useActionState(
+    createAction,
+    initialCreateListFormState,
+  );
+
+  useEffect(() => {
+    if (state.status === "success" && state.listId) {
+      onCreated({ id: state.listId, title: state.title ?? "your new list" });
+    } else if (state.redirectTo) {
+      router.push(state.redirectTo);
+    }
+  }, [state, onCreated, router]);
+
+  const titleError =
+    state.status === "invalid" ? state.fieldErrors?.title : undefined;
+
+  return (
+    <form action={formAction} className="flex flex-col gap-3">
+      <input type="hidden" name="returnTo" value={returnTo} />
+      <input type="hidden" name="visibility" value="public" />
+      <p className="text-sm leading-relaxed text-foreground/70">
+        You don&apos;t have any lists yet. Name your first one and this title
+        will be ready to save.
+      </p>
+      <label htmlFor={inputId} className="text-sm text-foreground/60">
+        List name
+      </label>
+      <input
+        id={inputId}
+        name="title"
+        required
+        maxLength={120}
+        autoComplete="off"
+        aria-invalid={titleError ? true : undefined}
+        className="h-10 rounded-lg border border-border/70 bg-surface-2 px-3 text-sm text-foreground outline-none focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/40"
+      />
+      {(titleError || (state.status !== "success" && state.message)) && (
+        <p role="alert" className="text-sm text-foreground/70">
+          {titleError ?? state.message}
+        </p>
+      )}
+      <div className="flex justify-end">
+        <SubmitButton
+          pendingLabel="Creating"
+          className="inline-flex h-9 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-medium text-accent-foreground outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-1 disabled:opacity-60"
+        >
+          Create list
+        </SubmitButton>
+      </div>
+    </form>
   );
 }

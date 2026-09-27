@@ -1,5 +1,7 @@
-import Image from "next/image";
+import { ArtworkImage } from "@/components/media/artwork-image";
+import { ArtworkFallback } from "@/components/media/media-poster";
 import { mediaKindLabel } from "@/components/media/media-type-badge";
+import { displayableArtwork } from "@/lib/media/artwork";
 import type { DiscoveryCandidate } from "@/lib/discovery/types";
 import { formatReleaseDate } from "@/lib/discovery/windows";
 import { cn } from "@/lib/cn";
@@ -39,6 +41,10 @@ export function DiscoveryCard({
   ...context
 }: DiscoveryCardProps) {
   const landscape = candidate.kind === "game";
+  const artwork = displayableArtwork(candidate.posterUrl);
+  const fallback = (
+    <ArtworkFallback title={candidate.title} decorative size="lg" />
+  );
   const meta = [
     showKind ? mediaKindLabel(candidate.kind) : null,
     showDate && candidate.releaseDate
@@ -56,11 +62,10 @@ export function DiscoveryCard({
           landscape ? "aspect-video" : "aspect-[2/3]",
         )}
       >
-        {candidate.posterUrl ? (
-          <Image
-            src={candidate.posterUrl}
+        {artwork ? (
+          <ArtworkImage
+            src={artwork}
             alt=""
-            fill
             priority={priority}
             sizes={
               landscape
@@ -68,13 +73,10 @@ export function DiscoveryCard({
                 : "(min-width: 1024px) 18vw, (min-width: 640px) 30vw, 45vw"
             }
             className="object-cover"
+            fallback={fallback}
           />
         ) : (
-          <div className="flex h-full items-end p-3">
-            <span className="line-clamp-4 text-balance font-display text-lg leading-tight text-foreground/70">
-              {candidate.title}
-            </span>
-          </div>
+          fallback
         )}
       </div>
       <div className="flex flex-col gap-1">

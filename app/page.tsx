@@ -13,12 +13,17 @@ import {
   FeedNoFollowsState,
   FeedSignedOutState,
 } from "@/components/feed/feed-states";
-import { FeaturedBanner } from "@/components/home/featured-banner";
-import { ReleaseShelf } from "@/components/home/release-shelf";
-import { KindShelf } from "@/components/home/kind-shelf";
+import {
+  FeaturedBanner,
+  FeaturedTitleLink,
+} from "@/components/home/featured-banner";
 import { HomeSources } from "@/components/home/home-sources";
 import { ShelfSkeleton } from "@/components/home/shelf-skeleton";
-import { HomeDiscovery } from "@/components/discovery/home-discovery";
+import {
+  HomeDiscovery,
+  HomeFeatured,
+} from "@/components/discovery/home-discovery";
+import { hasProviderBackdrop, hasProviderPoster } from "@/lib/media/artwork";
 import {
   availableExternalProviders,
   shouldOfferExternalCatalog,
@@ -42,26 +47,17 @@ import { getCurrentUser } from "@/lib/auth/data";
 import {
   readFeaturedCandidates,
   readRecentlyAdded,
-  readReleaseWindow,
   type HomeRead,
 } from "@/lib/supabase/home";
 import { FEATURED_SLUGS, pickFeatured, utcDayIndex } from "@/lib/home/featured";
-import {
-  RELEASE_SHELF_LIMIT,
-  releaseWindowStartYear,
-  selectReleaseShelf,
-} from "@/lib/home/releases";
 
-/** Media-type shelves, in display order, with how many titles each shows. */
-const KIND_SHELVES: ReadonlyArray<{ kind: MediaKind; limit: number }> = [
-  { kind: "movie", limit: 5 },
-  { kind: "tv", limit: 5 },
-  { kind: "book", limit: 5 },
-  { kind: "game", limit: 3 },
-];
+/** Rows read for the local shelf before dropping titles without real artwork. */
+const RECENTLY_ADDED_READ = 24;
+const RECENTLY_ADDED_SHOWN = 10;
 
-/** Release candidates read before year filtering; bounded by HOME_READ_MAX. */
-const RELEASE_READ_LIMIT = 24;
+function hasRealArtwork(item: MediaItem): boolean {
+  return hasProviderBackdrop(item) || hasProviderPoster(item);
+}
 
 function mixedExampleTitles(): MediaItem[] {
   const zipped: MediaItem[] = [];
@@ -90,7 +86,6 @@ export default async function HomePage() {
   const configured = isSupabaseConfigured();
   const signedIn = configured ? Boolean(await getCurrentUser()) : false;
   const now = new Date();
-  const currentYear = now.getUTCFullYear();
   const dayIndex = utcDayIndex(now);
   const discoveryOn = configured && shouldOfferExternalCatalog();
 
@@ -102,42 +97,35 @@ export default async function HomePage() {
         <>
           <Container className="pt-2">
             <Suspense fallback={<FeaturedSkeleton />}>
-              <FeaturedSection dayIndex={dayIndex} />
+              {discoveryOn ? (
+                <HomeFeatured
+                  dayIndex={dayIndex}
+                  fallback={<FeaturedSection dayIndex={dayIndex} />}
+                />
+              ) : (
+                <FeaturedSection dayIndex={dayIndex} />
+              )}
             </Suspense>
           </Container>
 
           {signedIn && <FollowingFeedPreview />}
 
           <Container className="flex flex-col gap-16 py-16">
-            <Suspense fallback={<ShelfSkeleton label="releases" />}>
-              <ReleaseSection currentYear={currentYear} />
-            </Suspense>
             {discoveryOn && (
               <Suspense fallback={<ShelfSkeleton label="discovery" />}>
                 <HomeDiscovery />
               </Suspense>
             )}
-            {KIND_SHELVES.map(({ kind, limit }) => (
-              <Suspense
-                key={kind}
-                fallback={
-                  <ShelfSkeleton
-                    label={`${kind} shelf`}
-                    count={limit}
-                    artwork={kind === "game" ? "landscape" : "poster"}
-                  />
-                }
-              >
-                <KindSection kind={kind} limit={limit} />
-              </Suspense>
-            ))}
+            <Suspense fallback={<ShelfSkeleton label="recently added" />}>
+              <RecentlyAddedSection />
+            </Suspense>
           </Container>
 
           {!signedIn && <FollowingFeedPreview />}
 
           <Container className="pb-8">
             <Suspense fallback={null}>
-              <SourcesSection currentYear={currentYear} />
+              <SourcesSection />
             </Suspense>
           </Container>
         </>
@@ -225,62 +213,71 @@ function FeaturedSkeleton() {
   );
 }
 
+/**
+ * Local-catalog hero, used when provider discovery is off or has nothing with
+ * a real backdrop. Only titles with real provider artwork are eligible.
+ */
 async function FeaturedSection({ dayIndex }: { dayIndex: number }) {
   let read = await readFeaturedCandidates(FEATURED_SLUGS);
-  if (read.status === "ok" && read.items.length === 0) {
-    read = await readRecentlyAdded(12);
+  if (read.status === "ok" && !read.items.some(hasRealArtwork)) {
+    read = await readRecentlyAdded(RECENTLY_ADDED_READ);
   }
   if (read.status !== "ok") return null;
-  const pick = pickFeatured(read.items, dayIndex);
+  const pick = pickFeatured(read.items.filter(hasRealArtwork), dayIndex);
   if (!pick) return null;
   return (
     <FeaturedBanner
       item={pick.item}
-      eyebrow={pick.curated ? "Editor's pick" : "From the catalog"}
+      eyebrow={pick.curated ? "Editor's pick" : "Recently added to Favalog"}
+      cta={<FeaturedTitleLink item={pick.item} />}
     />
   );
 }
 
-async function ReleaseSection({ currentYear }: { currentYear: number }) {
-  const read = await readReleaseWindow(
-    releaseWindowStartYear(currentYear),
-    RELEASE_READ_LIMIT,
-  );
+/** Titles people recently brought into Favalog, shown only with real artwork. */
+async function RecentlyAddedSection() {
+  const read = await readRecentlyAdded(RECENTLY_ADDED_READ);
   if (read.status !== "ok") return null;
-  const shelf = selectReleaseShelf(
-    read.items,
-    currentYear,
-    RELEASE_SHELF_LIMIT,
+  const items = read.items
+    .filter(hasProviderPoster)
+    .slice(0, RECENTLY_ADDED_SHOWN);
+  if (items.length === 0) return null;
+  return (
+    <section aria-label="Recently added to Favalog">
+      <SectionHeader
+        title="Recently added to Favalog"
+        description="The newest titles in Favalog's own catalog, across every media type."
+        href="/explore"
+        linkLabel="Explore"
+        as="h2"
+      />
+      <ul
+        role="list"
+        className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 lg:grid-cols-5"
+      >
+        {items.map((item) => (
+          <li key={item.id}>
+            <MediaCard item={item} />
+          </li>
+        ))}
+      </ul>
+    </section>
   );
-  return <ReleaseShelf shelf={shelf} currentYear={currentYear} />;
-}
-
-async function KindSection({
-  kind,
-  limit,
-}: {
-  kind: MediaKind;
-  limit: number;
-}) {
-  const read = await readRecentlyAdded(limit, kind);
-  if (read.status !== "ok") return null;
-  return <KindShelf kind={kind} items={read.items} />;
 }
 
 /**
  * Credits every provider whose data the sections above displayed. The reads
  * are request-memoized, so this repeats no database work.
  */
-async function SourcesSection({ currentYear }: { currentYear: number }) {
-  const [featured, releases, ...shelves] = await Promise.all([
+async function SourcesSection() {
+  const reads = await Promise.all([
     readFeaturedCandidates(FEATURED_SLUGS),
-    readReleaseWindow(releaseWindowStartYear(currentYear), RELEASE_READ_LIMIT),
-    ...KIND_SHELVES.map(({ kind, limit }) => readRecentlyAdded(limit, kind)),
+    readRecentlyAdded(RECENTLY_ADDED_READ),
   ]);
   const providers = new Set<ExternalProvider>(
     shouldOfferExternalCatalog() ? availableExternalProviders() : [],
   );
-  for (const read of [featured, releases, ...shelves] as HomeRead[]) {
+  for (const read of reads as HomeRead[]) {
     if (read.status === "ok") read.providers.forEach((p) => providers.add(p));
   }
   return <HomeSources providers={[...providers]} />;
@@ -360,7 +357,11 @@ function ExampleSections({ dayIndex }: { dayIndex: number }) {
     <>
       {featured && (
         <Container className="pt-2">
-          <FeaturedBanner item={featured.item} eyebrow="Example title" />
+          <FeaturedBanner
+            item={featured.item}
+            eyebrow="Example title"
+            cta={<FeaturedTitleLink item={featured.item} />}
+          />
         </Container>
       )}
 

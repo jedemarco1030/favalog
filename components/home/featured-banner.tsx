@@ -1,45 +1,72 @@
-import Image from "next/image";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { ArrowUpRight } from "lucide-react";
-import type { MediaItem } from "@/lib/types";
+import type { MediaItem, MediaKind } from "@/lib/types";
+import { ArtworkImage } from "@/components/media/artwork-image";
 import { MediaPoster } from "@/components/media/media-poster";
 import { mediaKindLabel } from "@/components/media/media-type-badge";
+import { displayableArtwork } from "@/lib/media/artwork";
 
-interface FeaturedBannerProps {
-  item: MediaItem;
-  /** Eyebrow describing WHY this title is shown (never a popularity claim). */
-  eyebrow: string;
+/** What the banner shows. Built from a canonical title or a provider candidate. */
+export interface FeaturedDisplay {
+  title: string;
+  kind: MediaKind;
+  year?: number;
+  synopsis?: string;
+  posterUrl?: string;
+  backdropUrl?: string;
 }
 
-const CTA_LABEL: Record<MediaItem["kind"], string> = {
+interface FeaturedBannerProps {
+  item: FeaturedDisplay;
+  /** Eyebrow describing WHY this title is shown, e.g. "Trending on TMDB". */
+  eyebrow: string;
+  /** The primary action: a link to details, or the discovery Open/Save controls. */
+  cta: ReactNode;
+}
+
+const CTA_LABEL: Record<MediaKind, string> = {
   movie: "View film",
   tv: "View series",
   book: "View book",
   game: "View game",
 };
 
+/** The banner CTA for a title that already exists in Favalog. */
+export function FeaturedTitleLink({ item }: { item: MediaItem }) {
+  return (
+    <Link
+      href={`/title/${item.slug}`}
+      className="inline-flex w-fit items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+    >
+      {CTA_LABEL[item.kind]}
+      <span className="sr-only">: {item.title}</span>
+      <ArrowUpRight className="size-4" aria-hidden="true" />
+    </Link>
+  );
+}
+
 /**
- * One strong featured composition — no carousel, no autoplay. Wide backdrop
- * artwork gets a full-bleed treatment with a token-based scrim so text keeps
- * contrast in both themes; titles without a backdrop (most books) get an
- * intentional poster-beside-copy layout instead of a stretched cover.
+ * One strong featured composition, with no carousel and no autoplay. Only real
+ * provider backdrops get the full-bleed treatment; a portrait poster is never
+ * stretched into a wide banner, it sits beside the copy instead. A backdrop that
+ * fails to load leaves the surface and copy intact.
  */
-export function FeaturedBanner({ item, eyebrow }: FeaturedBannerProps) {
-  const href = `/title/${item.slug}`;
-  const kindLabel = mediaKindLabel(item.kind);
+export function FeaturedBanner({ item, eyebrow, cta }: FeaturedBannerProps) {
+  const backdrop = displayableArtwork(item.backdropUrl);
   const copy = (
     <>
       <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-accent">
         {eyebrow}
       </p>
       <p className="mt-3 flex items-center gap-2 text-xs uppercase tracking-wide text-foreground/60">
-        <span>{kindLabel}</span>
-        {item.year > 0 && (
+        <span>{mediaKindLabel(item.kind)}</span>
+        {item.year ? (
           <>
             <span aria-hidden="true">·</span>
             <span className="tabular-nums">{item.year}</span>
           </>
-        )}
+        ) : null}
       </p>
       <h2
         id="featured-heading"
@@ -52,31 +79,24 @@ export function FeaturedBanner({ item, eyebrow }: FeaturedBannerProps) {
           {item.synopsis}
         </p>
       )}
-      <Link
-        href={href}
-        className="mt-5 inline-flex w-fit items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-      >
-        {CTA_LABEL[item.kind]}
-        <span className="sr-only">: {item.title}</span>
-        <ArrowUpRight className="size-4" aria-hidden="true" />
-      </Link>
+      <div className="mt-5">{cta}</div>
     </>
   );
 
-  if (item.backdropUrl) {
+  if (backdrop) {
     return (
       <section
         aria-labelledby="featured-heading"
         className="relative isolate overflow-hidden rounded-2xl border border-border/60 bg-surface-1"
       >
         <div className="relative aspect-[4/5] w-full sm:aspect-[16/9] lg:aspect-[21/9]">
-          <Image
-            src={item.backdropUrl}
+          <ArtworkImage
+            src={backdrop}
             alt=""
-            fill
             priority
             sizes="(min-width: 1280px) 1200px, 100vw"
             className="-z-10 object-cover object-[center_30%]"
+            fallback={null}
           />
           <div
             aria-hidden="true"
@@ -97,7 +117,7 @@ export function FeaturedBanner({ item, eyebrow }: FeaturedBannerProps) {
     >
       <div className="flex flex-col gap-6 p-6 sm:flex-row sm:items-end sm:gap-10 sm:p-10">
         <MediaPoster
-          item={item}
+          item={{ title: item.title, posterUrl: item.posterUrl ?? "" }}
           decorative
           priority
           sizes="(min-width: 640px) 208px, 160px"

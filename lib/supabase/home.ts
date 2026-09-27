@@ -22,6 +22,9 @@ export type HomeRead =
   | { status: "unavailable" }
   | { status: "error" };
 
+/** `media_items.source` of the curated demo seed catalog. */
+export const DEMO_SEED_SOURCE = "favalog";
+
 /** Hard upper bound on any Home read. */
 export const HOME_READ_MAX = 24;
 
@@ -37,7 +40,10 @@ async function readHome(query: HomeQuery): Promise<HomeRead> {
     let q = supabase
       .from("media_items")
       .select("*")
-      .is("provider_removed_at", null);
+      .is("provider_removed_at", null)
+      // Demo seed rows carry bundled placeholder graphics, not real artwork;
+      // they stay browsable elsewhere but are never promoted on Home.
+      .neq("source", DEMO_SEED_SOURCE);
 
     if (query.by === "slugs") {
       if (query.slugs.length === 0) {
