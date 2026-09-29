@@ -25,6 +25,8 @@
  *     OMITS first_publish_date (like the real Dune Work OL893414W); the year is
  *     only recoverable via the adapter's bounded exact Work-key Search fallback
  *     (`q=key:"/works/<id>"`), which this server answers with key + year only.
+ *   - Discovery: TMDB weekly movie trending returns "Fixture Lantern Coast"
+ *     (id 999101); every other trending/discover shelf is empty.
  *
  * Bind to 127.0.0.1 only. Port from FIXTURE_PORT (default 5599).
  */
@@ -68,6 +70,22 @@ const DUNE = {
   ],
   cast: ["Timothée Chalamet", "Zendaya"],
   directors: ["Denis Villeneuve"],
+};
+
+// Served only by the TMDB trending discovery shelf, so the Save dialog can be
+// exercised on a discovery card without touching the search fixtures.
+const LANTERN = {
+  id: 999101,
+  title: "Fixture Lantern Coast",
+  overview:
+    "A deterministic fixture film about a lighthouse keeper who logs every " +
+    "ship that never arrives.",
+  year: 2025,
+  releaseDate: "2025-05-09",
+  runtime: 104,
+  genres: [{ id: 18, name: "Drama" }],
+  cast: ["Ada Fixture"],
+  directors: ["Dee Terministic"],
 };
 
 const FIXTURE_BOOK = {
@@ -216,6 +234,30 @@ const server = createServer((req, res) => {
       total_results: 0,
       results: [],
     });
+  }
+  // Discovery shelves: only the undated trending shelf carries a fixture title,
+  // so date-windowed shelves stay deterministic (empty) regardless of today.
+  if (path === "/tmdb/trending/movie/week") {
+    return sendJson(res, 200, {
+      page: 1,
+      total_pages: 1,
+      total_results: 1,
+      results: [tmdbSearchResult(LANTERN)],
+    });
+  }
+  if (
+    path.startsWith("/tmdb/trending/") ||
+    path.startsWith("/tmdb/discover/")
+  ) {
+    return sendJson(res, 200, {
+      page: 1,
+      total_pages: 1,
+      total_results: 0,
+      results: [],
+    });
+  }
+  if (path === `/tmdb/movie/${LANTERN.id}`) {
+    return sendJson(res, 200, tmdbMovieDetail(LANTERN));
   }
   if (path === `/tmdb/movie/${DUNE.id}`) {
     return sendJson(res, 200, tmdbMovieDetail(DUNE));
