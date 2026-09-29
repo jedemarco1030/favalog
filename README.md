@@ -17,9 +17,9 @@ catalog stores only the titles people actually engage with.
 
 - **Live deployment:** <https://favalog.vercel.app>
 - **Screenshots:** not yet committed. The v0 sandbox cannot run a browser, so
-  no screenshots have been captured from a real session. Phase 4E PR 2 adds
-  them from the CI Playwright run, so every image comes from the actual app
-  rather than a mock-up.
+  screenshots will be captured from CI Playwright runs or real sessions,
+  never mock-ups.
+- **Engineering case study:** [`docs/case-study.md`](docs/case-study.md).
 
 ## What Favalog does
 
@@ -106,17 +106,17 @@ Operator scripts: `npm run catalog` (import), `npm run refresh:catalog`,
 
 ## Verification approach
 
-| Check                                         | Command                              | Runs in CI                                                 |
-| --------------------------------------------- | ------------------------------------ | ---------------------------------------------------------- |
-| Format, lint, typecheck                       | `npm run validate`                   | Yes                                                        |
-| Unit and component tests (Vitest, coverage)   | `npm run test:coverage`              | Yes                                                        |
-| Schema and RLS tests (pgTAP)                  | `npm run db:test`                    | Yes (local Supabase)                                       |
-| Generated types drift                         | `npm run supabase:types`             | Yes                                                        |
-| Playwright `default` and `no-env`             | `npm run test:e2e:no-env`            | Yes                                                        |
-| Seeded Explore journeys                       | `npm run test:e2e:configured`        | Yes (local Supabase)                                       |
-| Quality baseline (performance and a11y lab)   | runs inside the `default` project    | Yes; evidence in the `playwright-report` artifact          |
-| `@fixtures` (offline provider fixture server) | `npm run test:e2e:fixtures`          | Yes (local Supabase), added in Phase 4E; first run pending |
-| `social`, `likes` journeys                    | `npm run test:e2e:social` / `:likes` | **Not yet**: run locally                                   |
+| Check                                         | Command                              | Runs in CI                                        |
+| --------------------------------------------- | ------------------------------------ | ------------------------------------------------- |
+| Format, lint, typecheck                       | `npm run validate`                   | Yes                                               |
+| Unit and component tests (Vitest, coverage)   | `npm run test:coverage`              | Yes                                               |
+| Schema and RLS tests (pgTAP)                  | `npm run db:test`                    | Yes (local Supabase)                              |
+| Generated types drift                         | `npm run supabase:types`             | Yes                                               |
+| Playwright `default` and `no-env`             | `npm run test:e2e:no-env`            | Yes                                               |
+| Seeded Explore journeys                       | `npm run test:e2e:configured`        | Yes (local Supabase)                              |
+| Quality baseline (performance and a11y lab)   | runs inside the `default` project    | Yes; evidence in the `playwright-report` artifact |
+| `@fixtures` (offline provider fixture server) | `npm run test:e2e:fixtures`          | Yes (local Supabase)                              |
+| `social`, `likes` journeys                    | `npm run test:e2e:social` / `:likes` | **Not yet**: run locally                          |
 
 Tests never mutate hosted production. The `@fixtures` suite refuses to start
 when `SUPABASE_URL` points at a hosted project. Laboratory measurements are
@@ -136,8 +136,7 @@ production behavior.
 - Community reviews on some surfaces still come from the labelled mock layer.
 - `catalog-refresh.yml` is on `main`, but no run has been recorded, and
   whether it is enabled on the hosting side is unverified.
-- The `likes` Playwright suite is not yet in CI. `@fixtures` was added to CI
-  in Phase 4E, and its first run is pending.
+- The `social` and `likes` Playwright suites are not yet in CI.
 - Possible duplicate RAWG candidates are tracked as a data-quality issue.
   Records are never merged on title similarity alone.
 - There are no notifications, comments, blocking, or private accounts yet.

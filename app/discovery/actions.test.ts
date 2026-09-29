@@ -219,12 +219,27 @@ describe("saveDiscoveredTitleAction", () => {
   });
 
   it("surfaces a list write failure without revalidating", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     addListItem.mockResolvedValue({
       status: "error",
       message: "We couldn't update that list.",
     });
 
     const result = await save();
+
+    const events = warn.mock.calls.map(([line]) => JSON.parse(String(line)));
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        event: "discovery.save_add_failed",
+        provider: "rawg",
+        reason: "error",
+      }),
+    );
+    const serialized = JSON.stringify(events);
+    expect(serialized).not.toContain(LIST_ID);
+    expect(serialized).not.toContain("hades");
+    expect(serialized).not.toContain("3498");
+    warn.mockRestore();
 
     expect(result).toEqual({
       status: "error",
