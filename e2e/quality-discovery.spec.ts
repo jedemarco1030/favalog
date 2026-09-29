@@ -16,8 +16,7 @@ import {
  * signed-in fixture user, and the offline provider fixture server supplying
  * "Fixture Lantern Coast" to Explore's discovery overview.
  *
- * The fixtures suite is not yet wired into CI; see
- * `docs/ci/fixtures-e2e-ci-handoff.md`.
+ * CI runs this suite in the `explore-integration` job.
  */
 
 const DISCOVERY_TITLE = "Fixture Lantern Coast";
