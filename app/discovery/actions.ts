@@ -17,6 +17,7 @@ import { createServerCatalogMaterializer } from "@/lib/catalog/server-materializ
 import { validateMaterializeInput } from "@/lib/catalog/validation";
 import { isUuid } from "@/lib/supabase/list-input";
 import { addListItem } from "@/lib/supabase/lists";
+import { logDiscoveryEvent } from "@/lib/discovery/log";
 import { withSaveIntent } from "@/lib/discovery/save-intent";
 import {
   parseDiscoverySaveFormData,
@@ -127,7 +128,16 @@ export async function saveDiscoveredTitleAction(
     };
   }
 
+  const addStartedAt = performance.now();
   const added = await addListItem({ listId: raw.listId, mediaSlug });
+  if (added.status !== "success") {
+    logDiscoveryEvent({
+      event: "discovery.save_add_failed",
+      provider: input.provider,
+      reason: added.status,
+      latencyMs: performance.now() - addStartedAt,
+    });
+  }
   switch (added.status) {
     case "success":
       revalidatePath(`/list/${added.slug}`);

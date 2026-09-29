@@ -28,6 +28,7 @@ import {
   tmdbMovieUrl,
   type RelatedGroup,
 } from "./related";
+import { logDiscoveryEvent } from "./log";
 import { nextDataCache, type DiscoveryDeps } from "./service";
 
 /**
@@ -148,6 +149,7 @@ export async function getRelatedTitles(
   const isAvailable = deps.isAvailable ?? isExternalProviderAvailable;
   if (!isAvailable(ref.provider)) return null;
   const cache = deps.cache ?? nextDataCache;
+  const startedAt = performance.now();
 
   try {
     const group = await cache(
@@ -157,14 +159,13 @@ export async function getRelatedTitles(
     );
     return group && group.candidates.length > 0 ? group : null;
   } catch (error) {
-    console.warn(
-      JSON.stringify({
-        event: "discovery.related_unavailable",
-        provider: ref.provider,
-        category:
-          error instanceof CatalogProviderError ? error.category : "unknown",
-      }),
-    );
+    logDiscoveryEvent({
+      event: "discovery.related_unavailable",
+      provider: ref.provider,
+      category:
+        error instanceof CatalogProviderError ? error.category : "unknown",
+      latencyMs: performance.now() - startedAt,
+    });
     return null;
   }
 }

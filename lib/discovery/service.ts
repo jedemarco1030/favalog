@@ -24,6 +24,7 @@ import {
   tmdbShelfUrl,
   type ShelfFetchResult,
 } from "./providers";
+import { logDiscoveryEvent } from "./log";
 import { DISCOVERY_SHELVES, type ShelfDefinition } from "./shelves";
 import type {
   DiscoveryCandidate,
@@ -169,6 +170,7 @@ export async function getDiscoveryShelf(
   const now = (deps.now ?? (() => new Date()))();
   const cache = deps.cache ?? nextDataCache;
   const day = dayBucket(now);
+  const startedAt = performance.now();
 
   try {
     let result: CachedShelf;
@@ -212,14 +214,14 @@ export async function getDiscoveryShelf(
   } catch (error) {
     const category =
       error instanceof CatalogProviderError ? error.category : "unknown";
-    console.warn(
-      JSON.stringify({
-        event: "discovery.shelf_unavailable",
-        shelfId,
-        page,
-        category,
-      }),
-    );
+    logDiscoveryEvent({
+      event: "discovery.shelf_unavailable",
+      provider: def.provider,
+      shelfId,
+      page,
+      category,
+      latencyMs: performance.now() - startedAt,
+    });
     return {
       status: "unavailable",
       shelfId,

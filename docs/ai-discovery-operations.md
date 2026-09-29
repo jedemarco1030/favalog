@@ -400,6 +400,24 @@ sustained `failed`/`unavailable` count points at provider/credential issues.
   stale until re-enabled. Disabling never retracts metadata already delivered to
   browsers and never deletes user records.
 
+## Discovery failure events (Phase 4E)
+
+`lib/discovery/log.ts` emits closed, schema-versioned (`schemaVersion: 1`)
+JSON lines via `console.warn`. They never contain external ids, titles,
+slugs, list ids or names, user identity, query text, provider payloads, or
+free-text error messages. Latency is bucketed with the catalog
+`bucketLatency` helper, never recorded raw.
+
+| Event                           | Fields                                                     | Meaning                                                                        | First response                                                                                                                                                                                                                                               |
+| ------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `discovery.shelf_unavailable`   | `provider`, `shelfId`, `page`, `category`, `latencyBucket` | One discovery shelf could not be read. Only that shelf is hidden.              | Group by `provider` and `category`. `auth` means rotating the token and checking the flag. `rate_limited` means checking page caps and cache freshness. Bursts of `timeout` with high latency buckets point at provider degradation.                         |
+| `discovery.related_unavailable` | `provider`, `category`, `latencyBucket`                    | The related-titles rail on a title page could not be read and renders nothing. | Same triage as shelves. A title page is never blocked by this rail.                                                                                                                                                                                          |
+| `discovery.save_add_failed`     | `provider`, `reason`, `latencyBucket`                      | The title was materialized, but adding it to the chosen list failed.           | The catalog row exists, and a retry re-runs only the list write. `error` or `unavailable` points at the list write or Supabase; `unauthenticated` usually means the session expired mid-save. Materialization failures are logged separately by the catalog. |
+
+Rollback for a misbehaving provider is its existing flag (`TMDB_ENABLED`,
+`OPEN_LIBRARY_ENABLED`, `RAWG_ENABLED`, or `EXTERNAL_CATALOG_ENABLED`).
+Discovery degrades to the remaining providers or to the local catalog.
+
 ## Privacy boundaries and retention
 
 - **Never** in telemetry or analytics: raw/normalized **query text**, media
