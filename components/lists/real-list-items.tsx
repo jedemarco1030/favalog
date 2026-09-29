@@ -52,7 +52,7 @@ export function RealListItems({
               {isRanked && (
                 <span
                   aria-hidden="true"
-                  className="w-6 shrink-0 pt-1 text-right font-display text-lg text-foreground/40 tabular-nums sm:w-8 sm:text-xl"
+                  className="w-6 shrink-0 pt-1 text-right font-display text-lg text-foreground/60 tabular-nums sm:w-8 sm:text-xl"
                 >
                   {index + 1}
                 </span>

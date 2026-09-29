@@ -70,7 +70,7 @@ export function RatingBreakdown({
               </span>
               <span className="text-right text-foreground/60 tabular-nums">
                 {countFormatter.format(bucketCount)}
-                <span className="ml-2 text-foreground/40">
+                <span className="ml-2 text-foreground/60">
                   {percentFormatter.format(percent)}
                 </span>
               </span>

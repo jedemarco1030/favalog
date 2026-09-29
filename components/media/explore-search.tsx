@@ -89,6 +89,7 @@ export function ExploreSearch({
 
   const inputId = "explore-search";
   const resultsHeadingId = "explore-results-heading";
+  const resultsRegionId = "explore-results";
 
   // Emit exactly one coarse, aggregate "search outcome rendered" product event
   // per committed search. The `outcome` prop reference only changes when the
@@ -166,7 +167,7 @@ export function ExploreSearch({
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Try “a thoughtful sci-fi story about memory and grief”"
             autoComplete="off"
-            aria-controls={resultsHeadingId}
+            aria-controls={hasActiveQuery ? resultsRegionId : undefined}
             className="h-12 w-full rounded-full border border-border/70 bg-surface-1 pl-11 pr-28 text-base text-foreground placeholder:text-foreground/40 outline-none transition-colors focus:border-accent/60 focus-visible:ring-2 focus-visible:ring-accent"
           />
           <button
@@ -205,7 +206,24 @@ export function ExploreSearch({
 
       {hasActiveQuery ? (
         <div className="flex flex-col gap-16">
-          <section aria-labelledby={resultsHeadingId} aria-busy={isPending}>
+          <section
+            id={resultsRegionId}
+            aria-labelledby={
+              outcome.status === "unavailable" ||
+              outcome.status === "error" ||
+              outcome.status === "empty"
+                ? undefined
+                : resultsHeadingId
+            }
+            aria-label={
+              outcome.status === "unavailable" ||
+              outcome.status === "error" ||
+              outcome.status === "empty"
+                ? "Search results"
+                : undefined
+            }
+            aria-busy={isPending}
+          >
             <ExploreResults
               outcome={outcome}
               isPending={isPending}

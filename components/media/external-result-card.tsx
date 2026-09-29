@@ -81,7 +81,7 @@ export function ExternalResultCard({
             {result.creators}
           </p>
         )}
-        <p className="text-xs text-foreground/40">via {result.providerLabel}</p>
+        <p className="text-xs text-foreground/60">via {result.providerLabel}</p>
       </div>
 
       {result.status === "existing" && result.existingSlug ? (

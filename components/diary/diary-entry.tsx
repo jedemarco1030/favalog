@@ -57,7 +57,7 @@ export function DiaryEntry({
         <span className="font-display text-xl text-foreground tabular-nums">
           {dayFormatter.format(date)}
         </span>
-        <span className="mt-1 text-[11px] uppercase tracking-wide text-foreground/40">
+        <span className="mt-1 text-[11px] uppercase tracking-wide text-foreground/60">
           {weekdayFormatter.format(date)}
         </span>
       </time>

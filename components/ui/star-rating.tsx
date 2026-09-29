@@ -26,6 +26,7 @@ export function StarRating({
   return (
     <span
       className={cn("inline-flex items-center gap-1 text-accent", className)}
+      role="img"
       aria-label={`${clamped} out of 5 stars`}
     >
       <span className="inline-flex items-center" aria-hidden="true">
