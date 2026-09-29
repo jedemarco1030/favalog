@@ -242,7 +242,15 @@ const server = createServer((req, res) => {
       page: 1,
       total_pages: 1,
       total_results: 1,
-      results: [tmdbSearchResult(LANTERN)],
+      // Explore's overview only promotes titles with provider artwork, so this
+      // card needs a well-formed poster path. The image itself 404s upstream
+      // and the card falls back to its typeset artwork, which the app handles.
+      results: [
+        {
+          ...tmdbSearchResult(LANTERN),
+          poster_path: "/fixture-lantern-coast.jpg",
+        },
+      ],
     });
   }
   if (

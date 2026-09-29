@@ -72,6 +72,7 @@ export function tmdbShelfUrl(
   def: ShelfDefinition,
   page: number,
   now: Date,
+  base: string = TMDB_API_BASE,
 ): string {
   const kind = def.kind === "tv" ? "tv" : "movie";
   const params = new URLSearchParams({
@@ -80,7 +81,7 @@ export function tmdbShelfUrl(
   });
 
   if (def.sort === "trending") {
-    return `${TMDB_API_BASE}/trending/${kind}/week?${params}`;
+    return `${base}/trending/${kind}/week?${params}`;
   }
 
   params.set("include_adult", "false");
@@ -96,7 +97,7 @@ export function tmdbShelfUrl(
   } else {
     params.set("sort_by", "popularity.desc");
   }
-  return `${TMDB_API_BASE}/discover/${kind}?${params}`;
+  return `${base}/discover/${kind}?${params}`;
 }
 
 interface TmdbListItem {
@@ -175,6 +176,7 @@ export function rawgShelfUrl(
   page: number,
   now: Date,
   apiKey: string,
+  base: string = RAWG_BASE,
 ): string {
   const params = new URLSearchParams({
     key: apiKey,
@@ -189,7 +191,7 @@ export function rawgShelfUrl(
   } else {
     params.set("ordering", "-added");
   }
-  return `${RAWG_BASE}/games?${params}`;
+  return `${base}/games?${params}`;
 }
 
 interface RawgListItem {
@@ -244,8 +246,11 @@ export function normalizeRawgShelf(
 // --- Open Library ------------------------------------------------------------
 
 /** One request per freshness window covers every page of the book shelf. */
-export function openLibraryTrendingUrl(def: ShelfDefinition): string {
-  return `${OPEN_LIBRARY_BASE}/trending/weekly.json?limit=${def.pageSize * def.maxPages}`;
+export function openLibraryTrendingUrl(
+  def: ShelfDefinition,
+  base: string = OPEN_LIBRARY_BASE,
+): string {
+  return `${base}/trending/weekly.json?limit=${def.pageSize * def.maxPages}`;
 }
 
 interface OpenLibraryTrendingWork {

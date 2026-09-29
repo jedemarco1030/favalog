@@ -116,6 +116,16 @@ describe("TMDB shelves", () => {
     expect(trending.pathname).toMatch(/\/trending\/tv\/week$/);
   });
 
+  it("builds shelf URLs against an overridden base (fixture transport)", () => {
+    const base = "http://127.0.0.1:4010/tmdb/3";
+    expect(
+      tmdbShelfUrl(DISCOVERY_SHELVES["movie-trending"], 1, NOW, base),
+    ).toMatch(/^http:\/\/127\.0\.0\.1:4010\/tmdb\/3\/trending\/movie\/week\?/);
+    expect(
+      rawgShelfUrl(DISCOVERY_SHELVES["game-popular"], 1, NOW, "k", base),
+    ).toMatch(/^http:\/\/127\.0\.0\.1:4010\/tmdb\/3\/games\?/);
+  });
+
   it("drops rows without identity, adult rows, and out-of-window dates", () => {
     const def = DISCOVERY_SHELVES["movie-upcoming"];
     const result = normalizeTmdbShelf(

@@ -8,8 +8,10 @@ import {
   buildUserAgent,
   getOpenLibraryContact,
 } from "@/lib/catalog/openlibrary/config";
-import { getRawgApiKey } from "@/lib/catalog/rawg/config";
-import { getTmdbToken } from "@/lib/catalog/tmdb/config";
+import { RAWG_BASE, getRawgApiKey } from "@/lib/catalog/rawg/config";
+import { OPEN_LIBRARY_BASE } from "@/lib/catalog/openlibrary/config";
+import { resolveTestProviderBaseUrl } from "@/lib/catalog/test-transport";
+import { TMDB_API_BASE, getTmdbToken } from "@/lib/catalog/tmdb/config";
 import type { ExternalProvider } from "@/lib/catalog/types";
 import {
   dayBucket,
@@ -74,6 +76,23 @@ interface CachedShelf extends ShelfFetchResult {
   fetchedAt: string;
 }
 
+const DEFAULT_PROVIDER_BASE = {
+  tmdb: TMDB_API_BASE,
+  openlibrary: OPEN_LIBRARY_BASE,
+  rawg: RAWG_BASE,
+} as const;
+
+/**
+ * Same loopback-guarded override the catalog provider registry uses, so the
+ * `@fixtures` suite's discovery shelves hit the local fixture server rather
+ * than the live provider. Production always resolves to the real host.
+ */
+function providerBase(provider: keyof typeof DEFAULT_PROVIDER_BASE): string {
+  return (
+    resolveTestProviderBaseUrl(provider) ?? DEFAULT_PROVIDER_BASE[provider]
+  );
+}
+
 function notConfigured(provider: ExternalProvider, operation: string): never {
   throw providerError({ provider, operation, category: "not_configured" });
 }
@@ -93,7 +112,7 @@ async function fetchShelf(
     const { data } = await fetchProviderJson<unknown>({
       provider: "tmdb",
       operation,
-      url: tmdbShelfUrl(def, page, now),
+      url: tmdbShelfUrl(def, page, now, providerBase("tmdb")),
       headers: { Authorization: `Bearer ${token}` },
       fetchImpl,
     });
@@ -106,7 +125,7 @@ async function fetchShelf(
     const { data } = await fetchProviderJson<unknown>({
       provider: "rawg",
       operation,
-      url: rawgShelfUrl(def, page, now, key),
+      url: rawgShelfUrl(def, page, now, key, providerBase("rawg")),
       fetchImpl,
     });
     return normalizeRawgShelf(data, def, page, now);
@@ -125,7 +144,7 @@ async function fetchOpenLibraryAll(
   const { data } = await fetchProviderJson<unknown>({
     provider: "openlibrary",
     operation: `discovery:${def.id}`,
-    url: openLibraryTrendingUrl(def),
+    url: openLibraryTrendingUrl(def, providerBase("openlibrary")),
     headers: { "User-Agent": buildUserAgent(contact) },
     fetchImpl: deps.fetchImpl,
   });
@@ -159,7 +178,7 @@ export async function getDiscoveryShelf(
           candidates: await fetchOpenLibraryAll(def, deps),
           fetchedAt: new Date().toISOString(),
         }),
-        ["discovery", def.id, day],
+        ["discovery", def.id, day, providerBase(def.provider)],
         def.freshnessSeconds,
       );
       result = {
@@ -172,7 +191,7 @@ export async function getDiscoveryShelf(
           ...(await fetchShelf(def, page, now, deps)),
           fetchedAt: new Date().toISOString(),
         }),
-        ["discovery", def.id, String(page), day],
+        ["discovery", def.id, String(page), day, providerBase(def.provider)],
         def.freshnessSeconds,
       );
     }
