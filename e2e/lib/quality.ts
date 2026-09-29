@@ -75,6 +75,12 @@ export interface ImageSample {
   transferBytes: number;
 }
 
+export interface LayoutShiftSample {
+  value: number;
+  atMs: number;
+  nodes: string[];
+}
+
 export interface RunMetrics {
   ttfbMs: number;
   domContentLoadedMs: number;
@@ -83,6 +89,8 @@ export interface RunMetrics {
   lcpElement: string | null;
   /** Sum of layout-shift entries without recent input (not session-windowed). */
   cls: number;
+  /** Largest individual layout shifts (≥ 0.001) with their source nodes. */
+  shifts: LayoutShiftSample[];
   scriptBytes: number;
   scriptCount: number;
   imageBytes: number;
@@ -92,7 +100,16 @@ export interface RunMetrics {
 }
 
 const OBSERVER_SCRIPT = `
-  window.__favalogLab = { lcp: null, lcpElement: null, cls: 0 };
+  window.__favalogLab = { lcp: null, lcpElement: null, cls: 0, shifts: [] };
+  const describeNode = (n) => {
+    if (!n || n.nodeType !== 1) return "text";
+    const id = n.id ? "#" + n.id : "";
+    const cls = typeof n.className === "string" && n.className
+      ? "." + n.className.trim().split(/\\s+/).slice(0, 3).join(".")
+      : "";
+    const label = n.getAttribute("aria-label") || (n.textContent || "").trim().slice(0, 30);
+    return n.tagName.toLowerCase() + id + cls + (label ? "(" + label + ")" : "");
+  };
   try {
     new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
@@ -107,7 +124,15 @@ const OBSERVER_SCRIPT = `
     }).observe({ type: "largest-contentful-paint", buffered: true });
     new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
-        if (!entry.hadRecentInput) window.__favalogLab.cls += entry.value;
+        if (entry.hadRecentInput) continue;
+        window.__favalogLab.cls += entry.value;
+        if (entry.value >= 0.001 && window.__favalogLab.shifts.length < 10) {
+          window.__favalogLab.shifts.push({
+            value: Math.round(entry.value * 10000) / 10000,
+            atMs: Math.round(entry.startTime),
+            nodes: (entry.sources || []).slice(0, 3).map((s) => describeNode(s.node)),
+          });
+        }
       }
     }).observe({ type: "layout-shift", buffered: true });
   } catch (e) {}
@@ -167,7 +192,12 @@ export async function measureRun(
     await page.waitForTimeout(1_500);
 
     return await page.evaluate(() => {
-      type Lab = { lcp: number | null; lcpElement: string | null; cls: number };
+      type Lab = {
+        lcp: number | null;
+        lcpElement: string | null;
+        cls: number;
+        shifts: { value: number; atMs: number; nodes: string[] }[];
+      };
       const lab = (window as unknown as { __favalogLab: Lab }).__favalogLab;
       const nav = performance.getEntriesByType(
         "navigation",
@@ -212,6 +242,7 @@ export async function measureRun(
         lcpMs: lab.lcp === null ? null : Math.round(lab.lcp),
         lcpElement: lab.lcpElement,
         cls: Math.round(lab.cls * 10000) / 10000,
+        shifts: lab.shifts,
         scriptBytes: scripts.reduce((sum, r) => sum + bytes(r), 0),
         scriptCount: scripts.length,
         imageBytes: imageResources.reduce((sum, r) => sum + bytes(r), 0),
@@ -252,6 +283,7 @@ export function summarizeRuns(runs: RunMetrics[]) {
       totalBytes: pick("totalBytes"),
     },
     lcpElements: runs.map((r) => r.lcpElement),
+    layoutShifts: runs.map((r) => r.shifts),
     scriptCount: last.scriptCount,
     imageCount: last.imageCount,
     oversizedImages: last.images.filter((i) => i.oversizeRatio > 2),

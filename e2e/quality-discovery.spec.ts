@@ -64,15 +64,22 @@ test.describe("@fixtures quality discovery", () => {
     const initialFocus = await describeFocus(page);
     const dialogAxe = await runAxe(page, "dialog[open]");
 
-    // Tab through twelve stops and record whether focus ever leaves the
-    // dialog. Native modal <dialog> should keep it inside.
+    // Tab through twelve stops. A native modal <dialog> makes the page inert,
+    // so after the last control Chromium hands focus to the browser chrome,
+    // which reads as `document.body`. That is expected and recorded
+    // separately; only focus landing on a page element outside the dialog
+    // is a real trap leak.
     const escapedFocus: string[] = [];
+    let browserChromeStops = 0;
     for (let i = 0; i < 12; i++) {
       await page.keyboard.press("Tab");
-      const inside = await page.evaluate(
-        () => !!document.activeElement?.closest("dialog[open]"),
-      );
-      if (!inside) escapedFocus.push(await describeFocus(page));
+      const where = await page.evaluate(() => {
+        const el = document.activeElement;
+        if (!el || el === document.body) return "chrome";
+        return el.closest("dialog[open]") ? "inside" : "outside";
+      });
+      if (where === "chrome") browserChromeStops += 1;
+      if (where === "outside") escapedFocus.push(await describeFocus(page));
     }
 
     await dialog.getByRole("button", { name: "Create new list" }).focus();
@@ -89,6 +96,7 @@ test.describe("@fixtures quality discovery", () => {
     await recordEvidence(testInfo, "a11y-save-dialog", {
       initialFocus,
       escapedFocus,
+      browserChromeStops,
       createFormFocus,
       focusReturnedToTrigger,
       dialogAxe,
