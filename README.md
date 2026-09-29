@@ -1,1177 +1,152 @@
 # Favalog
 
-> **Everything you watch, read, and play. One place to remember it.**
+Favalog is a social entertainment platform for tracking, rating, reviewing,
+organizing, and discovering **movies, TV series, books, and video games** in one
+cross-media record. Discovery is led by external providers. The canonical
+catalog stores only the titles people actually engage with.
 
-Favalog is a social entertainment platform where people track, rate, review,
-organize, and discover the movies, TV, and books they love. Long-term, a
-person's Favalog becomes a living record of their taste — the things they
-watch, read, and love, and eventually the games, music, and other interests
-that make up their taste.
+> Status is reconciled as of **2026-09-29** against `main`. Each capability
+> below is labelled by its evidence: implemented in code, CI-verified,
+> owner-confirmed in production, or unverified/deferred. The authoritative
+> per-capability table is the "Status reconciliation" section of
+> [`docs/product-roadmap.md`](docs/product-roadmap.md). The earlier, longer
+> README is preserved verbatim at
+> [`docs/history/readme-through-phase-4d.md`](docs/history/readme-through-phase-4d.md).
 
-The current MVP scope is **movies, TV, and books**. A Supabase/PostgreSQL
-backend foundation is in place: **authentication + onboarding**, the
-**persistent title-log lifecycle** (log a title with an optional rating and
-review, then edit or delete it), the **persistent list lifecycle** (create
-a list, add/remove titles, edit list metadata, delete a whole list, view the
-real list, and see it on the owner's profile), the **persistent favorites
-loop** (favorite/unfavorite a title, and see the ordered shelf on the owner's
-profile), and the **persistent follow lifecycle and follower-only lists** (follow/unfollow
-users, accurate follower/following counts, and follower-aware list visibility)
-are wired to it, and an authenticated user's **Diary**, **Lists**,
-**Favorites**, and **Profile** now render real Supabase data. A
-**Catalog Platform foundation** is also in place: the backend can now search
-and import (materialize) movies/TV from **TMDB** and books from **Open Library**
-into the real catalog. This ingestion layer is server-only, and its federated
-Explore discovery + canonical on-demand materialization is now **wired and
-production-verified** (Open Library enabled; TMDB gated off). The **local**
-curated catalog migration owns **28** titles, while the **2026-09-01 hosted
-production observation** recorded **29** — the 28 curated titles plus the
-imported Open Library Work `OL893414W`, which resolves to the canonical **Dune**
-title (a point-in-time figure; importing TMDB titles after activation will
-change it). The app still builds and runs with **no** Supabase or provider
-environment variables set. The architecture is designed so the remaining pieces
-can drop in without rewriting the UI.
+## Live demo and screenshots
 
-**TMDB activation readiness & periodic refresh (implemented locally, not yet
-activated in production).** Provider gating/attribution are reconciled to the
-documented activation requirements, and a bounded, resumable periodic
-metadata-refresh worker (`scripts/refresh-catalog.mjs`) keeps imported
-provider-owned rows fresh and invalidates stale embeddings, behind the existing
-remote-write guard and an owner-gated scheduler. `TMDB_ENABLED` remains
-**false** in hosted production; activation is the owner-controlled procedure in
+- **Live deployment:** <https://favalog.vercel.app>
+- **Screenshots:** not yet committed. The v0 sandbox cannot run a browser, so
+  no screenshots have been captured from a real session. Phase 4E PR 2 adds
+  them from the CI Playwright run, so every image comes from the actual app
+  rather than a mock-up.
+
+## What Favalog does
+
+| Media type | Discovery and metadata source | Canonical identity    | Semantic search             |
+| ---------- | ----------------------------- | --------------------- | --------------------------- |
+| Movies     | TMDB                          | `tmdb` + `movie:<id>` | Yes (owner-permitted)       |
+| TV series  | TMDB                          | `tmdb` + `tv:<id>`    | Yes (owner-permitted)       |
+| Books      | Open Library                  | Open Library Work id  | Yes                         |
+| Games      | RAWG                          | `rawg` + numeric id   | **No**: keyword search only |
+
+The **RAWG limitation**: game discovery, import, and keyword search work, and
+title pages credit RAWG. Live semantic embedding of RAWG content is blocked in
+code (`RAWG_LIVE_EMBEDDING_PERMISSION_DOCUMENTED = false`) and by the
+`RAWG_EMBEDDING_ENABLED` flag until RAWG's permission is documented.
+
+### Current user journeys
+
+All of these are implemented and owner-confirmed in production:
+
+1. **Discover without searching.** Home and the empty-query Explore view show
+   provider-ranked shelves (Trending, New releases, Coming soon, Highest
+   rated) with an artwork-led hero. A failing provider hides only its own
+   shelves.
+2. **Search.** Explore runs hybrid search (Postgres full-text plus pgvector,
+   fused with Reciprocal-Rank Fusion) over the local catalog, alongside
+   federated provider results.
+3. **Save a discovered title.** Save materializes the title idempotently and
+   adds it to a list. Signed-out viewers sign in and return to the same card
+   with its picker open.
+4. **Create a list while saving.** "+ Create new list" is available whether
+   the user has no lists or several. If the list is created but the save
+   fails, retry re-runs only the save, so it never creates a duplicate list.
+5. **Related titles.** Title pages show titles linked by an explicit provider
+   relationship: the TMDB collection, the RAWG developer, or the Open Library
+   author.
+6. **The personal record.** Diary entries with optional reviews, lists with
+   public, followers-only, or private visibility, favorites, and profiles.
+7. **Social.** Follows, follower-only lists enforced by Row Level Security, a
+   following feed, and likes on reviews and lists.
+
+## Architecture
+
+- **Next.js 16 App Router** (React 19.2): Server Components by default,
+  Server Actions for mutations, and `proxy.ts` for session refresh only.
+- **Supabase**: Postgres with Row Level Security on every user table, SSR
+  cookie auth (`@supabase/ssr`), `SECURITY INVOKER` RPCs scoped to
+  `auth.uid()`, and forward-only migrations with generated types
+  (`lib/database.types.ts`).
+- **Catalog platform** (`lib/catalog/`): provider-neutral adapters for TMDB,
+  Open Library, and RAWG. Catalog writes go only through the `service_role`
+  `materialize_media_item(...)` RPC. Canonical aliases live in
+  `media_external_ids`.
+- **Discovery** (`lib/discovery/`): server-side provider reads with a shared
+  cache freshness window, page caps, and per-provider flags. Failures stay
+  isolated per shelf.
+- **Search**: hybrid retrieval with exact-title protection, a semantic
+  relevance cutoff, and provider-eligibility gates. It degrades to
+  keyword-only search when embeddings are unavailable.
+
+Further reading: [`docs/backend-architecture.md`](docs/backend-architecture.md),
+[ADRs](docs/adr/),
+[`docs/ai-discovery-system-card.md`](docs/ai-discovery-system-card.md), and
 [`docs/tmdb-activation-rollout.md`](docs/tmdb-activation-rollout.md).
 
----
-
-## Tech stack
-
-| Concern    | Choice                                                   |
-| ---------- | -------------------------------------------------------- |
-| Framework  | Next.js 16 (App Router, React Server Components)         |
-| Language   | TypeScript (strict)                                      |
-| UI         | React 19                                                 |
-| Styling    | Tailwind CSS v4 with CSS design tokens                   |
-| Icons      | `lucide-react`                                           |
-| Fonts      | Inter (sans), Fraunces (editorial serif), JetBrains Mono |
-| Linting    | ESLint (flat config, `eslint-config-next`)               |
-| Formatting | Prettier (+ `eslint-config-prettier`)                    |
-| Unit tests | Vitest + React Testing Library + jsdom                   |
-| E2E tests  | Playwright (Chromium)                                    |
-| Components | Storybook (`@storybook/nextjs-vite`) + a11y addon        |
-| Git hooks  | Husky + lint-staged                                      |
-| CI         | GitHub Actions                                           |
-
-No component library, no CSS-in-JS runtime, no state manager. Interactivity
-is opt-in via Client Components; every other component is a Server Component
-by default.
-
-### Local runtime
-
-This project standardizes on **Node.js 22 (LTS)** to match CI (GitHub Actions
-runs on Node 22) and the Vercel production runtime. The requirement is pinned
-in two places:
-
-- `.nvmrc` selects Node 22 — run `nvm use` (or `nvm install`) in the repo root
-  to switch your shell to the correct version.
-- `package.json` `engines` declares `"node": ">=22 <23"`, so `npm install`
-  warns if you are on a mismatched major.
-
-Node 22 provides the built-in `process.loadEnvFile()` used by the local
-tooling scripts (e.g. `scripts/embed-catalog.mjs`, `scripts/eval-search.mjs`)
-to read `.env.local`, so **no `dotenv` dependency is required**. If your shell
-resolves an older Node (for example an accidental system `/usr/local/bin/node`),
-run `nvm use` before invoking the npm scripts.
-
----
-
-## Project structure
-
-```
-app/                     App Router routes, layouts, and global styles
-  layout.tsx             Root layout — fonts, metadata, header, footer
-  page.tsx               Home page (hero collage; configured: the real From your circle following preview + an Explore the catalog shelf; no-env: clearly labelled example sections; Build your Favalog CTA)
-  globals.css            Tailwind entry + design tokens
-  explore/page.tsx       Explore — search, media-type filter, and editorial shelves
-  diary/page.tsx         Diary — unified newest-first log of watched / read titles with a media-type filter
-  lists/page.tsx         Lists — cross-media collection discovery index with curated sections and local search
-  list/[slug]/page.tsx   Individual list/collection page, keyed by the stable `List.slug`
-  title/[slug]/page.tsx  Unified movie / TV / book detail page, keyed by `MediaItem.slug`
-  profile/[username]/page.tsx  A person's Favalog — profile experience keyed by the stable `User.username`
-  not-found.tsx          Site-wide 404 for unmatched routes and `notFound()`
-
-components/
-  brand/                 Wordmark and brand-only assets
-  layout/                Site header, footer, primary nav, mobile nav
-  ui/                    Design-system primitives (Container, Badge,
-                         StarRating, RatingDisplay, SearchInput,
-                         SectionHeader, EmptyState, Skeleton)
-  media/                 MediaCard, MediaPoster, MediaTypeBadge,
-                         HorizontalMediaRow, MediaHero, MediaActions,
-                         MediaDetails, RatingBreakdown, FavoriteButton
-                         (real title-page favorite toggle)
-  activity/              ActivityCard used by the feed
-  diary/                 DiaryTimeline, DiaryEntry, DiarySummary, and the
-                         shared diary view-model/helpers
-  lists/                 Mock list UI (ListCard, ListPreviewCovers, ListItemRow,
-                         ListHeader, ListActions, ListSection, ListsBrowser) plus
-                         the wired real-list UI (RealListCard, RealListDetail,
-                         RealListItems, RealListsSections, CreateListDialog/Form,
-                         CreateListLauncher, AddToListDialog, RemoveListItemDialog,
-                         ShareListButton) and the shared list view-model/helpers
-  reviews/               ReviewCard
-  user/                  UserAvatar, ProfileStats, ProfileHeader,
-                         ProfileSection, FavoriteMediaGrid, FollowButton, and the wired
-                         real-profile UI (RealProfile with real Favorites,
-                         Follows, and Lists sections)
-  skeletons/             Media, activity/feed, and profile skeletons
-
-lib/
-  types.ts               Strongly typed domain models
-  site-config.ts         Centralized brand name, tagline, and site URL
-  cn.ts                  Class name joiner utility
-  data/                  Mock data layer (users, media, activity, diary, lists, profile, index)
-
-public/media/            Local SVG placeholder posters, backdrops, avatars
-
-scripts/
-  generate-placeholders.mjs   Regenerates the SVG placeholder artwork
-```
-
-### Data layer
-
-The UI **never** reads hard-coded arrays. It imports from `@/lib/data`, which
-is the sole entry point of the mock data layer. Replacing mock data with a
-real API later means replacing that module — the domain types stay identical.
-
-Every trackable title conforms to a shared `MediaItem` discriminated union
-(`Movie | TVShow | Book`) so cross-media UI (feed, lists, search) can be built
-once and reused.
-
----
-
-## Backend (Supabase) — foundation + authentication
-
-> **Current status: authentication + onboarding AND the full persistent
-> diary-entry lifecycle (create + edit + delete) are implemented on top of the
-> Supabase foundation; the rest of the product still uses mock data.** Sign up,
-> sign in, email confirmation, password reset, Google OAuth (optional),
-> session-aware navigation, and first-time profile onboarding are wired to
-> Supabase Auth. On a title page a signed-in, onboarded user can **Log / Rate /
-> Review** — each creates a diary entry (Review adds a linked review) through the
-> atomic `public.log_media(...)` RPC. The owner can then **edit** that entry
-> (via `public.update_diary_entry(...)` — including adding, updating, or removing
-> its linked review, and clearing its rating) or **delete** it (via
-> `public.delete_diary_entry(...)`, which also removes the linked review so no
-> orphan remains) from both the title's personal-state area and each row of
-> their real diary. That entry appears as the title's **personal state**, in the
-> user's real **`/diary`**, and on their real **`/profile/[username]`** (derived
-> stats, recently watched/read, and reviews); all three revalidate after every
-> create/edit/delete. A diary-linked review stores its rating as `null` by
-> design; its displayed rating resolves from the diary entry.
->
-> Signed-out visitors see a neutral **Log** primary action (never a personalized
-> "Watched"/"Read"), with Log/Rate/Review routing through the safe sign-in
-> `returnTo` flow, and `/diary` shows a clearly labelled **example diary** (never
-> presented as their own) with no edit/delete controls. The **persistent list
-> lifecycle** — create a list, add/remove titles, **edit list metadata**, and
-> **delete a whole list** (via `public.create_list` / `add_list_item` /
-> `remove_list_item` / `update_list` / `delete_list` with server-generated
-> globally-unique immutable slugs and `public`/`private` visibility) — is now
-> **wired end-to-end**: a real **Add to list** dialog on `/title/[slug]`, real
-> "Your lists" + "Community lists" sections and a "Create list" launcher on
-> `/lists`, real `/list/[slug]` detail (owner-only per-item removal, owner-only
-> edit/delete list controls, no faked likes), and a real **Lists** section on
-> `/profile/[username]`. The **persistent favorites loop** — favorite/unfavorite
-> a title on `/title/[slug]` (via the atomic idempotent
-> `public.set_favorite(...)` RPC) and see the ordered shelf on the owner's real
-> `/profile/[username]` — is now **wired end-to-end** too: a real
-> `FavoriteButton` toggle on the title page for signed-in viewers (signed-out
-> visitors get a neutral **Favorite** sign-in link) and a real **Favorites**
-> section on real profiles (visible to any visitor, since favorites are
-> publicly readable). **Drag-and-drop/arbitrary reordering, curator notes,
-> list likes, follower-aware visibility, arbitrary favorite reordering,
-> direct favorite-removal from the profile, and follows remain deferred**, and
-> the catalog / community reviews still render from the `@/lib/data` mock layer.
-> The generated database types (`lib/database.types.ts`) are real and
-> drift-checked, the catalog migration owns all **28** curated titles (hosted
-> production adds a 29th via the imported Open Library Work `OL893414W` →
-> canonical **Dune**), and `seed.sql` references that catalog and remains
-> **local only**.
-> The app still builds and runs with **no** Supabase environment variables set —
-> public browsing keeps working and the auth/logging entry points show a
-> controlled unavailable state.
-> See [Authentication & onboarding](#authentication--onboarding) below.
-
-Full detail lives in [`docs/backend-architecture.md`](docs/backend-architecture.md)
-and [`docs/adr/0001-supabase-backend.md`](docs/adr/0001-supabase-backend.md).
-
-### Layout
-
-```
-supabase/
-  config.toml           Supabase CLI project config
-  migrations/           Version-controlled SQL — the schema source of truth
-  seed.sql              Small deterministic local seed (movie/TV/book + relations)
-  tests/database/       pgTAP tests for constraints + RLS
-lib/
-  database.types.ts     Generated DB types (regenerate via npm run supabase:types)
-  supabase/
-    env.ts              Safe, non-throwing env access + validation
-    client.ts           Browser client (Client Components)
-    server.ts           Per-request cookie-aware server client
-    session.ts          Session-cookie refresh helper (used by proxy.ts)
-    mappers.ts          DB row -> domain model boundary (+ profile mapper)
-    profiles.ts         Public profile lookup selector (server-only)
-  auth/
-    data.ts             Server-only DAL: getCurrentUser/Profile, requireUser/…
-    validation.ts       Pure input validation + normalization
-    safe-redirect.ts    Same-origin-only return-to validation
-    errors.ts           Supabase error -> safe user-facing messages
-    capability.ts       Auth/Google availability detection
-    profile.ts          Profile-completeness rule
-    urls.ts             Trusted absolute-URL builder for callbacks/emails
-app/
-  auth/                 Sign in/up, forgot/update password, callback, confirm
-  onboarding/           First-time profile completion (account-only)
-proxy.ts                Root Proxy (Next.js 16) — session refresh + optimistic
-                        /onboarding redirect (NOT the security boundary)
-```
-
-### Environment variables
-
-Copy `.env.example` to `.env.local` (git-ignored) and fill in the values. None
-are required for the current mock-data app to build or run.
-
-| Variable                               | Exposure        | Notes                                       |
-| -------------------------------------- | --------------- | ------------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`             | browser+server  | Public project URL                          |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | browser+server  | Public publishable key (formerly "anon")    |
-| `NEXT_PUBLIC_SITE_URL`                 | browser+server  | Optional canonical origin for callback URLs |
-| `NEXT_PUBLIC_SUPABASE_GOOGLE_ENABLED`  | browser+server  | Optional `"true"` to show Google sign-in    |
-| `SUPABASE_SECRET_KEY`                  | **server only** | Privileged; future admin use; optional      |
-
-Never expose the secret key, database password, or privileged connection
-strings to browser code.
-
-### Local setup
-
-Requires **Docker** running. The Supabase CLI ships as a dev dependency.
+## Development setup
 
 ```bash
-npm run supabase:start     # start local stack (Postgres, Auth, Studio, …)
-npm run supabase:status    # print local URLs + keys → paste into .env.local
-npm run supabase:reset     # apply all migrations, then run seed.sql
-npm run supabase:types     # regenerate lib/database.types.ts from local DB
-npm run db:test            # run pgTAP schema + RLS tests
-npm run supabase:stop      # stop the local stack
+npm ci
+npm run supabase:start          # local Supabase stack (Docker)
+npm run supabase:reset          # apply migrations and seed
+npm run dev
 ```
 
-> `lib/database.types.ts` is **genuinely generated** from the local database by
-> `npm run supabase:types` and is guarded by a secret-free drift check
-> (regeneration must produce no diff). Regenerate it only when a migration
-> actually changes the schema; never hand-edit it.
-
-### Remote linking (later)
-
-```bash
-supabase login
-supabase link --project-ref <your-project-ref>
-supabase db push
-```
-
-Remote/PR CI does **not** require Supabase credentials.
-
-### Hosted verification status
-
-The hosted development project has been **deployed and verified** for the
-logging foundation, diary edit/delete, and the **full** persistent list
-lifecycle (create/add/remove **and** edit/delete). All **17** migrations through
-`20260814160200_edit_delete_list_rpcs.sql` are recorded in the remote
-`schema_migrations` ledger — no drift. Generated database types
-(`lib/database.types.ts`, via `npm run supabase:types`) are real and
-drift-checked (a second generation is byte-identical). Hosted RPC
-security/grant checks and production list behavior — including private-list
-non-disclosure, immutable-slug edits, and the authoritative post-delete redirect
-to `/lists` (the former list URL correctly becomes not-found; commit `53eac02`
-fixed the client-navigation race) have been confirmed. Migrations for the
-favorites loop (**18th**), AI Discovery (**19th��22nd**), and the relevance
-cutoff (**23rd**), the Catalog Platform v1A provider ingestion (**24th**), and
-the v1B canonical-identity migration (**25th**) are now **applied to hosted
-Supabase** as well: all **25** migrations through `20260815120600` are recorded
-in the remote `schema_migrations` ledger, and commit `2c9ab54` is **deployed to Vercel
-production** (status Ready; the current repository tip includes commits
-`77790be` and `d9453e5`). **AI Discovery v1 is production-active and verified**
-(2026-08-27): the owner-controlled guarded OpenAI backfill completed
-successfully, so the hosted embedding corpus
-(`public.media_search_documents`) now holds a complete, compatible corpus
-(provider `openai`, model `text-embedding-3-small`, `dimensions: 512`, document
-version `v1`) matching the catalog (28 curated locally; **29** in hosted
-production, including the imported Open Library Work `OL893414W` → canonical
-**Dune**), and **production semantic
-retrieval is enabled** — hybrid search runs on the deployed `/explore` and still
-degrades to keyword-only on any semantic failure. An earlier accidental hosted
-fake-embedding write was **cleaned up before** this guarded real backfill (no
-placeholder vectors remained). The read-only hosted corpus / provenance /
-compatible-corpus / security / idempotency checks all returned their documented
-expected results, and browser verification confirmed a sci-fi intent query
-returns relevant results while an out-of-catalog query returns the controlled
-"No matches yet" state. The local live evaluation (2026-08-25) remains the
-documented evidence of **semantic quality** and stays distinct from this
-hosted-database and production-browser verification. The remote-write guard
-(`npm run embed:catalog -- --allow-remote --confirm-project-ref=<ref>` with
-`OPENAI_API_KEY` set) **remains the required process** for any future production
-re-embedding.
-
-Historical note (2026-08-05): an earlier pass verified the first 8 migrations
-directly via read-only schema introspection plus disposable-account auth flows
-over the Supabase client, before CLI link/push was available in that
-environment. That pass found and fixed `handle_new_user()` casting `::citext`
-unqualified under a pinned empty `search_path` (citext lives in `extensions`);
-forward-only migration
-`20260805175500_fix_handle_new_user_citext_qualification.sql` qualifies the
-cast as `extensions.citext`. Auth was verified end-to-end against the hosted
-project (disposable accounts, cleaned up): automatic profile creation via the
-trigger, sign-in, wrong-password rejection, owner onboarding update,
-case-insensitive duplicate-username rejection, RLS cross-user-update block, and
-sign-out.
-
-- **Schema & migrations (current)**: all **25** migrations through
-  `20260815120600` are on hosted Supabase — tables, both enums (`media_kind`,
-  `list_visibility`), triggers/functions, constraints, indexes, RLS on every
-  table, diary RPCs, the full list create/add/remove **and** edit/delete RPCs,
-  the favorites RPC, the AI Discovery search schema/functions, the Catalog
-  Platform v1A provider-ingestion schema/RPC (`20260815120500`), and the v1B
-  canonical-identity alias table + resolving materializer (`20260815120600`)
-  match the intended owner-write / public-read (and private-embedding) model.
-- **Database types (current)**: `lib/database.types.ts` is **genuinely
-  generated** via `npm run supabase:types` and drift-checked; do not hand-edit
-  it. Regenerate only when a migration changes the schema.
-- **List management edit/delete (hosted)**: migration
-  `20260814160200_edit_delete_list_rpcs.sql` (the 17th — `public.update_list` /
-  `public.delete_list`) is **deployed and verified** on hosted Supabase; list
-  metadata editing (immutable slug), whole-list deletion, and the post-delete
-  redirect to `/lists` are live.
-- **Favorites (hosted)**: migration
-  `20260814160300_set_favorite_rpc.sql` (the 18th — `public.set_favorite`) is
-  **applied to hosted Supabase**. The `favorites` table and its RLS were laid
-  down earlier (`20260805150600` / `20260805150700`); this migration adds the
-  atomic idempotent write RPC.
-- **AI Discovery (hosted schema + corpus; production-active)**: the AI Discovery
-  migrations (`20260815120000`, `20260815120100`, `20260815120200`,
-  `20260815120300`, and the semantic cutoff `20260815120400` — the 19th–23rd)
-  are **applied to hosted Supabase**, and the hosted embedding corpus
-  (`public.media_search_documents`) is now **populated** by the owner-controlled
-  guarded OpenAI backfill (2026-08-27): a complete, compatible corpus (provider
-  `openai`, model `text-embedding-3-small`, `dimensions: 512`, document version
-  `v1`) matching the catalog (28 curated locally; **29** in hosted production,
-  including the imported Open Library Work `OL893414W`). An earlier accidental
-  hosted fake-embedding write was **cleaned up before** this real backfill (no
-  placeholder vectors remained). **Production semantic retrieval is enabled and
-  verified**: `compatible_embedding_count > 0` so the deployed `/explore` serves
-  hybrid results and still degrades to keyword-only on any semantic failure. The
-  read-only hosted corpus / provenance / compatible-corpus / security /
-  idempotency checks all returned their documented expected results, and browser
-  verification confirmed a sci-fi intent query returns relevant results while an
-  out-of-catalog query returns the controlled "No matches yet" state (the local
-  live evaluation, 2026-08-25, remains the distinct evidence of semantic
-  quality). Any future production re-embedding **must** repeat the
-  owner-controlled guarded backfill
-  (`npm run embed:catalog -- --allow-remote --confirm-project-ref=<ref>` with
-  `OPENAI_API_KEY` set); the remote-write guard rejects a `--fake` write to a
-  remote target (even with `--force`) and rejects a live remote write unless
-  **both** `--allow-remote` and a matching
-  `--confirm-project-ref=<exact-project-ref>` are supplied.
-
-- **Not exercised in the earliest hosted pass** (require a browser / real email
-  inbox / dashboard): the sign-up UI + email-confirmation link, browser
-  session-restore-on-refresh, the recovery email link, the Google OAuth consent
-  screen, and Vercel environment/deploy verification. Backend equivalents were
-  verified above.
-
----
-
-## Authentication & onboarding
-
-Phase 2 wires Supabase Auth into the app shell and adds a first-time onboarding
-flow. The rest of the product still renders from the `@/lib/data` mock layer;
-**persistent** user actions (logging, rating, reviewing, lists) remain out of
-scope. Everything degrades gracefully with no Supabase env: public browsing
-works and the auth entry points show a controlled "accounts aren't available
-yet" state.
-
-### What's implemented
-
-- Email/password **sign up** (display name, username, email, password) with
-  server-side validation and a "check your email" confirmation state.
-- Email/password **sign in** with a safe post-sign-in redirect.
-- **Email confirmation** and **password reset → update** via token-hash
-  verification (no deprecated implicit-flow fragments).
-- **Google OAuth** (PKCE) — optional, shown only when configured.
-- **Sign out**, session-aware header (signed-out controls vs. account menu).
-- First-time **onboarding** to complete a username + display name.
-- **Safe return-to** validation, and route protection for `/onboarding`.
-
-### Auth routes
-
-| Route                   | Kind          | Purpose                                        |
-| ----------------------- | ------------- | ---------------------------------------------- |
-| `/auth/sign-in`         | Page + Action | Email/password sign in (+ optional Google)     |
-| `/auth/sign-up`         | Page + Action | Create account with profile metadata           |
-| `/auth/forgot-password` | Page + Action | Request a reset email (neutral response)       |
-| `/auth/update-password` | Page + Action | Set a new password (recovery context required) |
-| `/auth/callback`        | Route Handler | OAuth/PKCE code exchange                       |
-| `/auth/confirm`         | Route Handler | Email confirmation / recovery token verify     |
-| `/onboarding`           | Page + Action | Complete profile (account-only)                |
-
-Sign out is a Server Action invoked from the header account menu.
-
-### Supabase dashboard configuration
-
-For a hosted project (Authentication → URL Configuration, and Providers):
-
-- **Site URL**: your canonical origin (e.g. `https://favalog.vercel.app`; locally
-  `http://127.0.0.1:3000`).
-- **Redirect URLs** (allow-list): `http://127.0.0.1:3000/**` for local, plus your
-  production and any Vercel preview origins you want to permit, e.g.
-  `https://favalog.vercel.app/**`. Prefer explicit origins over a broad wildcard;
-  a wildcard trades safety for preview convenience.
-- **Email templates**: point the confirmation and recovery links at
-  `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type={{ .Type }}&next=/onboarding`
-  (use `next=/auth/update-password` for the recovery template).
-- **Google provider**: create OAuth credentials in Google Cloud, set the
-  authorized redirect URI to `https://<project-ref>.supabase.co/auth/v1/callback`,
-  paste the client id/secret into Supabase, then set
-  `NEXT_PUBLIC_SUPABASE_GOOGLE_ENABLE Strue` to reveal the button. The client
-  secret lives only in Supabase — never in this repo.
-
-Local defaults live in `supabase/config.toml` (`[auth]` `site_url` +
-`additional_redirect_urls`).
-
-### Transitional profile behavior
-
-`/profile/[username]` is intentionally hybrid during this phase:
-
-- A **mock demo username** (e.g. `jamie`) renders the full mock profile exactly
-  as before.
-- A username that resolves to a **real Supabase profile** renders a minimal
-  real identity (name, @handle, bio, location, join date) with honest empty
-  states — a newly-registered user is **never** attributed a mock user's diary,
-  reviews, or lists.
-- Anything else is a genuine 404.
-
----
-
-## AI Discovery (catalog search)
-
-**AI Discovery v1** adds real, catalog-backed search to `/explore` over the
-**28** curated movies / TV / books. It is **retrieval, not generative AI** —
-every result is a real `media_items` row and **no** LLM-written text is
-produced. Two signals are fused: Postgres full-text search (lexical) and
-pgvector cosine similarity (semantic), combined with **Reciprocal-Rank Fusion**
-(`k = 60`) plus **exact-title protection** and a **semantic relevance cutoff**
-(maximum cosine distance `0.72`) so typing a title always returns that title
-first and low-quality matches are rejected.
-
-Full detail: [`docs/ai-discovery-system-card.md`](docs/ai-discovery-system-card.md)
-and [ADR 0003](docs/adr/0003-ai-discovery-hybrid-catalog-retrieval.md).
-
-## Catalog Platform (external-provider ingestion)
-
-**Catalog Platform v1A** is a server-only foundation (`lib/catalog/`) for
-trusted ingestion from external providers. It allows searching and importing
-movies/TV from **TMDB** and books from **Open Library** into the Favalog
-catalog.
-
-- **Trusted Materialization**: The server re-fetches and normalizes data from the
-  source; caller-supplied metadata is never trusted.
-- **Operator CLI**: Fail-closed `npm run catalog` (`search`, `inspect`, `import`)
-  with the same remote-write guards as the embedding pipeline.
-- **Identity**: Reuses stable `media_items (source, external_id)` identity;
-  TMDB uses kind-qualified IDs (e.g. `movie:603`) and Open Library uses stable
-  Work IDs.
-- **Rules**: TMDB attribution notice/logo required before user-facing results;
-  Open Library requires identifying contact email.
-- **Environment**: Requires server-only `TMDB_API_READ_TOKEN` and
-  `OPEN_LIBRARY_CONTACT_EMAIL` for live requests.
-
-**Catalog Platform v1B** adds a canonical-identity layer and **federated Explore
-discovery with on-demand materialization** on top of that foundation.
-
-- **Canonical identity + alias.** A forward-only `public.media_external_ids`
-  alias table plus the canonically-resolving `materialize_external_media(...)`
-  RPC ensure a provider result that is the **same real-world work** as an
-  existing (especially curated) title reuses that title's id and immutable slug
-  instead of creating a duplicate. Resolution is **conservative and
-  deterministic** (existing link → existing provider row → exact-normalized
-  title + kind + year, exactly one match → create new); an ambiguous match
-  **fails safe** and attaches nothing. It never uses fuzzy/semantic matching and
-  preserves community ratings and all user data.
-- **Federated Explore (behind a flag).** `/explore` runs local hybrid search
-  first, then — **only** for a committed non-empty query and **only** when the
-  server-only `EXTERNAL_CATALOG_ENABLED` flag is on, the provider's own flag
-  (`TMDB_ENABLED`, `OPEN_LIBRARY_ENABLED`) is on, **and** a provider is
-  configured — streams two separate, attributed sections: "More movies & TV"
-  (TMDB) and "More books" (Open Library). Providers are called **server-side
-  only**; external rankings are **not** blended into the local results; one
-  provider failing never hides local results or the other provider. With the
-  flag off/unset or no provider configured, `/explore` keeps its exact local-only
-  experience.
-- **On-demand import.** A signed-in, onboarded user can import an external
-  title; the Server Action submits **only** the provider, media kind, and
-  external id (never title/artwork/rating/credits), re-authenticates, and lets
-  the trusted server materializer re-fetch and normalize the data before
-  redirecting to `/title/[slug]`. The title page resolves materialized titles via
-  a server-only reader so Log/Rate/Review/Favorite/Add-to-list work unchanged.
-- **Provider attribution.** The mandatory TMDB notice ("This product uses the
-  TMDB API but is not endorsed or certified by TMDB.") and logo, plus an Open
-  Library credit, are shown with results. The in-repo TMDB logo
-  (`public/tmdb.svg`) is the official "blue_short" horizontal mark from TMDB
-  (retrieved 2026-08-31); the artwork is unmodified, with only non-rendering
-  Adobe Illustrator editor metadata (`data-name` layer labels) stripped so the
-  markup validates.
-- **Query privacy.** When federation is enabled, the raw search query **is sent
-  to TMDB / Open Library** to fetch results — the deliberate cost of federated
-  discovery. Favalog's own structured telemetry (`catalog_materialize`) still
-  carries only safe metadata (provider, operation, outcome, resolution, coarse
-  latency, retries, error category) and **never** the query text, ids, titles,
-  user email, credentials, or provider payloads.
-- **Eventual semantic embedding.** A materialized title is **keyword-searchable
-  immediately** and remains missing/stale for semantic embedding until the
-  guarded, owner-controlled `npm run embed:catalog` re-embeds it.
-
-The v1A operator ingestion path is unchanged. The canonical-identity migration
-(`20260815120600`) is now **applied to hosted Supabase and production-verified**
-(the 25th of 25 hosted migrations): federated Explore discovery and canonical
-on-demand materialization are enabled, the Open Library Work `OL893414W` has
-been imported into hosted production (resolving to the canonical **Dune** title,
-for **29** hosted titles vs. 28 curated locally), and `TMDB_ENABLED` remains
-**false** in production and must stay disabled pending owner licensing
-confirmation.
-
-### Features
-
-- Natural-language + keyword catalog search with a shareable `?q=` URL and
-  movie / TV / book filters, using the existing cross-media cards linking to
-  `/title/[slug]`.
-- Explicit submission (no paid request per keystroke) with loading / empty /
-  unavailable / safe-error states; raw similarity scores are never shown and the
-  feature is not advertised as AI-generated.
-- **Keyword search always works** — with no OpenAI key, the kill switch off, the
-  semantic path unavailable, or **no compatible embedding corpus** (the stored
-  vectors' provider / model / dimensions / document version don't match the
-  active query embedding), search falls back to keyword and the page never
-  fails. In that last case the app detects the mismatch cheaply and stays
-  keyword-only **without paying for a query embedding** (mode `keyword_fallback`,
-  reason `incompatible_corpus`); it never claims `hybrid` unless a compatible
-  semantic corpus was actually used. When Supabase is entirely unconfigured, the
-  existing no-env public browsing is preserved.
-- Embeddings use OpenAI `text-embedding-3-small` at `dimensions: 512`, generated
-  **server-side only** via the official `openai` SDK behind the
-  `EmbeddingProvider` seam; raw vectors are never exposed to the browser.
-
-### New scripts
-
-```bash
-npm run embed:catalog      # Generate/refresh catalog embeddings (local; service
-                           # role; re-embeds when the full embedding identity —
-                           # provider / model / dimensions / document version /
-                           # content — changes; --force re-embeds everything)
-npm run eval:search        # Run the offline search evaluation harness
-                           # (Recall@5, MRR, exact-title top-1, positive zero-result
-                           # rate, negative clean rate, per-category; nonzero exit)
-npm run catalog            # Search and import items from external providers
-                           # (TMDB, Open Library) into the local/remote catalog.
-                           # Subcommands: search, inspect, import.
-```
-
-`embed:catalog` and `catalog` target a **local** Supabase stack by default.
-`embed:catalog` needs `OPENAI_API_KEY`. A stored row is treated as unchanged only
-when the provider, model, dimensions, document version, **and** content hash all
-match what the current run would produce; `--force` is a recovery escape hatch.
-
-Writing to a **hosted** (remote) Supabase project is guarded. Both the
-embedding and catalog CLIs classify the resolved Supabase URL as local vs.
-remote and, for a remote target, always reject a `--fake` write (even with
-`--force`) and reject a live write unless the operator passes **both**
-`--allow-remote` **and** `--confirm-project-ref=<exact-project-ref>` matching
-the project reference in the resolved URL. `--force` never bypasses this
-guard; remote dry runs stay write-free and clearly label the remote target.
-The owner-operated hosted backfill
-used to enable production semantic search — and required for any future
-production re-embedding — is:
-
-```bash
-# With OPENAI_API_KEY set and the remote Supabase URL resolved:
-npm run embed:catalog -- --allow-remote --confirm-project-ref=<ref>
-```
-
-`eval:search` runs a deterministic **secret-free** mode
-(fixtures) and a **keyword baseline**; its **live hybrid** mode is gated on a local
-Supabase + `OPENAI_API_KEY`. It enforces quality gates: `minRecallAt5 = 0.55`,
-`minMrr = 0.6`, `minExactTitleTop1Accuracy = 1.0`, `maxPositiveZeroResultRate = 0.3`,
-and `minNegativeCleanRate = 0.8`. In `--live` mode it **fails closed** if any
-stale vector remains. **Live metrics (local, 28-title catalog, 2026-08-25):**
-Recall@5 0.921, MRR 1.000, exact-title top-1 1.000, positiveZeroResultRate 0.000,
-negativeCleanRate 0.800 (hybrid). Threshold check: PASS. These numbers are
-from **local** evaluation and remain the documented evidence of semantic
-quality.
-
-**Production state (2026-08-27):** AI Discovery v1 is **production-active and
-verified**, and so are Catalog Platform v1A/v1B. All **25** migrations (through
-`20260815120600`, including the v1A provider-ingestion and v1B
-canonical-identity migrations) are applied to hosted Supabase and commit
-`2c9ab54` is deployed to Vercel production (status Ready;
-the current repository tip includes commits `77790be` and `d9453e5`). The
-owner-controlled guarded OpenAI backfill (above) **completed successfully**, so
-the hosted embedding corpus (`public.media_search_documents`) now holds a
-complete, compatible corpus (provider `openai`, model `text-embedding-3-small`,
-`dimensions: 512`, document version `v1`) matching the hosted production catalog
-(**29** titles — 28 curated plus the imported Open Library Work `OL893414W`; 28
-curated locally); an earlier accidental hosted fake-embedding write was
-**cleaned up before** this
-real backfill. **Production semantic retrieval is enabled and verified:**
-`compatible_embedding_count > 0` so `/explore` serves hybrid results and still
-degrades to keyword-only on any semantic failure. The read-only hosted corpus /
-provenance / compatible-corpus / security / idempotency checks all returned
-their documented expected results, and browser verification confirmed a sci-fi
-intent query returns relevant results while an out-of-catalog query returns the
-controlled "No matches yet" state — distinct from the local live evaluation
-(2026-08-25) above, which remains the evidence of semantic quality. Any future
-production re-embedding **must** repeat the owner-controlled guarded backfill
-(above); the remote-write guard is never bypassed and never automatic.
-
-### Environment variables
-
-| Variable                     | Exposure        | Notes                                                                                         |
-| ---------------------------- | --------------- | --------------------------------------------------------------------------------------------- |
-| `OPENAI_API_KEY`             | **server only** | Secret; embeds the query for semantic search. Optional.                                       |
-| `SEMANTIC_SEARCH_ENABLED`    | **server only** | Kill switch; default enabled. Falsey disables semantic search.                                |
-| `TMDB_API_READ_TOKEN`        | **server only** | Secret; used for movie/TV ingestion. TMDB attribution required.                               |
-| `OPEN_LIBRARY_CONTACT_EMAIL` | **server only** | Identifying contact for book ingestion (User-Agent).                                          |
-| `EXTERNAL_CATALOG_ENABLED`   | **server only** | Global kill switch for federated Explore discovery; **off** by default.                       |
-| `TMDB_ENABLED`               | **server only** | Per-provider TMDB control; **off** by default. Keep off pending owner licensing confirmation. |
-| `OPEN_LIBRARY_ENABLED`       | **server only** | Per-provider Open Library control; **on** by default.                                         |
-
-Neither is required to build or run. With no `OPENAI_API_KEY` (or the kill
-switch off), catalog search runs **keyword-only**. `OPENAI_API_KEY` is never
-`NEXT_PUBLIC_`, never logged, and never sent to the browser.
-
-### Operations & observability
-
-AI Discovery emits privacy-preserving signals for operators and product:
-
-- **Server telemetry** — a versioned, closed `catalog_search` event per executed
-  search (mode, allow-listed kind, query **length**, result count, zero-result,
-  semantic-attempted / compatible-corpus indicators, embedding model + token
-  count, and the **separate** keyword / compatibility-check / embedding /
-  hybrid-database / total latencies, plus a safe error category and fallback
-  reason). Never the query text, title/slug, vectors, or user identity.
-  `semanticAttempted` is `true` only when a successful keyword path actually
-  enters the semantic upgrade, so a keyword-retrieval failure keeps it `false`.
-- **Aggregate product analytics** — two coarse Vercel Web Analytics events
-  (`explore_search`, `explore_result_selected`) carrying only mode, filter,
-  result kind, zero-result, and **bucketed** result-count / rank; analytics
-  failure never affects navigation or search. The root `<Analytics>` integration
-  is wrapped so its `beforeSend` hook strips the `?q=` parameter from every
-  analytics event URL (failing closed on an unparseable URL).
-- **Query privacy** — Favalog does **not intentionally write raw query text** to
-  its database, the `catalog_search` event, or custom product-event properties.
-  Because Explore uses a **shareable `?q=` URL**, the query still appears in the
-  browser address bar / history, and hosting infrastructure may process or
-  retain request search parameters per its configuration and retention policy;
-  that platform request metadata (including Vercel Runtime Logs) is distinct from
-  Favalog's application-owned telemetry and remains an owner/platform concern.
-- **Continuous evaluation in CI** — the secret-free seeded Explore integration
-  job runs the deterministic evaluation harness in JSON mode and uploads the
-  report as an artifact, honestly labelled deterministic integration/regression
-  evidence (not live semantic-quality evidence).
-- **Rollback** — set `SEMANTIC_SEARCH_ENABLED` to a falsey token to disable the
-  paid semantic path immediately; keyword search keeps working.
-
-Metric formulas, initial SLOs/guardrails, investigation playbooks, and the
-guarded re-embedding procedure are in the
-[operations runbook](docs/ai-discovery-operations.md). Vercel dashboards,
-alerts, and retention are an **owner task** — this repo only emits the events.
-
----
-
-## Commands
-
-```bash
-npm install                # Install dependencies (also sets up Husky hooks)
-
-# Development
-npm run dev                # Start the dev server on http://localhost:3000
-npm run build              # Production build
-npm run start              # Serve the production build
-
-# Static quality
-npm run lint               # ESLint (code quality)
-npm run typecheck          # TypeScript (tsc --noEmit)
-npm run format             # Prettier — write
-npm run format:check       # Prettier — check only
-
-# Unit / component tests
-npm run test               # Vitest (single run)
-npm run test:watch         # Vitest (watch mode)
-npm run test:coverage      # Vitest with coverage report
-
-# End-to-end tests
-npm run test:e2e           # Playwright against a production build (all suites)
-npm run test:e2e:social    # Following-feed journey only (loopback Supabase)
-npm run test:e2e:ui        # Playwright interactive UI mode
-
-# Component development
-npm run storybook          # Storybook dev server on http://localhost:6006
-npm run build-storybook    # Static Storybook build
-
-# Aggregate gates
-npm run validate           # format:check + lint + typecheck + test
-npm run validate:full      # validate + build + test:e2e
-
-# Supabase / database (require Docker; see the Backend section above)
-npm run supabase:start     # Start the local Supabase stack
-npm run supabase:status    # Print local URLs + keys
-npm run supabase:reset     # Re-apply migrations, then run seed.sql
-npm run supabase:types     # Regenerate lib/database.types.ts from the local DB
-npm run supabase:stop      # Stop the local stack
-npm run db:test            # Run pgTAP schema + RLS tests
-
-# AI Discovery (catalog search; see the AI Discovery section above)
-npm run embed:catalog      # Generate/refresh catalog embeddings (local; needs
-                           # a local Supabase stack + OPENAI_API_KEY)
-npm run eval:search        # Run the offline search evaluation harness
-```
-
-To regenerate the placeholder artwork after editing the mock catalog:
-
-```bash
-node scripts/generate-placeholders.mjs
-```
-
----
-
-## Quality & testing
-
-Favalog ships with a layered quality stack. Each tool owns one concern and
-they are wired together so `npm run validate` is a reliable local gate.
-
-| Tool                      | Role                                                                                    |
-| ------------------------- | --------------------------------------------------------------------------------------- |
-| **ESLint**                | Code quality (flat config, `eslint-config-next`)                                        |
-| **TypeScript**            | Strict static types (`npm run typecheck`)                                               |
-| **Prettier**              | Formatting only; `eslint-config-prettier` disables ESLint's overlapping stylistic rules |
-| **Vitest**                | Unit + component test runner (jsdom, `@/*` alias via `vite-tsconfig-paths`)             |
-| **React Testing Library** | Component testing via accessible queries (`@testing-library/jest-dom`, `user-event`)    |
-| **Playwright**            | End-to-end user flows against the production build (Chromium)                           |
-| **Storybook**             | Isolated component states, visual review, accessibility (`@storybook/addon-a11y`)       |
-| **Husky + lint-staged**   | Pre-commit: Prettier + ESLint on staged files only                                      |
-| **GitHub Actions**        | CI: format, lint, typecheck, unit tests, build, Storybook build, E2E                    |
-
-### Testing strategy
-
-- **Unit tests** cover deterministic domain/data logic in `lib/` — selectors,
-  search matching, filtering, related-media, and rating math. These are the
-  highest-value tests and are exercised directly (see `lib/**/*.test.ts`).
-- **React Testing Library** covers interactive and conditional Client
-  Components (Explore search/filter, Diary filtering, MobileNav, cards, and
-  rating displays). Tests assert observable behavior through accessible
-  queries — never internal state or class names.
-- **Playwright** covers complete user journeys (home → explore → title,
-  search, media-type filtering, movie vs. book detail, the custom 404, the
-  diary, the following-feed journey — follow → feed → edit → delete → unfollow,
-  which runs in its own loopback-only `social` suite, the lists flow — index →
-  list → title, list search, and the
-  invalid-list-slug 404, the profile flow — profile, derived statistics,
-  favorite title, one of the user's lists, and the unknown-username 404, and
-  the secret-free auth flow — signed-out header, sign-in/up/forgot pages render
-  accessibly, the controlled no-config state, and `/onboarding` not being
-  publicly reachable) against `next build` + `next start`, using semantic
-  locators.
-- **Local-only E2E isolation.** Every mutation-capable Playwright suite (the
-  ordinary `configured` suite, the `social` following-feed suite, and the
-  Catalog Platform v1B `fixtures` / `fixtures-prod-reject` suites) runs **only**
-  against a local loopback Supabase
-  stack. The protected runner `scripts/run-e2e-local.mjs` resolves LOCAL
-  credentials from the running stack (`supabase status`) or an explicitly
-  ignored `.env.e2e.local` and, via the shared guard
-  `scripts/lib/local-supabase-target.mjs`, hard-verifies the target is loopback
-  **before** building, starting Next.js, or executing tests — it never reads the
-  hosted `.env.local`, and there is no override that permits a hosted target.
-  The `no-env` suite (`scripts/run-e2e-no-env.mjs`) explicitly removes
-  Supabase/provider credentials. Start the stack with `npm run supabase:start`
-  before running these suites. Each suite resets the database first, so the
-  `social` and `fixtures` journeys never race over the shared social accounts;
-  a credential-free invocation of the `social` suite skips honestly (with a
-  GitHub `::notice::` annotation in CI) instead of failing confusingly, while a
-  hosted or half-configured target still fails loudly. CI runs the suite for
-  real in the secret-free `social-integration` job against a throwaway local
-  Supabase stack.
-- **Storybook** documents genuine component states (media/review/activity
-  cards, badges, ratings, empty states) on the Favalog dark theme and provides
-  an accessibility panel for visual/a11y review.
-
-Async App Router **Server Components** are intentionally _not_ forced into the
-unit toolchain (Vitest does not support them cleanly). Their underlying data
-logic is unit-tested and their rendered routes are covered by Playwright.
-
-### Coverage
-
-`npm run test:coverage` uses the V8 provider with thresholds of **70%**
-statements / lines / functions and **60%** branches. Coverage is scoped (via
-`vitest.config.mts` `coverage.include`) to the deterministic domain logic and
-the interactive/conditional components that are actually tested, so the numbers
-stay meaningful rather than diluted by purely presentational or
-Server-Component-only surfaces (which are covered by Playwright instead).
-
-### Contributing standard
-
-New work should include quality coverage **where it adds real value** — the
-rule is _not_ "every component needs a test and a story". Use this guide:
-
-| Change                                         | Expected coverage              |
-| ---------------------------------------------- | ------------------------------ |
-| New deterministic business/domain logic        | Unit tests (Vitest)            |
-| New interactive component                      | RTL tests                      |
-| New reusable visual component with real states | Storybook stories              |
-| New critical user flow                         | Playwright E2E                 |
-| Bug fix                                        | Regression test when practical |
-
-Do not add test-only IDs or snapshots to hit a number; prefer accessible,
-behavior-focused assertions.
-
----
-
-## MVP scope (current)
-
-The current implementation covers the **application shell, shared UI layer,
-and fully built Home, Explore, Diary, Lists, title-detail, list-detail, and
-profile experiences**:
-
-- Design system: dark-first tokens, editorial typography, accent color
-- Root layout with deployment-aware SEO metadata and Open Graph tags,
-  centralized in `lib/site-config.ts`
-- Responsive top navigation: wordmark, primary nav, search field,
-  notifications, a profile avatar linking to the current viewer's
-  `/profile/[username]`, and a dedicated mobile sheet
-- Reusable primitives: `Container`, `Badge`, `StarRating`, `RatingDisplay`,
-  `SearchInput`, `SectionHeader`, `EmptyState`, `Skeleton`
-- Media components: `MediaCard`, `MediaPoster`, `MediaTypeBadge`,
-  `HorizontalMediaRow`, `ExploreDiscovery`
-- Social components: `ActivityCard`, `ReviewCard`, `UserAvatar`,
-  `ProfileStats`, `ProfileHeader`, `ProfileSection`, `FavoriteMediaGrid`
-- Loading states: `MediaCardSkeleton`, `MediaRowSkeleton`,
-  `ActivityCardSkeleton`, `FeedSkeleton`, `ProfileSkeleton`
-- Typed domain models: `User`, `MediaItem`, `Movie`, `TVShow`, `Book`,
-  `Review`, `Rating`, `List`, `ActivityItem`, `DiaryEntry`, `Favorite`,
-  `CurrentlyEnjoying` (both `MediaItem` and `List` carry a stable `slug`,
-  distinct from the display title; `User` carries a stable `username`,
-  distinct from the display name)
-- Mock data layer at `lib/data`
-- Home page composed of a hero (with a mixed movie / TV / book collage) and,
-  when Supabase is configured, only truthful sections: the real **From your
-  circle** following-feed preview (`getFollowingFeedPreview`, "View all" →
-  `/feed`) with its distinct signed-out / following-nobody / no-activity /
-  error states, plus one honest **Explore the catalog** shelf from the real
-  browse reader (omitted when it reports unavailable or error — mock activity
-  is never substituted). Trending / popular / "Because you liked …" claims are
-  gone; in a no-environment build the mock rows remain as clearly labelled
-  **Example** sections. A closing **Build your Favalog** CTA ends the page.
-
-### Primary navigation
-
-| Route                 | Status                                                                                                                                                                                                                                            |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/`                   | Implemented (home)                                                                                                                                                                                                                                |
-| `/explore`            | Implemented — local search, All / Movies / TV / Books filter, editorial shelves                                                                                                                                                                   |
-| `/diary`              | Implemented — unified newest-first diary of movies, TV, and books, grouped by month, with All / Movies / TV / Books local filtering and a derived activity summary                                                                                |
-| `/lists`              | Implemented — server-first index with a "Create list" launcher, real "Your lists" + strictly-`public` "Community lists" sections, and clearly-labelled curated example sections with lightweight local search                                     |
-| `/list/[slug]`        | Implemented — resolves a real list first (`getRealListBySlug`, globally-unique slug) then falls back to mock demonstration lists; real detail renders stored contents by position, owner-only per-item removal, and Share (no faked likes)        |
-| `/title/[slug]`       | Implemented — unified detail page for movies, TV, and books with adaptive credits, community rating breakdown, popular reviews, and cross-media "More like this"                                                                                  |
-| `/profile/[username]` | Implemented — a person's Favalog profile keyed by the stable `User.username`: identity header, derived taste statistics, favorites, currently enjoying, recently watched/read, recent reviews, lists, and recent activity (e.g. `/profile/jamie`) |
-
-Movies, TV, and books are **not** top-level destinations. They are media
-types that will be filtered inside `/explore`.
-
-### Explore
-
-`/explore` is the primary discovery surface for movies, TV, and books.
-
-- **Local search.** The interactive search field filters the mock catalog
-  as the user types, matching against title, subtitle, the credit
-  appropriate to each kind (director for movies, creators for TV,
-  authors for books), and genre tags. The searchable "haystack" for each
-  `MediaItem` is built in `lib/data` via `searchTermsFor` and pre-joined
-  on the server so the Client Component never has to understand which
-  discriminant carries which credit.
-- **Media-type filter.** All / Movies / TV / Books, implemented as
-  `aria-pressed` toggle buttons. `All` is the default. The filter also
-  applies while a search query is active, so results always respect both
-  axes.
-- **Editorial shelves.** When no search query is active, Explore renders
-  Trending now (mixed), Popular movies, Popular books, Popular
-  television, Critically acclaimed, New & noteworthy, and Hidden gems.
-  Every shelf is derived from the existing mock catalog via helpers in
-  `lib/data` (`getTrendingMedia`, `getPopular*`, `getCriticallyAcclaimed`,
-  `getNewAndNoteworthy`, `getHiddenGems`), which keeps the UI free of any
-  storage-shape assumptions.
-- **URL state.** Search and filter mirror to the URL as `?q=…&type=…`
-  via a debounced `router.replace`. Sharing `/explore?q=dune&type=book`
-  restores the same view; `type=all` is omitted so the default URL stays
-  clean.
-- **Server-first.** Only the search input, filter toggles, and their
-  results grid are a Client Component (`ExploreDiscovery`). The page
-  header and every editorial shelf render as Server Components using the
-  shared `HorizontalMediaRow` and `MediaCard`.
-- **Mock-data limitations.** The catalog is intentionally small; "trending"
-  is a deterministic interleave, "popular" sorts by `averageRating`, and
-  "hidden gems" is a curated id list in the data layer. All of these are
-  drop-in replaceable once a real backend exists.
-
-### Diary (`/diary`)
-
-`/diary` is the personal, chronological record of everything a user has
-watched and read. Movies, TV, and books share **one** newest-first timeline —
-there are no per-kind diary routes.
-
-- **Unified log-entry model.** A typed `DiaryEntry` (`lib/types.ts`) has
-  stable identity and references media by `mediaId` and any review by
-  `reviewId` — never embedding a full `MediaItem` or duplicating review
-  bodies. Deterministic mock entries spanning several months of 2026 live in
-  `lib/data/diary.ts` alongside selectors: `getDiaryEntriesForUser`,
-  `getDiaryEntryMedia`, `getDiaryEntriesByType`, and `getDiarySummary`.
-- **Derived activity summary.** The restrained summary strip (total logged
-  this year plus a films / series / books breakdown) is computed from the
-  diary itself via `getDiarySummary`, so the counts can never drift from the
-  log. It is intentionally a single line, not a stats dashboard.
-- **Month-grouped timeline.** Entries are grouped by month and ordered newest
-  first. Each row shows the date, cover artwork, title, year, media type, the
-  action taken (watched / rewatched / read / reread), the user's rating if
-  present, and a small review indicator with a one-line excerpt when a review
-  exists. Both artwork and title link to `/title/[slug]`. Dates are formatted
-  with native `Intl.DateTimeFormat` — no date library was added.
-- **Local media-type filtering.** All / Movies / TV / Books, implemented as
-  `aria-pressed` toggle buttons (`All` is the default). Filtering runs
-  entirely on the client against the already-resolved entries and mirrors to
-  the URL as `?type=…` via `router.replace`; `type=all` is omitted so the
-  default URL stays clean. Each empty filter shows concise copy
-  (e.g. "No books logged yet.").
-- **Server-first.** The page resolves every `DiaryEntry` into a flat,
-  serializable view model on the server (looking up media and review by id),
-  so the only Client Component (`DiaryTimeline`) filters the array it is given
-  and never touches the data layer. The header, summary, and entry rows
-  otherwise render as Server Components.
-- **Responsive & accessible.** A single `h1`, month headings as `h2`, a
-  responsive list/timeline (no wide desktop table) with compact artwork and a
-  readable date rail on mobile, meaningful link names, `aria-pressed` filter
-  state, visible focus rings, and screen-reader-friendly star ratings.
-
-### Lists (`/lists` and `/list/[slug]`)
-
-Lists let people organize and share **cross-media** collections of movies, TV,
-and books. A single list may freely mix all three kinds — there is deliberately
-no per-kind list system. The **persistent list loop** (create → add title →
-view → see on the owner's profile → add/remove) is now wired to Supabase; the
-curated mock sections remain as clearly-labelled editorial examples alongside
-the real content.
-
-- **Typed list model.** A `List` (`lib/types.ts`) has stable identity and a
-  stable `slug` (distinct from the display `title`, so renaming never breaks a
-  URL). It references its titles by an **ordered** `mediaIds` array and never
-  embeds a full `MediaItem`; when `isRanked`, that order is the ranking. It also
-  carries a `description`, a sparse per-title `notes` map, `createdAt` /
-  `updatedAt`, a `likeCount`, and a reserved `visibility` field for a future
-  access model. Mock lists and their selectors live in `lib/data/lists.ts`:
-  `getLists`, `getListBySlug`, `getListById`, `getListsByUser`, `getListMedia`,
-  `getListItemNote`, `getListOwner`, `getPopularLists`,
-  `getRecentlyUpdatedLists`, `getFeaturedLists`, `getListsFromCircle`, and
-  `listSearchTermsFor`. All storage-shape knowledge stays in the data layer.
-- **Mixed-media by design.** Movies, TV, and books share **one** `ListItemRow`
-  renderer and **one** `ListCard`. There is no `MovieListCard` / `BookListCard`
-  fork; the shared `MediaItem` union drives everything, and every list item and
-  card links to the existing `/title/[slug]` and `/list/[slug]` routes.
-- **Real list surfaces (`/lists`).** The index is server-first. Its header
-  carries a **Create list** launcerr (`create-list-launcher.tsx`): signed-in →
-  a `CreateListDialog`; signed-out → a sign-in link with `returnTo=/lists`;
-  no-env → a controlled unavailable state. Real sections (`real-lists-sections.tsx`)
-  render the signed-in user's **Your lists** (`getMyLists`, public + private,
-  with private status shown and an honest empty / read-error state — never a
-  mock fallback) and a strictly-`public` **Community lists** section
-  (`getPublicLists`, real owner / title / description / item count / ranked /
-  updated date, never private, never a fabricated cover or like count). Real
-  lists use `real-list-card.tsx`.
-- **Curated example sections.** The former Popular, From your circle, Recently
-  updated, and Staff picks sections remain but are relabelled as **curated
-  examples**, so mock likes / owners / follows are never presented as live
-  activity. The only Client Component on the index (`ListsBrowser`) still filters
-  **only** the curated mock content by title, description, or creator against a
-  server-built haystack (real and curated content are kept separate) — no tags,
-  advanced filtering, search library, or URL state.
-- **List detail (`/list/[slug]`).** The route resolves a **real** list first via
-  `getRealListBySlug` (globally-unique slug, deterministic), falling back to mock
-  demonstration lists. Private / unauthorized / unknown real lists resolve to
-  not-found through RLS and fall through **without disclosing existence**. Real
-  detail (`real-list-detail.tsx`) renders the stored title, description, owner,
-  visibility, ranked flag, and updated date over the items ordered by stored
-  `position` (1-based ranks when ranked, poster fallback when `posterUrl` is
-  empty), each linking to `/title/[slug]`. The owner sees a per-item **Remove
-  from list** control with an explicit confirmation naming both the title and the
-  list (`remove-list-item-dialog.tsx`); non-owners see no mutation controls.
-  Share is preserved; there is **no** mock Like toggle and **no** fake zero-like
-  counter on a real list. Mock demonstration lists keep the legacy `ListHeader` /
-  `ListItemRow` presentation (ranks, curator notes, presentation-only Like /
-  Share). Unknown slugs call `notFound()` and render the site-wide 404.
-
-### Title detail (`/title/[slug]`)
-
-One route serves every `MediaItem` kind — no separate `/movie`, `/tv`, or
-`/book` trees. The URL is keyed on the stable `MediaItem.slug` so display
-titles can change without breaking links. Invalid slugs use Next.js
-`notFound()` and render `app/not-found.tsx`.
-
-- **Media-type-specific rendering.** `MediaHero` and `MediaDetails` narrow on
-  the discriminated `MediaItem` union so each kind only shows the fields
-  that logically belong to it: director / runtime / cast for movies;
-  creators / seasons / episode count / run status for TV; author(s) / page
-  count / publisher for books. The page structure is shared; only these
-  small components specialize.
-- **Dynamic metadata.** `generateMetadata` is per-title: page title,
-  description, Open Graph title/description/url/image, and Twitter card
-  are all derived from the item's own data. URLs are built from
-  `lib/site-config.ts` (no hard-coded canonical domain).
-- **Community rating.** `RatingBreakdown` renders the average, rating
-  count, and a semantic 5-row histogram. Counts and percentages are
-  visible text — bar width alone never carries the meaning. The
-  underlying distribution is produced by `getRatingDistribution` in
-  `lib/data`, which synthesises a deterministic bell-shaped histogram
-  from the item's `averageRating` so no per-user rating rows are needed
-  in the mock catalog.
-- **Popular reviews.** Reviews are looked up through `getReviewsForMedia`
-  and resolved to users via the shared mock user layer, then rendered
-  with the existing `ReviewCard`. When a title has no reviews the
-  section falls back to `EmptyState` rather than fabricating content.
-- **Cross-media "More like this".** `getRelatedMedia` prefers curated
-  relationships in `recommendationShelves` and falls back to a
-  deterministic same-genre / rating-ordered walk across the full
-  catalog. Related items intentionally may span films, series, and
-  books, and always link back to `/title/[slug]` through the existing
-  `MediaCard`.
-- **Actions.** For a signed-in, onboarded viewer, **Log / Rate / Review** open
-  one shared accessible dialog and persist through `logTitleAction` →
-  `public.log_media(...)`. When the viewer has already logged the title, their
-  latest **personal state** (verb, date, rating) is shown with owner-only
-  **Edit** and **Delete** controls (`update_diary_entry` / `delete_diary_entry`).
-  The primary action reads **Log** (or **Log again** once logged) — never a
-  personalized "Watched"/"Read" for a signed-out visitor. Signed-out
-  Log/Rate/Review are real links into the safe sign-in `returnTo` flow.
-- **Add to list.** The control is now real. A signed-out visitor gets a sign-in
-  link through the safe `returnTo` flow (copy mentions adding titles to lists).
-  A signed-in, onboarded viewer opens an `AddToListDialog` loaded via
-  `getMyListsWithMembership(slug)` that lists each owned list (title, item count,
-  public/private, ranked, and whether the title is already included) with
-  idempotent add/remove toggles, an inline create-list that creates the list and
-  adds the title atomically (via `mediaSlug`), and a link to the affected list
-  after success. When the catalog slug is unknown (`mediaKnown: false`) or a read
-  error occurs it shows a controlled unavailable state.
-- **Favorite.** The control is now real. A signed-in viewer gets a real
-  `FavoriteButton` toggle (Heart icon, `aria-pressed`, a pending/disabled state
-  that prevents duplicate submissions) that persists through `setFavoriteAction`
-  → `public.set_favorite(...)` and reflects server truth (never an optimistic
-  value). A signed-out visitor gets a neutral **Favorite** sign-in link (never a
-  personalized "Favorited") through the safe `returnTo` flow. The state is loaded
-  on the server (`getMyFavoriteState(slug)`) for authenticated viewers.
-
-### Profile (`/profile/[username]`)
-
-A person's Favalog profile is their entertainment identity in one editorial,
-single-`h1` page. The route is keyed on the stable `User.username` (distinct
-from the mutable `displayName`), so `/profile/jamie` is the primary demo
-(Jamie DeMarco). Unknown usernames call `notFound()` and render the site-wide 404. The app-shell avatar links here for the mock current viewer.
-
-- **Stored identity vs. derived statistics.** `User` stores only identity
-  (`username`, `displayName`, `avatarUrl`, `bio`, optional `location`,
-  `joinedAt`, follower/following counts). Every headline statistic — movies
-  watched, shows watched, books read, reviews, lists, and average rating — is
-  **derived** from the existing diary, reviews, and lists via
-  `getUserProfileStats` in `lib/data/profile.ts`, never hardcoded, so the
-  numbers can never drift from the underlying records.
-- **Data layer.** Profile selectors live behind `@/lib/data`:
-  `getUserByUsername`, `getCurrentUser`, `getUserFavorites`,
-  `getUserCurrentlyEnjoying`, `getReviewsByUser`, `getActivityForUser`,
-  `getUserProfileStats`, `getUserRecentlyWatched`, `getUserRecentlyRead`, and
-  `getUserRecentActivity`. Favorites and "currently enjoying" are thin,
-  ordered `Favorite` / `CurrentlyEnjoying` records that reference media by
-  `mediaId` — no media, review, list, diary, or activity data is duplicated.
-- **Sections.** A cinematic `ProfileHeader` (avatar, name, `@username`, bio,
-  location, join date, follower/following counts, decorative cover collage,
-  and a presentation-only **Edit profile** action for the current viewer),
-  a restrained derived-statistics band (`ProfileStats`), a prominent
-  cross-media **Favorites** shelf (`FavoriteMediaGrid`), **Currently
-  enjoying**, **Recently watched** / **Recently read** rows drawn from the
-  diary, **Recent reviews** (`ReviewCard`, `EmptyState` when none), **Lists**
-  (`ListCard` with a "Browse all lists" link), and a lightweight **Recent
-  activity** feed (`ActivityCard`). Sections are composed with focused
-  `ProfileHeader`, `ProfileSes ion`, and `FavoriteMediaGrid` components rather
-  than one enormous page.
-- **Real lists on real profiles.** A **real** Supabase profile now shows a real
-  **Lists** section and list count from `getRealListsForUser` (public-only for
-  visitors, all for the owner via RLS, with private lists visually identified
-  for the owner). A real profile never inherits mock lists; **mock demo
-  profiles** keep their mock list data.
-- **Real favorites on real profiles.** A **real** Supabase profile now shows a
-  real **Favorites** section ordered by position from `getRealFavoritesForUser`
-  (cross-media `MediaCard`s linking to `/title/[slug]`, honest owner/visitor
-  empty states, a controlled read-error state). Favorites are publicly readable,
-  so they appear for any visitor; only the owner can change them (from the title
-  page this phase). A real profile never inherits mock favorites; **mock demo
-  profiles** keep their mock favorites.
-- **Dynamic metadata.** `generateMetadata` derives the title
-  (`Display Name (@username)`), description (the bio), and Open Graph / Twitter
-  tags from the user, with the canonical URL built from `lib/site-config.ts`.
-- **Editing is out of scope.** Beyond the wired list and favorites surfaces,
-  profile editing, avatar uploads, arbitrary favorite reordering, direct
-  favorite-removal from the profile, and following/unfollowing remain out of
-  scope — the rest of the mock profile experience is read-only against the mock
-  data layer.
-
----
-
-## Future architecture direction
-
-- **Backend / data**: swap `lib/data` for a fetcher that returns the same
-  types (server actions and/or a REST/GraphQL client). Domain types and UI
-  components stay unchanged.
-- **Authentication**: session/identity provider (e.g. Auth.js) wired into
-  Server Components via `cookies()`; no client-side auth state.
-- **Media metadata**: integrate real catalogs (e.g. TMDB, OpenLibrary) behind
-  the `MediaItem` type so the UI keeps working through the transition.
-- **Activity, diary & lists**: persist per-user activity, diary/log entries,
-  follows, and lists in a database, keyed to the authenticated user; the feed
-  and diary become real queries rather than static arrays. Diary write actions
-  (log / rate / review a title) are intentionally out of scope until the write
-  path and authentication exist.
-- **Reviews & ratings**: server actions for create/update; optimistic UI in
-  the few Client Components that need it.
-- **Recommendations & stats**: derived views built on top of activity —
-  intentionally out of scope until the write path exists.
-- **Search**: full-text search over `MediaItem` served from the backend. The
-  header's `SearchInput` is presentation-only for now.
-- **Canonical domain**: the site URL is resolved in `lib/site-config.ts` from
-  `NEXT_PUBLIC_SITE_URL`, then Vercel's `VERCEL_URL`, then
-  `http://localhost:3000` in development, falling back to the current
-  deployment at `https://favalog.vercel.app`. When a production domain
-  (e.g. `favalog.com`) is chosen and owned, either set
-  `NEXT_PUBLIC_SITE_URL` at deploy time or update the fallback in
-  `lib/site-config.ts`.
-
----
-
-## Notes
-
-- Placeholder artwork is generated SVG under `public/media/`. When the app is
-  wired to a real catalog, replace these with remote URLs and add the host to
-  `images.remotePatterns` in `next.config.ts`.
-- The app is dark-only for now. A light theme can be added later by swapping
-  the CSS custom properties in `app/globals.css`.
-  apping
-  the CSS custom properties in `app/globals.css`.
+The app builds and renders with **no** environment variables. Without Supabase
+it runs in no-env mode, and curated demo content is labelled as an example
+catalog. To enable providers, set the server-only flags `EXTERNAL_CATALOG_ENABLED`,
+`TMDB_ENABLED` with `TMDB_API_READ_TOKEN`, `OPEN_LIBRARY_ENABLED`, and
+`RAWG_ENABLED` with `RAWG_API_KEY`. Code defaults are described in
+[`docs/backend-architecture.md`](docs/backend-architecture.md#environment-variables).
+Defaults are not deployment state.
+
+Operator scripts: `npm run catalog` (import), `npm run refresh:catalog`,
+`npm run embed:catalog`, and `npm run eval:search`.
+
+## Verification approach
+
+| Check                                         | Command                              | Runs in CI                                                 |
+| --------------------------------------------- | ------------------------------------ | ---------------------------------------------------------- |
+| Format, lint, typecheck                       | `npm run validate`                   | Yes                                                        |
+| Unit and component tests (Vitest, coverage)   | `npm run test:coverage`              | Yes                                                        |
+| Schema and RLS tests (pgTAP)                  | `npm run db:test`                    | Yes (local Supabase)                                       |
+| Generated types drift                         | `npm run supabase:types`             | Yes                                                        |
+| Playwright `default` and `no-env`             | `npm run test:e2e:no-env`            | Yes                                                        |
+| Seeded Explore journeys                       | `npm run test:e2e:configured`        | Yes (local Supabase)                                       |
+| Quality baseline (performance and a11y lab)   | runs inside the `default` project    | Yes; evidence in the `playwright-report` artifact          |
+| `@fixtures` (offline provider fixture server) | `npm run test:e2e:fixtures`          | Yes (local Supabase), added in Phase 4E; first run pending |
+| `social`, `likes` journeys                    | `npm run test:e2e:social` / `:likes` | **Not yet**: run locally                                   |
+
+Tests never mutate hosted production. The `@fixtures` suite refuses to start
+when `SUPABASE_URL` points at a hosted project. Laboratory measurements are
+documented in [`docs/quality/baseline.md`](docs/quality/baseline.md). They are
+not real-user metrics, and a passing automated accessibility scan does not
+establish accessibility compliance.
+
+Development happens in a browser-only environment (v0 on a sandbox VM without
+a browser runtime). Browser evidence therefore comes from GitHub Actions, and a
+successful compile is never treated as verification. The project is built with
+AI assistance: the owner sets requirements and reviews, merges, and confirms
+production behavior.
+
+## Known limitations
+
+- RAWG content is not semantically searchable (see above).
+- Community reviews on some surfaces still come from the labelled mock layer.
+- `catalog-refresh.yml` is on `main`, but no run has been recorded, and
+  whether it is enabled on the hosting side is unverified.
+- The `likes` Playwright suite is not yet in CI. `@fixtures` was added to CI
+  in Phase 4E, and its first run is pending.
+- Possible duplicate RAWG candidates are tracked as a data-quality issue.
+  Records are never merged on title similarity alone.
+- There are no notifications, comments, blocking, or private accounts yet.
+
+## Next priorities
+
+Phase 4E: production quality and portfolio readiness. Measured
+performance and accessibility fixes, regression coverage for the critical
+journeys, redacted operational events, an engineering case study, and a small
+invited-beta session ([`docs/beta/invited-beta-checklist.md`](docs/beta/invited-beta-checklist.md)).
+Notifications, billing, mini-games, new providers, and personalized
+recommendations are outside this phase.

@@ -1174,6 +1174,14 @@ title resolves and reuses all existing per-user features.
 > backfill (see the operations runbook); the remote-write guard is never
 > bypassed and never automatic.
 
+> **Update (2026-09-29):** the `TMDB_ENABLED` statement above is 2026-09-01
+> history. TMDB discovery, search, import, and title pages have been
+> owner-confirmed in production since 2026-09-21 (see
+> [`tmdb-activation-rollout.md`](tmdb-activation-rollout.md)). RAWG games are
+> enabled for discovery and import. RAWG live embedding stays blocked in code
+> until RAWG permission is documented. Current status by capability is in the
+> roadmap's "Status reconciliation (2026-09-29)" table.
+
 ## Supabase clients
 
 Per current `@supabase/ssr` guidance (the deprecated `@supabase/auth-helpers-*`
@@ -1193,14 +1201,20 @@ Only public configuration uses the `NEXT_PUBLIC_` prefix:
 
 | Variable                               | Scope           | Required for app startup                             |
 | -------------------------------------- | --------------- | ---------------------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`             | browser+server  | No (mock-data phase)                                 |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | browser+server  | No (mock-data phase)                                 |
+| `NEXT_PUBLIC_SUPABASE_URL`             | browser+server  | No — without it the app runs in labelled no-env mode |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | browser+server  | No — without it the app runs in labelled no-env mode |
 | `SUPABASE_SECRET_KEY`                  | **server only** | No — administrative only                             |
 | `TMDB_API_READ_TOKEN`                  | **server only** | No — catalog import only                             |
 | `OPEN_LIBRARY_CONTACT_EMAIL`           | **server only** | No — catalog import only                             |
 | `EXTERNAL_CATALOG_ENABLED`             | **server only** | No — off by default; global federated Explore switch |
 | `TMDB_ENABLED`                         | **server only** | No — off by default; per-provider TMDB gate          |
 | `OPEN_LIBRARY_ENABLED`                 | **server only** | No — on by default; per-provider control             |
+| `RAWG_ENABLED` / `RAWG_API_KEY`        | **server only** | No — off by default; RAWG games discovery and import |
+| `RAWG_EMBEDDING_ENABLED`               | **server only** | No — off by default; live use also blocked in code   |
+
+"Off by default" describes the code default. It does not describe hosted
+production, where the owner has enabled TMDB and RAWG. The table records flag
+defaults, not deployment state.
 
 `lib/supabase/env.ts` never throws at import time, so the app keeps building and
 rendering on Vercel with none of these set. `.env.example` documents the names
@@ -1673,6 +1687,7 @@ of the full mock catalog):
   "Catalog Platform v1B" above; v1B is now **hosted and production-verified**,
   with the Open Library Work `OL893414W` imported into hosted production. Still
   deferred: generative AI over external results and non-Explore import
-  surfaces. TMDB is disabled by default in all environments (and must remain
-  disabled in production) pending owner licensing confirmation.)
+  surfaces. TMDB is disabled by default in code. As of 2026-09-01 it was also
+  disabled in production pending owner licensing confirmation. That was
+  superseded on 2026-09-21, when TMDB was owner-confirmed in production.)
 - Full followers-only list visibility enforcement.

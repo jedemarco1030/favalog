@@ -1,17 +1,50 @@
 # Favalog product roadmap
 
-> Living document. Last reconciled: 2026-09-25, against the verified production
-> state below. Update this file whenever a phase ships, a capability becomes
-> production-verified, or the agreed sequence changes. When a statement is only
-> true at a point in time, keep it and date it rather than deleting the history.
+> Living document. Last reconciled: 2026-09-29 (Phase 4E), against `main` at
+> `7486441` and the owner confirmations below. Update this file whenever a phase
+> ships, a capability becomes production-verified, or the agreed sequence
+> changes. When a statement is only true at a point in time, keep it and date it
+> rather than deleting the history.
+
+## Status reconciliation (2026-09-29)
+
+This section supersedes conflicting status lines further down, which are kept
+as dated history. It uses four separate labels, and a claim gets only the
+labels it has evidence for:
+
+- **Implemented**: the code is on `main`.
+- **CI-verified**: a job in `.github/workflows/ci.yml` exercises it.
+- **Owner-confirmed**: the owner reported the behavior working in hosted
+  production.
+- **Unverified / deferred**: none of the above, or intentionally not built.
+
+Committed files are never taken as evidence of hosted flags, scheduler
+activation, or database state.
+
+| Capability                                                                        | Implemented                    | CI-verified                                                        | Owner-confirmed in production                                                                 |
+| --------------------------------------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| Auth, onboarding, diary, reviews, lists, favorites, profiles (real Supabase)      | Yes                            | Unit, pgTAP, Playwright                                            | Yes (2026-09-01 baseline)                                                                     |
+| Follows, follower-only lists, following feed, likes                               | Yes                            | pgTAP, `social` / `likes` Playwright                               | Yes (2026-09-25)                                                                              |
+| Hybrid search (full-text + pgvector) with Open Library federation                 | Yes                            | Unit, pgTAP, `eval:search` fixtures                                | Yes (2026-09-01)                                                                              |
+| TMDB movie/TV discovery, search, import, title pages                              | Yes                            | Unit, `@fixtures` Playwright (offline fixture server)              | Yes (2026-09-21)                                                                              |
+| Games via RAWG: discovery, import, keyword search, attribution                    | Yes (PR #11, #13)              | Unit, pgTAP (`game_media_and_status.test.sql`)                     | Preview-verified 2026-09-25; production discovery included in the 2026-09-29 confirmation     |
+| RAWG **live semantic embedding**                                                  | Gated off in code              | Only `--fake` vectors in tests                                     | **Deferred**: needs documented RAWG permission                                                |
+| Phase 4D discovery shelves, artwork fallback, related titles, save from discovery | Yes (PR #13, #14)              | Unit, component                                                    | Yes (2026-09-29)                                                                              |
+| Create a new list inside the Save dialog (new and existing-list users)            | Yes (PR #15)                   | Component tests; the `@fixtures` spec is **not in CI** (see below) | Yes (2026-09-29)                                                                              |
+| `catalog-refresh.yml` workflow                                                    | Yes, on `main` since `7486441` | Worker logic unit-tested; workflow runs not observed               | **Unverified**: no run evidence recorded; whether `CATALOG_REFRESH_ENABLED` is set is unknown |
+
+**Known CI gap (2026-09-29).** `ci.yml` runs the `default`, `no-env`,
+`configured`, and seeded Explore Playwright projects. The `@fixtures`,
+`social`, and `likes` suites run locally via `npm run test:e2e:*`, but CI does
+not run them yet. Phase 4E records that gap rather than hiding it.
 
 ## Product vision
 
 Favalog is a social entertainment platform for tracking, rating, reviewing,
-organizing, and discovering movies, television, and books. Over time a person's
-Favalog becomes a living record of the entertainment and interests they love.
-Movies, TV, and books are media types inside shared experiences — a single
-cross-media diary, list, review, favorite, and discovery surface — **not**
+organizing, and discovering movies, television, books, and video games. Over
+time a person's Favalog becomes a living record of the entertainment and
+interests they love. Movies, TV, books, and games are media types inside shared
+experiences — a single cross-media diary, list, review, favorite, and discovery surface — **not**
 separate top-level products.
 
 The visual direction is dark-first, premium, editorial, cinematic, social,
@@ -186,8 +219,10 @@ owner-controlled activation procedure and disable/recovery steps live in
 - **Catalog Platform v1A/v1B — external ingestion & federated discovery** —
   provider-neutral ingestion (`lib/catalog/`), canonical-identity aliasing
   (`media_external_ids`), federated Explore sections, and trusted on-demand
-  materialization. Open Library is enabled and production-verified; TMDB is
-  gated off.
+  materialization. Open Library is enabled and production-verified. TMDB was
+  gated off until 2026-09-21, and its discovery and import are now
+  owner-confirmed in production (see the TMDB activation milestone). RAWG games
+  are enabled for discovery and import; see Phase 4C.1.
 - **Catalog browsing and genre remediation** — Explore's real server-backed
   browse mode (media-type and genre filters, global sorts, bounded pagination,
   and validated shareable URL state) and the canonical book-genre taxonomy are
@@ -296,8 +331,11 @@ Status, kept separate:
   `RAWG_API_KEY` are set in the project environment.
 - **Preview-verified (2026-09-25):** the Games filter on `/explore` returned
   the materialized game, and `/title/hades` rendered with RAWG attribution.
-- **Not production-verified:** the 4C.1 branch is not merged or deployed. A
-  production smoke check is still pending.
+- **Not production-verified (as of 2026-09-25):** the 4C.1 branch was not yet
+  merged or deployed at that time.
+- **Update (2026-09-29):** 4C.1 merged to `main` as PR #11. Game discovery is
+  covered by the owner's 2026-09-29 production-discovery confirmation. No
+  separate games-only production smoke check has been recorded.
 
 ### RAWG source permissions
 
@@ -322,7 +360,10 @@ applicable RAWG permission, and a reviewed change must flip that constant and
 cite the permission. Until then, games take part in keyword search but not
 semantic search.
 
-## Phase 4D — Provider discovery and direct saving (increment 1, implemented locally)
+## Phase 4D — Provider discovery and direct saving (increment 1, merged and owner-confirmed)
+
+> **Update (2026-09-29):** merged as PR #13. The owner has confirmed production
+> discovery. The status list below is the original pre-merge record.
 
 Home and Explore now surface titles beyond the local catalog. Shelves come
 from provider rankings, and the provider is always credited:
@@ -357,7 +398,12 @@ Status:
   timed out on navigation.
 - **Not hosted or production-verified.** This increment needs no migrations.
 
-## Phase 4D — Discovery completion (increment 2, implemented locally)
+## Phase 4D — Discovery completion (increment 2, merged and owner-confirmed)
+
+> **Update (2026-09-29):** merged as PR #14, with the follow-up "Create new
+> list" for every user merged as PR #15. The owner has confirmed production
+> discovery, artwork improvements, social interactions, and creating a list
+> while saving. The status list below is the original pre-merge record.
 
 This increment makes provider discovery the main way to browse Favalog:
 
@@ -399,12 +445,37 @@ Status:
 - Community reviews still render from the `@/lib/data` mock layer rather than
   real Supabase reads. Home's activity is now real (Phase 4B.2), but there is
   no community-review system behind it.
-- Live RAWG embedding is blocked on documented permission (see above).
-- Phase 4D increment 1 is merged. Increment 2 (discovery completion) needs
-  interactive preview verification of the save-intent flow, then a merge.
+- Live RAWG embedding is blocked on documented permission (see above). Games
+  take part in keyword search only.
+- The scheduled `catalog-refresh` workflow exists on `main`, but no manual or
+  scheduled run has been recorded, and the state of `CATALOG_REFRESH_ENABLED`
+  is unverified.
+- The `@fixtures`, `social`, and `likes` Playwright suites run locally but not
+  in CI.
+- Possible duplicate RAWG candidates (the same game appearing as more than one
+  provider result) are tracked as a separate data-quality issue. Canonical
+  records are never merged, and user data is never deleted, on title
+  similarity alone.
 - Comments, blocking, private accounts, and follower directories remain
   deferred.
-- Growth, monetization, and portfolio-packaging work has not started.
+- Growth and monetization have not started. Portfolio packaging begins in
+  Phase 4E (below).
+
+## Phase 4E — Production quality and portfolio readiness (in progress)
+
+Delivered in two PRs:
+
+1. **Documentation and evidence (this PR).** This PR reconciles the docs
+   above, restructures the README, and adds a reproducible laboratory quality
+   baseline (`docs/quality/baseline.md`) run in GitHub Actions, plus the
+   invited-beta checklist (`docs/beta/invited-beta-checklist.md`).
+2. **Measured improvements.** PR 2 will make fixes chosen from the baseline
+   artifacts, add regression coverage for the critical journeys, add bounded
+   and redacted operational events, and complete `docs/case-study.md`. Its
+   before/after numbers must come from the same harness.
+
+Out of scope: notifications, billing, mini-games, new providers, and
+personalized recommendations.
 
 ## Agreed phase sequence
 

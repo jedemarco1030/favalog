@@ -355,6 +355,20 @@ jobs:
       - name: Run strict Explore Playwright tests
         run: E2E_SUITE=configured npx playwright test --project=configured
 
+      # `@fixtures` suite: federated discovery against the OFFLINE provider
+      # fixture server (no provider keys) and this job's local Supabase stack.
+      # It covers the Save dialog, list creation, and the Phase 4E Save-dialog
+      # quality evidence. A fresh reset gives it the same clean database as
+      # `npm run test:e2e:fixtures`. The report is written to its own directory,
+      # so it does not overwrite the strict Explore report.
+      - name: Reset local database for fixtures suite
+        run: npx supabase db reset
+
+      - name: Run fixtures Playwright tests
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-fixtures
+        run: E2E_SUITE=fixtures npx playwright test
+
       - name: Stop local Supabase stack
         if: ${{ always() }}
         run: npx supabase stop --no-backup
@@ -365,6 +379,14 @@ jobs:
         with:
           name: playwright-report-explore-integration
           path: playwright-report
+          retention-days: 7
+
+      - name: Upload fixtures Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-fixtures
+          path: playwright-report-fixtures
           retention-days: 7
 
   # STRICT, secret-free social integration: the multi-user following-feed
