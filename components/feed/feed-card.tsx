@@ -159,7 +159,7 @@ export function FeedCard({ item, like, className }: FeedCardProps) {
           </div>
         )}
 
-        <p className="mt-1 text-xs text-foreground/40">
+        <p className="mt-1 text-xs text-foreground/60">
           <time dateTime={item.createdAt}>{createdLabel}</time>
           {/* Only shown when the entry was genuinely backdated. */}
           {item.loggedAt && (

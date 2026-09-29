@@ -211,10 +211,18 @@ jobs:
       #     fallback with `isSupabaseConfigured()` false).
       # Each `E2E_SUITE` value selects its own project set + server (see
       # playwright.config.ts), so they run as two invocations against one build.
+      # Each invocation writes its own HTML report. Sharing one directory let
+      # the no-env run overwrite the default run's report, which silently
+      # dropped the quality-baseline evidence attached by the default project.
       - name: Run default Playwright tests
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report
         run: E2E_SUITE=configured npx playwright test --project=default
 
       - name: Run no-env Playwright tests
+        if: ${{ !cancelled() }}
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-no-env
         run: E2E_SUITE=no-env npx playwright test
 
       - name: Upload Playwright report
@@ -223,6 +231,14 @@ jobs:
         with:
           name: playwright-report
           path: playwright-report
+          retention-days: 7
+
+      - name: Upload no-env Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-no-env
+          path: playwright-report-no-env
           retention-days: 7
 
   # STRICT, secret-free Explore integration: the seeded-catalog contract runs

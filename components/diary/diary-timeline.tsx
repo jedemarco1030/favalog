@@ -140,7 +140,7 @@ export function DiaryTimeline({
             <section key={group.key} aria-labelledby={`diary-${group.key}`}>
               <h2
                 id={`diary-${group.key}`}
-                className="mb-5 font-display text-sm font-medium uppercase tracking-widest text-foreground/40"
+                className="mb-5 font-display text-sm font-medium uppercase tracking-widest text-foreground/60"
               >
                 {group.label}
               </h2>

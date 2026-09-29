@@ -10,12 +10,12 @@ explicitly, and the parts that need a human are listed under "Manual checks".
 
 ## Status
 
-| Item                                                               | State                                                           |
-| ------------------------------------------------------------------ | --------------------------------------------------------------- |
-| Harness (`e2e/lib/quality.ts`)                                     | Implemented; typechecked and linted                             |
-| Page baseline (`e2e/quality-baseline.spec.ts`)                     | Runs in CI `default` project; **first results pending**         |
-| Save-dialog quality (`e2e/quality-discovery.spec.ts`, `@fixtures`) | Runs in CI `explore-integration` job; **first results pending** |
-| Numbers in this document                                           | **None yet.** PR 1 results are copied here from CI artifacts    |
+| Item                                                               | State                                                        |
+| ------------------------------------------------------------------ | ------------------------------------------------------------ |
+| Harness (`e2e/lib/quality.ts`)                                     | Implemented; typechecked and linted                          |
+| Page baseline (`e2e/quality-baseline.spec.ts`)                     | Runs in CI `default` project; results recorded below         |
+| Save-dialog quality (`e2e/quality-discovery.spec.ts`, `@fixtures`) | Runs in CI `explore-integration` job; results recorded below |
+| Numbers in this document                                           | Copied from CI artifacts of runs 36629764589 and 36631595301 |
 
 The v0 development sandbox cannot launch Chromium (missing system libraries),
 so no browser measurement has been run locally. Every number recorded here
@@ -81,9 +81,67 @@ figures.
 
 ## Results
 
-| Commit                 | CI run | Surface | Profile | LCP ms | CLS | Script KB | Image KB | Axe violations |
-| ---------------------- | ------ | ------- | ------- | ------ | --- | --------- | -------- | -------------- |
-| _pending first CI run_ |        |         |         |        |     |           |          |                |
+Runs:
+
+- **Baseline** — `ac6bf6d` (instrumentation only, no product changes):
+  [run 36629764589](https://github.com/jedemarco1030/favalog/actions/runs/36629764589)
+- **After fixes** — `1cb5946`:
+  [run 36631595301](https://github.com/jedemarco1030/favalog/actions/runs/36631595301)
+
+Medians of 3 cold runs. Axe counts are distinct rule violations per profile
+(mobile and desktop were identical in both runs).
+
+| Surface           | Profile | LCP ms (before → after) | CLS (before → after) | Script KB | Image KB | Axe (before → after) |
+| ----------------- | ------- | ----------------------- | -------------------- | --------- | -------- | -------------------- |
+| `home`            | mobile  | 824 → 824               | 0.0003 → 0.0003      | 169.3     | 2.7      | 2 → 0                |
+| `home`            | desktop | 120 → 96                | 0 → 0                | 169.3     | 3.3      | 2 → 0                |
+| `explore-empty`   | mobile  | 868 → 836               | 0.0003 → 0.0003      | 179.6     | 0        | 2 → 0                |
+| `explore-empty`   | desktop | 132 → 96                | 0.0026 → 0           | 179.6     | 0        | 2 → 0                |
+| `explore-search`  | mobile  | 800 → 792               | 0.0009 → 0.0009      | 179.6     | 0        | 2 → 0                |
+| `explore-search`  | desktop | 92 → 76                 | 0 → 0                | 179.6     | 0        | 2 → 0                |
+| `title-detail`    | mobile  | 804 → 772               | 0.0006 → 0.0006      | 182.5     | 2.0      | 2 → 0                |
+| `title-detail`    | desktop | 124 → 104               | 0 → 0                | 182.5     | 2.0      | 2 → 0                |
+| Explore discovery | mobile  | 792 → 788               | 0.0001 → 0.0002      | 162.6     | 0.7 → 0  | —                    |
+| Explore discovery | desktop | 192 → 192               | **0.0897 → 0**       | 162.6     | 0.7      | —                    |
+| Save dialog       | —       | —                       | —                    | —         | —        | 0 → 0                |
+
+### Findings and fixes
+
+- **`color-contrast` (all four pages):** muted text used
+  `text-foreground/40`, about 3.3:1 against the background, which is below
+  the 4.5:1 AA minimum. Raised to `text-foreground/60` (about 6:1) across the
+  affected components; light mode behaves the same way.
+- **`aria-prohibited-attr` (Home, title page):** the read-only star rating
+  put `aria-label` on a generic `<span>`. It now has `role="img"`, which
+  permits the label.
+- **`aria-valid-attr-value` (Explore):** the search input's `aria-controls`
+  pointed at a results heading that isn't rendered in every state. It now
+  points at the results region, and only while a query is active. The region
+  falls back to `aria-label` when there's no heading (empty, error, or
+  unavailable).
+- **Explore discovery desktop CLS 0.0897:** layout-shift attribution traced
+  it to the stable catalog-browse section being pushed down when the streamed
+  discovery shelves above it resolved. The streamed section now renders below
+  the catalog browse, so it can't move already-painted content, and the shift
+  is gone.
+- **Skip link:** a "Skip to content" link was added to the root layout,
+  targeting `<main id="main-content">`. It's now the first tab stop on every
+  page.
+- **Save dialog:** no violations before or after. Focus opens on Close, never
+  escapes to a page element (the 2 browser-chrome stops after the last
+  control are expected for a native modal `<dialog>`), the create form
+  focuses its name field, and Escape returns focus to the trigger.
+- **Reduced motion:** no animation longer than 200 ms under
+  `prefers-reduced-motion: reduce` on any page.
+
+### Noted, not changed
+
+- Desktop Home and title pages load 150 px avatar SVGs rendered at 28 px
+  (oversize ratio 5.36). They are lazy, outside the initial viewport, and
+  558 bytes each, and SVG scales without quality loss, so there is no
+  meaningful cost to fix.
+- LCP differences of 20–40 ms on desktop are within run-to-run noise on a
+  shared CI runner and are not claimed as improvements.
 
 ## Manual checks (not automatable)
 

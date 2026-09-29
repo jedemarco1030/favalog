@@ -54,7 +54,7 @@ const errorOutcome: SearchOutcome = { status: "error", category: "database" };
 
 const defaultSections = (
   <div className="flex flex-col gap-4">
-    <p className="text-xs font-medium uppercase tracking-wide text-foreground/40">
+    <p className="text-xs font-medium uppercase tracking-wide text-foreground/60">
       Editorial examples — curated demonstration shelves
     </p>
     <ul role="list" className="flex flex-col gap-2 text-foreground/70">

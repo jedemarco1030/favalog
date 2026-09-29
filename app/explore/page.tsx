@@ -171,7 +171,7 @@ export default async function ExplorePage({
 
   const editorialExampleSections = (
     <div key="default-sections" className="flex flex-col gap-16">
-      <p className="text-xs font-medium uppercase tracking-wide text-foreground/40">
+      <p className="text-xs font-medium uppercase tracking-wide text-foreground/60">
         Editorial examples — curated demonstration shelves
       </p>
       {shelves.map((shelf) => (
@@ -200,12 +200,15 @@ export default async function ExplorePage({
 
   const defaultSections = browseOutcome ? (
     <div className="flex flex-col gap-12">
+      <CatalogBrowse outcome={browseOutcome} />
+      {/* Streams in below the stable catalog so its resolved height cannot
+          push already-painted content down (desktop CLS 0.0897 in the 4E
+          baseline when it sat above). */}
       {showOverview && (
         <Suspense fallback={<SectionSkeleton heading="Discover" />}>
           <ExploreDiscoveryOverview />
         </Suspense>
       )}
-      <CatalogBrowse outcome={browseOutcome} />
       {discoveryKind && (
         <Suspense fallback={<SectionSkeleton heading="Discover" />}>
           <DiscoveryBrowse

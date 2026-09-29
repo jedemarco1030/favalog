@@ -31,7 +31,7 @@ export function SiteFooter() {
             ))}
           </ul>
         </nav>
-        <p className="text-xs text-foreground/40">
+        <p className="text-xs text-foreground/60">
           © {new Date().getFullYear()} Favalog
         </p>
       </Container>

@@ -75,7 +75,7 @@ export function ActivityCard({
           </p>
         )}
         <time
-          className="mt-1 text-xs text-foreground/40"
+          className="mt-1 text-xs text-foreground/60"
           dateTime={activity.createdAt}
         >
           {dateFormatter.format(new Date(activity.createdAt))}
