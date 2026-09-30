@@ -1,7 +1,8 @@
 # Favalog product roadmap
 
-> Living document. Last reconciled: 2026-09-29 (Phase 4E), against `main` at
-> `7486441` and the owner confirmations below. Update this file whenever a phase
+> Living document. Last reconciled: 2026-09-29 (Phase 4E closeout), against
+> reviewed `main` at `5d1663b` (PR #20) and closeout PR #21. Release acceptance
+> is pending; see [the release checklist](mvp1-release-checklist.md). Update this file whenever a phase
 > ships, a capability becomes production-verified, or the agreed sequence
 > changes. When a statement is only true at a point in time, keep it and date it
 > rather than deleting the history.
@@ -21,22 +22,28 @@ labels it has evidence for:
 Committed files are never taken as evidence of hosted flags, scheduler
 activation, or database state.
 
-| Capability                                                                        | Implemented                    | CI-verified                                                        | Owner-confirmed in production                                                                 |
-| --------------------------------------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| Auth, onboarding, diary, reviews, lists, favorites, profiles (real Supabase)      | Yes                            | Unit, pgTAP, Playwright                                            | Yes (2026-09-01 baseline)                                                                     |
-| Follows, follower-only lists, following feed, likes                               | Yes                            | pgTAP, `social` / `likes` Playwright                               | Yes (2026-09-25)                                                                              |
-| Hybrid search (full-text + pgvector) with Open Library federation                 | Yes                            | Unit, pgTAP, `eval:search` fixtures                                | Yes (2026-09-01)                                                                              |
-| TMDB movie/TV discovery, search, import, title pages                              | Yes                            | Unit, `@fixtures` Playwright (offline fixture server)              | Yes (2026-09-21)                                                                              |
-| Games via RAWG: discovery, import, keyword search, attribution                    | Yes (PR #11, #13)              | Unit, pgTAP (`game_media_and_status.test.sql`)                     | Preview-verified 2026-09-25; production discovery included in the 2026-09-29 confirmation     |
-| RAWG **live semantic embedding**                                                  | Implemented; gated off in code | Fixture tests (Vitest and pgTAP) with `--fake` vectors only        | **Deferred**: RAWG permission unresolved. Not enabled, backfilled, or production-verified     |
-| Phase 4D discovery shelves, artwork fallback, related titles, save from discovery | Yes (PR #13, #14)              | Unit, component                                                    | Yes (2026-09-29)                                                                              |
-| Create a new list inside the Save dialog (new and existing-list users)            | Yes (PR #15)                   | Component tests; the `@fixtures` spec is **not in CI** (see below) | Yes (2026-09-29)                                                                              |
-| `catalog-refresh.yml` workflow                                                    | Yes, on `main` since `7486441` | Worker logic unit-tested; workflow runs not observed               | **Unverified**: no run evidence recorded; whether `CATALOG_REFRESH_ENABLED` is set is unknown |
+| Capability                                                                        | Implemented                    | CI-verified                                                                            | Owner-confirmed in production                                                             |
+| --------------------------------------------------------------------------------- | ------------------------------ | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Auth, onboarding, diary, reviews, lists, favorites, profiles (real Supabase)      | Yes                            | Unit, pgTAP, Playwright                                                                | Yes (2026-09-01 baseline)                                                                 |
+| Follows, follower-only lists, following feed, likes                               | Yes                            | pgTAP, `social` / `likes` Playwright                                                   | Yes (2026-09-25)                                                                          |
+| Hybrid search (full-text + pgvector) with Open Library federation                 | Yes                            | Unit, pgTAP, `eval:search` fixtures                                                    | Yes (2026-09-01)                                                                          |
+| TMDB movie/TV discovery, search, import, title pages                              | Yes                            | Unit, `@fixtures` Playwright (offline fixture server)                                  | Yes (2026-09-21)                                                                          |
+| Games via RAWG: discovery, import, keyword search, attribution                    | Yes (PR #11, #13)              | Unit, pgTAP (`game_media_and_status.test.sql`)                                         | Preview-verified 2026-09-25; production discovery included in the 2026-09-29 confirmation |
+| RAWG **live semantic embedding**                                                  | Implemented; gated off in code | Fixture tests (Vitest and pgTAP) with `--fake` vectors only                            | **Deferred**: RAWG permission unresolved. Not enabled, backfilled, or production-verified |
+| Phase 4D discovery shelves, artwork fallback, related titles, save from discovery | Yes (PR #13, #14)              | Unit, component                                                                        | Yes (2026-09-29)                                                                          |
+| Create a new list inside the Save dialog (new and existing-list users)            | Yes (PR #15)                   | Component tests and isolated `@fixtures` CI; PR #20 had one retried first-list journey | Yes (2026-09-29); retry-free closeout evidence still required                             |
+| `catalog-refresh.yml` workflow                                                    | Yes, on `main` since `7486441` | Worker logic unit-tested; latest scheduled run `36557022714` skipped                   | **Not operationally verified**: skipped jobs prove no metadata processing                 |
 
-**Known CI gap (2026-09-29).** `ci.yml` runs the `default`, `no-env`,
-`configured`, and seeded Explore Playwright projects. The `@fixtures`,
-`social`, and `likes` suites run locally via `npm run test:e2e:*`, but CI does
-not run them yet. Phase 4E records that gap rather than hiding it.
+**CI reconciliation (2026-09-29).** Contrary to the earlier status text,
+`@fixtures`, `social`, `likes`, and following-feed jobs already exist and ran
+in [baseline run 36661125887](https://github.com/jedemarco1030/favalog/actions/runs/36661125887).
+The fixture report recorded 28 first-attempt passes and one flaky/retried
+first-list journey, not 29 equivalent first-attempt passes. PR #21 adds
+per-invocation execution gates, retained failed-attempt traces, retry-free
+save repetitions, and artwork/readiness requirements. Its inspected results
+and remaining acceptance gates belong in the
+[release checklist](mvp1-release-checklist.md). No hosted activation is inferred
+from code or passing fixture CI.
 
 ## Product vision
 
@@ -520,16 +527,19 @@ Status:
 
 ## Phase 4E — Production quality and portfolio readiness (in progress)
 
-Delivered in two PRs:
+The earlier two-PR plan has been delivered across the baseline/evidence and
+quality-fix PRs through #20. It is retained in Git history, not described as
+future work here. Closeout PR #21 restores discovery-first Explore, corrects
+artwork-backed screenshot/quality readiness, retains first-failure traces,
+adds retry-free first-list repetitions, and completes per-invocation CI gates.
 
-1. **Documentation and evidence (this PR).** This PR reconciles the docs
-   above, restructures the README, and adds a reproducible laboratory quality
-   baseline (`docs/quality/baseline.md`) run in GitHub Actions, plus the
-   invited-beta checklist (`docs/beta/invited-beta-checklist.md`).
-2. **Measured improvements.** PR 2 will make fixes chosen from the baseline
-   artifacts, add regression coverage for the critical journeys, add bounded
-   and redacted operational events, and complete `docs/case-study.md`. Its
-   before/after numbers must come from the same harness.
+MVP 1 is **not accepted yet**. Final-source CI counts/artifacts and owner
+screen-reader, actual zoom, contrast, operational rehearsal, and production
+smoke results are explicit gates in the
+[release checklist](mvp1-release-checklist.md). The existing
+[invited-beta script](beta/invited-beta-checklist.md) stays a future owner-led
+activity, not evidence of completed user research. No performance improvement
+is claimed without comparable measurements.
 
 Out of scope: notifications, billing, mini-games, new providers, and
 personalized recommendations.
@@ -589,8 +599,9 @@ the owner-controlled hosted rollout.
 The following remain deferred and are not implied by the Phase 4B.1 delivery or
 the locally implemented Phase 4B.2 feed:
 
-- Scheduled catalog refresh: the `catalog-refresh` workflow is not installed
-  (TMDB discovery and import were owner-confirmed active on 2026-09-21).
+- Operational acceptance of scheduled catalog refresh: the workflow is
+  installed, but observed scheduled jobs skipped. Hosted write activation and
+  bounded processing evidence remain owner-controlled (see the release checklist).
 - Live RAWG embedding, until permission is documented.
 - Notifications, email, and push.
 - Moderation.
@@ -602,8 +613,9 @@ the locally implemented Phase 4B.2 feed:
 
 Measured honestly, without inventing traffic or business metrics:
 
-- A production-configured visitor can open `/explore` with no query and browse
-  only real Supabase catalog titles.
+- A production-configured visitor can open `/explore` with no query, encounter
+  provider discovery first, and browse the clearly identified real Supabase
+  catalog below it; no demonstration catalog is exposed as live content.
 - Browse filters, sorts, and pagination operate globally and restore correctly
   from a shared URL.
 - Search queries retain the evaluated hybrid-relevance behavior (offline eval
@@ -611,7 +623,8 @@ Measured honestly, without inventing traffic or business metrics:
 - Read failures never present mock data as production data.
 - Light, dark, and system themes work without hydration flash and preserve the
   Favalog brand.
-- Documentation accurately describes the verified 29-title production state.
+- Documentation keeps the historical 29-title observation dated 2026-09-01;
+  it does not restate it as a current production count.
 - The relevant validation matrix (format, lint, typecheck, unit/coverage, both
   build modes, Storybook, relevant Playwright, and — when schema/types change —
   Supabase reset + pgTAP + type-drift) passes.

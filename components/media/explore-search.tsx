@@ -235,7 +235,7 @@ export function ExploreSearch({
       ) : (
         <div className="flex flex-col gap-8">
           <p className="text-sm text-foreground/50">
-            Search the catalog above, or browse our editorial picks below.
+            Search above, or browse discovery and the catalog below.
           </p>
           {defaultSections}
         </div>

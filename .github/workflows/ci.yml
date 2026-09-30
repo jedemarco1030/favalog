@@ -221,11 +221,18 @@ jobs:
           QUALITY_EVIDENCE_DIR: quality-evidence-no-env
         run: E2E_SUITE=configured npx playwright test --project=default
 
+      # Six exact no-env exceptions: four pre-existing real-list placeholders
+      # and two authenticated journeys. Default has no Supabase/auth account;
+      # list creation/visibility run in isolated fixtures, not this build.
       - name: Assert default execution and narrowly allowed skips
         if: ${{ !cancelled() }}
         run: >-
-          node scripts/assert-e2e-results.mjs e2e-results/default.json --min=12
+          node scripts/assert-e2e-results.mjs e2e-results/default.json --min=44
           --require=quality-baseline.spec.ts
+          '--allow-skip=lists-persistence.spec.ts::create → add title → view list → see it on profile → remove title'
+          '--allow-skip=lists-persistence.spec.ts::a public real list is reachable by its globally-unique slug'
+          '--allow-skip=lists-persistence.spec.ts::a private real list is not disclosed to a non-owner'
+          "--allow-skip=lists-persistence.spec.ts::owner edits a list's metadata and stays on the immutable URL"
           '--allow-skip=lists-persistence.spec.ts::owner deletes a whole list and returns safely to /lists'
           '--allow-skip=favorites.spec.ts::favorite → refresh retains → appears on profile → remove → refresh retains removal → gone from profile'
 
@@ -448,9 +455,11 @@ jobs:
           retention-days: 14
 
       - name: Reset local database for retry-free first-list repetitions
+        if: ${{ !cancelled() }}
         run: npx supabase db reset
 
       - name: Repeat first-list journey twenty times (no retries)
+        if: ${{ !cancelled() }}
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-first-list
           PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-results/first-list.json
@@ -474,9 +483,11 @@ jobs:
           retention-days: 14
 
       - name: Reset local database for fixtures suite
+        if: ${{ !cancelled() }}
         run: npx supabase db reset
 
       - name: Run fixtures Playwright tests
+        if: ${{ !cancelled() }}
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-fixtures
           PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-results/fixtures.json
@@ -503,9 +514,11 @@ jobs:
       # titles into the local catalog, so reset before asserting they are absent;
       # otherwise local search can return them even when the override is refused.
       - name: Reset local database for production-refusal suite
+        if: ${{ !cancelled() }}
         run: npx supabase db reset
 
       - name: Run production-refusal Playwright tests
+        if: ${{ !cancelled() }}
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-prodreject
           PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-results/prodreject.json

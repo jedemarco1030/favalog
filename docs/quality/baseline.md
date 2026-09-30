@@ -17,9 +17,10 @@ explicitly, and the parts that need a human are listed under "Manual checks".
 | Save-dialog quality (`e2e/quality-discovery.spec.ts`, `@fixtures`) | Runs in CI `explore-integration` job; results recorded below |
 | Numbers in this document                                           | Copied from CI artifacts of runs 36629764589 and 36631595301 |
 
-The v0 development sandbox cannot launch Chromium (missing system libraries),
-so no browser measurement has been run locally. Every number recorded here
-must come from a GitHub Actions artifact and cite its run URL and commit.
+Native Chromium in the v0 sandbox lacked system libraries during the historical
+baseline work. Remote-browser preview checks are now available, but configured
+Docker-backed fixture measurements still run in GitHub CI. Every recorded lab
+number here must cite its evidence environment, run URL, and source commit.
 
 ## Surfaces
 
@@ -119,11 +120,12 @@ Medians of 3 cold runs. Axe counts are distinct rule violations per profile
   points at the results region, and only while a query is active. The region
   falls back to `aria-label` when there's no heading (empty, error, or
   unavailable).
-- **Explore discovery desktop CLS 0.0897:** layout-shift attribution traced
-  it to the stable catalog-browse section being pushed down when the streamed
-  discovery shelves above it resolved. The streamed section now renders below
-  the catalog browse, so it can't move already-painted content, and the shift
-  is gone.
+- **Historical Explore discovery desktop CLS 0.0897:** layout-shift attribution
+  traced it to catalog browse being pushed down when discovery above it resolved.
+  The historical fix moved discovery below the catalog and reported CLS 0.
+  That sacrificed discovery-first presentation and is **superseded by PR #21**:
+  discovery and downstream catalog share a loading boundary. Do not present
+  the historical metric as verification of the restored discovery-first page.
 - **Skip link:** a "Skip to content" link was added to the root layout,
   targeting `<main id="main-content">`. It's now the first tab stop on every
   page.
@@ -153,14 +155,14 @@ sizes), re-encoded with sharp at each requested width and quality. Byte counts
 are therefore representative. Image transfer time, CDN latency, and optimizer
 CPU cost are not, because route-fulfilled responses bypass CDP throttling.
 
-| Check                                          | Kind                                    |
-| ---------------------------------------------- | --------------------------------------- |
-| Home, empty Explore, search, title detail perf | Recorded, not gated (mobile/desktop)    |
-| Save dialog open latency                       | Recorded, not gated                     |
-| 320 px reflow on the same pages                | Asserted: no page-level overflow        |
-| 200% zoom (640 px CSS viewport at 2x)          | Asserted: no overflow, submit reachable |
-| Reduced motion with the dialog open            | Asserted: no motion longer than 10 ms   |
-| axe `color-contrast` over fixture artwork      | Asserted: no violations                 |
+| Check                                                                 | Kind                                    |
+| --------------------------------------------------------------------- | --------------------------------------- |
+| Home, empty Explore, search, title detail perf                        | Recorded, not gated (mobile/desktop)    |
+| Save dialog open latency                                              | Recorded, not gated                     |
+| 320 px reflow on the same pages                                       | Asserted: no page-level overflow        |
+| 200% zoom-equivalent viewport (640 px at 2x; not actual browser zoom) | Asserted: no overflow, submit reachable |
+| Reduced motion with the dialog open                                   | Asserted: no motion longer than 10 ms   |
+| axe `color-contrast` over fixture artwork                             | Asserted: no violations                 |
 
 Raw JSON is uploaded as `quality-evidence-configured-fixtures`, and
 `e2e/portfolio-screenshots.spec.ts` uploads `portfolio-screenshots`. Numbers

@@ -19,8 +19,8 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-vi.mock("@/app/lists/actions", () => ({
-  createListAction: vi.fn(),
+vi.mock("@/app/discovery/actions", () => ({
+  createAndSaveDiscoveredTitleAction: vi.fn(),
 }));
 
 const identity: ExternalRef = {
@@ -156,6 +156,53 @@ describe("DiscoveryCardActions save dialog", () => {
     ).toBeVisible();
     expect(createAction).toHaveBeenCalledTimes(1);
     expect(createAction.mock.calls[0][1].get("visibility")).toBe("public");
+    expect(saveAction.mock.calls[0][1].get("listId")).toBe("list-new");
+  });
+
+  it("uses a confirmed combined response without a second save request", async () => {
+    const createAction = vi.fn<DiscoveryCreateListAction>(async () => ({
+      ...createdList("list-new", "Rewatch"),
+      save: savedTo("list-new"),
+    }));
+    const { saveAction } = renderActions({ lists: [], createAction });
+    const { user, dialog } = await openDialog();
+    await user.type(within(dialog).getByLabelText("List name"), "Rewatch");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Create and save" }),
+    );
+    expect(await within(dialog).findByRole("status")).toHaveTextContent(
+      "Created Rewatch and saved Dune: Part Two.",
+    );
+    expect(createAction).toHaveBeenCalledTimes(1);
+    expect(createAction.mock.calls[0][1].get("externalId")).toBe(
+      identity.externalId,
+    );
+    expect(saveAction).not.toHaveBeenCalled();
+  });
+
+  it("retries only save after a combined response reports partial failure", async () => {
+    const createAction = vi.fn<DiscoveryCreateListAction>(async () => ({
+      ...createdList("list-new", "Rewatch"),
+      save: { status: "error", message: "Try again." },
+    }));
+    const { saveAction } = renderActions({ lists: [], createAction });
+    const { user, dialog } = await openDialog();
+    await user.type(within(dialog).getByLabelText("List name"), "Rewatch");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Create and save" }),
+    );
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "wasn't saved yet",
+    );
+    expect(saveAction).not.toHaveBeenCalled();
+    await user.click(
+      within(dialog).getByRole("button", { name: "Retry save" }),
+    );
+    expect(await within(dialog).findByRole("status")).toHaveTextContent(
+      "Created Rewatch and saved Dune: Part Two.",
+    );
+    expect(createAction).toHaveBeenCalledTimes(1);
+    expect(saveAction).toHaveBeenCalledTimes(1);
     expect(saveAction.mock.calls[0][1].get("listId")).toBe("list-new");
   });
 

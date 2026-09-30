@@ -1,6 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { createListAction } from "@/app/lists/actions";
+import {
+  initialCreateListFormState,
+  type CreateListFormState,
+} from "@/app/lists/list-form";
 
 import { getCurrentProfile, getCurrentUser } from "@/lib/auth/data";
 import { isProfileComplete } from "@/lib/auth/profile";
@@ -21,8 +26,71 @@ import { logDiscoveryEvent } from "@/lib/discovery/log";
 import { withSaveIntent } from "@/lib/discovery/save-intent";
 import {
   parseDiscoverySaveFormData,
+  initialDiscoverySaveState,
+  type DiscoveryCreateListState,
   type DiscoverySaveState,
 } from "./save-form";
+
+export async function createAndSaveDiscoveredTitleAction(
+  _previous: CreateListFormState,
+  formData: FormData,
+): Promise<DiscoveryCreateListState> {
+  const raw = parseDiscoverySaveFormData(formData);
+  const identity = validateMaterializeInput({
+    provider: raw.provider,
+    kind: raw.kind,
+    externalId: raw.externalId,
+  });
+  if (
+    !identity.ok ||
+    !shouldOfferExternalCatalog() ||
+    !isExternalProviderAvailable(identity.value.provider) ||
+    !isCatalogAdminConfigured()
+  ) {
+    return { status: "error", message: "That title can't be saved right now." };
+  }
+  const createData = new FormData();
+  for (const key of ["title", "visibility"] as const) {
+    const value = formData.get(key);
+    if (typeof value === "string") createData.set(key, value);
+  }
+  createData.set(
+    "returnTo",
+    getSafeRedirectPath(formData.get("returnTo"), "/explore"),
+  );
+  const created = await createListAction(
+    initialCreateListFormState,
+    createData,
+  );
+  if (created.status !== "success" || !created.listId) return created;
+
+  const saveData = new FormData();
+  saveData.set("provider", identity.value.provider);
+  saveData.set("kind", identity.value.kind);
+  saveData.set("externalId", identity.value.externalId);
+  saveData.set("listId", created.listId);
+  saveData.set(
+    "returnTo",
+    getSafeRedirectPath(formData.get("returnTo"), "/explore"),
+  );
+  try {
+    return {
+      ...created,
+      save: await saveDiscoveredTitleAction(
+        initialDiscoverySaveState,
+        saveData,
+      ),
+    };
+  } catch {
+    return {
+      ...created,
+      save: {
+        status: "error",
+        message: "We couldn't save that just now. Try again.",
+      },
+    };
+  }
+}
 
 function withReturnTo(base: string, returnTo: string): string {
   if (!returnTo || returnTo === "/") return base;

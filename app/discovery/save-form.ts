@@ -4,6 +4,12 @@
  * identity, a list id, and a return path — never title metadata or an owner id.
  */
 
+import type { CreateListFormState } from "@/app/lists/list-form";
+
+export type DiscoveryCreateListState = CreateListFormState & {
+  save?: DiscoverySaveState;
+};
+
 export interface DiscoverySaveInput {
   provider: string;
   kind: string;

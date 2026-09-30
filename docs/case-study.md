@@ -46,25 +46,34 @@ and fails independently. A failing provider hides its own shelves and emits a
 redacted, schema-versioned event (`docs/ai-discovery-operations.md`). The
 page itself doesn't error.
 
-**Save is two steps, and retry only repeats the one that failed.** Saving
-materializes the title, then adds it to a list. If a new list was created but
-the add failed, retry re-runs only the add, so it never duplicates the list.
+**Save has staged writes, not overlapping client requests.** Saving materializes
+the title, then adds it to a list. First-attempt traces reproduced the first-list
+stall while two successive Server Actions refreshed streamed discovery. The
+closeout combines creation and save into one server request with independent
+authentication/authorization at the existing write gates. A partial failure
+returns the created list; retry re-runs only save and never creates another list.
+This is not a database transaction or a claim that network retries are atomic.
 Signed-out viewers go through sign-in and return to the same card with the
 picker open. Every return path is validated as a same-origin relative path.
 
 ## Verification
 
-Development happened in a sandbox without a browser, so a successful
-compile was never treated as evidence of behaviour. CI does the verification:
+The sandbox has no Docker-backed local fixture stack; those browser journeys
+run in CI. Read-only preview checks can also use v0's remote browser. A
+successful compile is never treated as evidence of behaviour. CI verifies:
 
 - Formatting, lint, strict typecheck, Vitest with coverage, a production
   build, and Storybook.
 - pgTAP schema and RLS tests against a local Supabase stack, plus a
   generated-types drift check.
-- Playwright in three modes: `default`, `no-env` (the app with no
-  environment variables), and `@fixtures`, which runs the discovery and save
-  journeys against an offline provider fixture server and refuses to start
-  when pointed at a hosted Supabase.
+- Playwright default/no-env, seeded configured Explore, offline provider
+  fixtures, production-refusal, following-feed, social, and likes jobs.
+  Mutation-capable suites use isolated local Supabase, independent resets,
+  and distinct ports. Each invocation has a machine-readable report and
+  execution gate; failures, skips, and retried outcomes remain distinguishable.
+- Fixture quality and portfolio capture require settled discovery, successful
+  decoded artwork, and a materialized title record. Artwork is fulfilled
+  locally before Next's optimizer can contact a provider CDN.
 
 Tests never touch hosted production.
 
@@ -83,8 +92,13 @@ attribution was added, the baseline showed:
 - Desktop Explore CLS of 0.0897, which attribution traced to streamed
   discovery shelves pushing down the already-painted catalog browse.
 
-After the fixes, all four pages report 0 axe violations on mobile and
-desktop, and desktop Explore CLS is 0. Desktop LCP differences of 20–40 ms
+In those historical runs, all four no-env pages reported 0 axe violations on
+mobile and desktop. Moving discovery below the catalog produced desktop
+Explore CLS 0, but sacrificed discovery-first presentation; that is not the
+release solution. PR #21 restores provider shelves first inside a shared
+loading boundary with downstream catalog content. Its navigation-start,
+settled-state measurements are separate evidence, not a comparable speed
+improvement claim. Desktop LCP differences of 20–40 ms in the historical runs
 were within runner noise and are not claimed as improvements. Full numbers
 and CI run links are in [`docs/quality/baseline.md`](quality/baseline.md).
 These are lab measurements, not real-user data, and passing axe does not
@@ -96,8 +110,12 @@ document.
 - RAWG content is not semantically searchable. The pipeline is implemented and
   fixture-tested, but it stays off until RAWG permission is documented.
 - Some community-review surfaces still use the labelled mock layer.
-- The `social` and `likes` Playwright suites run locally, not in CI.
-- The scheduled catalog-refresh workflow has no recorded run.
+- Social and likes run in CI, but fixture evidence is not owner acceptance.
+- The five latest observed catalog-refresh scheduled runs skipped the job;
+  the GitHub activation gate and read-only rehearsal require owner verification.
+- Real VoiceOver/NVDA, actual browser zoom, and manual artwork contrast remain
+  owner checks. Axe incomplete findings are recorded, not called passes.
+- [MVP 1 acceptance](mvp1-release-checklist.md) is still pending.
 - No notifications, comments, blocking, or private accounts yet.
 
 ## How it was built

@@ -180,7 +180,10 @@ test.describe.serial("@fixtures discovery save continuation", () => {
       page.getByRole("heading", { level: 1, name: firstList }),
     ).toBeVisible();
     await expect(
-      page.getByRole("link", { name: /Fixture Lantern Coast \(Film, 2025\)/ }),
+      page.getByRole("region", { name: "List contents" }).getByRole("link", {
+        name: DISCOVERY_TITLE,
+        exact: true,
+      }),
     ).toHaveCount(1);
     expect(await countMediaByExternalId("tmdb", "movie:999101")).toBe(1);
     await page.goto("/lists");
