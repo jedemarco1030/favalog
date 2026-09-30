@@ -468,7 +468,9 @@ jobs:
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-first-list
           PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-results/first-list.json
-        run: E2E_SUITE=fixtures npx playwright test --grep 'zero lists' --repeat-each=20 --retries=0
+        run: |
+          node scripts/wait-local-supabase-auth.mjs
+          E2E_SUITE=fixtures npx playwright test --grep 'zero lists' --repeat-each=20 --retries=0
 
       - name: Assert all first-list repetitions executed on first attempt
         if: ${{ !cancelled() }}
@@ -498,7 +500,9 @@ jobs:
           PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-results/fixtures.json
           QUALITY_EVIDENCE_DIR: quality-evidence
           SCREENSHOT_DIR: portfolio-screenshots
-        run: E2E_SUITE=fixtures npx playwright test
+        run: |
+          node scripts/wait-local-supabase-auth.mjs
+          E2E_SUITE=fixtures npx playwright test
 
       - name: Assert fixtures suite executed
         if: ${{ !cancelled() }}

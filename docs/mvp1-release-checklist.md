@@ -128,8 +128,18 @@ to the committed file. Inspected artifacts: `e2e-results-explore-integration`,
 `portfolio-screenshots`, and `database-types-5847189027249bc3a9b939cc490af9c90f4f6340`.
 These results supersede the failed `76bb608` fixture attempt for application
 behavior; they do not erase its failures or establish new post-merge main CI.
-The final documentation/capture-only branch update still requires its own CI
-review, so engineering closeout remains incomplete until that gate is inspected.
+The final documentation/capture-only source `59368c5b933bfe7b2b606f0b4d161ea4b4d5465d`
+failed [CI 36766054279](https://github.com/jedemarco1030/favalog/actions/runs/36766054279).
+The production build, schema/RLS, following feed, likes, strict Explore and
+20 first-list repetitions passed. After the next local database reset, fixture
+Auth setup failed to create its user with an invalid upstream response; all
+33 dependent fixture tests, including screenshots, did not run. The missing
+`portfolio-screenshots` upload is a downstream failure, not a build error or
+proof that screenshots were captured. A bounded, loopback-only, read-only Auth
+admin readiness probe now gates both fixture invocations. Artifact requirements,
+application assertions and Playwright retries/timeouts remain unchanged. This
+readiness change needs fresh CI verification; engineering closeout remains
+incomplete until that gate is inspected.
 
 Earlier local follow-up checks: 1,562 unit/component tests across 163 files
 passed with coverage (93.66% statements, 86.31% branches, 96.20% functions,
