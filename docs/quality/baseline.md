@@ -143,10 +143,40 @@ Medians of 3 cold runs. Axe counts are distinct rule violations per profile
 - LCP differences of 20–40 ms on desktop are within run-to-run noise on a
   shared CI runner and are not claimed as improvements.
 
+## Configured-fixture evidence (CI)
+
+`e2e/quality-configured.spec.ts` runs in the `@fixtures` CI job against the
+production build, local Supabase, the offline provider fixtures, and a
+signed-in fixture user. Provider artwork is served from two committed fixture
+JPEGs (`e2e/fixtures/artwork/`, original abstract images at TMDB w500/w1280
+sizes), re-encoded with sharp at each requested width and quality. Byte counts
+are therefore representative. Image transfer time, CDN latency, and optimizer
+CPU cost are not, because route-fulfilled responses bypass CDP throttling.
+
+| Check                                          | Kind                                    |
+| ---------------------------------------------- | --------------------------------------- |
+| Home, empty Explore, search, title detail perf | Recorded, not gated (mobile/desktop)    |
+| Save dialog open latency                       | Recorded, not gated                     |
+| 320 px reflow on the same pages                | Asserted: no page-level overflow        |
+| 200% zoom (640 px CSS viewport at 2x)          | Asserted: no overflow, submit reachable |
+| Reduced motion with the dialog open            | Asserted: no motion longer than 10 ms   |
+| axe `color-contrast` over fixture artwork      | Asserted: no violations                 |
+
+Raw JSON is uploaded as `quality-evidence-configured-fixtures`, and
+`e2e/portfolio-screenshots.spec.ts` uploads `portfolio-screenshots`. Numbers
+are **pending the first CI run on this branch**; none are quoted here until
+they come from that artifact. Every Playwright step now writes a JSON report
+that `scripts/assert-e2e-results.mjs` checks, so a step that runs zero tests
+or skips everything fails instead of passing silently. `@prodreject` now has
+its own CI step.
+
+Retry after a failed list add has no browser hook. It's covered by the action
+and component tests, not by Playwright.
+
 ## Manual checks (not automatable)
 
 - Screen-reader announcement of Save success and error status (VoiceOver and
   NVDA).
-- Color contrast of text over artwork in the Home hero (axe can't assess text
-  over images).
-- 200% zoom and a 320 px reflow on Home and on title pages.
+- Color contrast of text over artwork. axe reports text on images as
+  incomplete rather than passing, so the automated check above catches
+  failures it can compute but doesn't prove the hero passes.

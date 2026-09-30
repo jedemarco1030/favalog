@@ -275,7 +275,7 @@ jobs:
       - name: Apply migrations + seed
         # `db reset` re-applies every migration and then runs `seed.sql`
         # (`[db.seed] enabled = true` in supabase/config.toml), guaranteeing the
-        # curated catalog (Afterglow, Dune: Part Two, …) is present.
+        # curated catalog (Afterglow, Dune: Part Two, ���) is present.
         run: npx supabase db reset
 
       # Publish the local stack's public config so the `configured` server is
@@ -369,21 +369,63 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run strict Explore Playwright tests
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-results/configured.json
         run: E2E_SUITE=configured npx playwright test --project=configured
+
+      - name: Assert strict Explore suite executed
+        if: ${{ !cancelled() }}
+        run: >-
+          node scripts/assert-e2e-results.mjs e2e-results/configured.json --min=5
+          --require=explore.spec.ts --require=explore-search.spec.ts
+          --require=explore-federated.spec.ts
 
       # `@fixtures` suite: federated discovery against the OFFLINE provider
       # fixture server (no provider keys) and this job's local Supabase stack.
-      # It covers the Save dialog, list creation, and the Phase 4E Save-dialog
-      # quality evidence. A fresh reset gives it the same clean database as
-      # `npm run test:e2e:fixtures`. The report is written to its own directory,
-      # so it does not overwrite the strict Explore report.
+      # It covers discovery, direct saving, sign-in continuation, inline list
+      # creation (zero and existing lists), retry after a failed add, refresh
+      # persistence, duplicate prevention, the configured quality evidence, and
+      # the README screenshots. A fresh reset gives it the same clean database
+      # as `npm run test:e2e:fixtures`. Reports go to their own directories.
       - name: Reset local database for fixtures suite
         run: npx supabase db reset
 
       - name: Run fixtures Playwright tests
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-fixtures
+          PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-results/fixtures.json
+          QUALITY_EVIDENCE_DIR: quality-evidence
+          SCREENSHOT_DIR: portfolio-screenshots
         run: E2E_SUITE=fixtures npx playwright test
+
+      - name: Assert fixtures suite executed
+        if: ${{ !cancelled() }}
+        run: >-
+          node scripts/assert-e2e-results.mjs e2e-results/fixtures.json --min=15
+          --require=discovery-save-dialog.spec.ts
+          --require=explore-materialize.spec.ts
+          --require=social-and-follower-lists.spec.ts
+          --require=quality-configured.spec.ts
+          --require=portfolio-screenshots.spec.ts
+
+      # `@prodreject`: the same build started with a PRODUCTION runtime marker
+      # must refuse the loopback transport override. The fixtures suite imports
+      # titles into the local catalog, so reset before asserting they are absent;
+      # otherwise local search can return them even when the override is refused.
+      - name: Reset local database for production-refusal suite
+        run: npx supabase db reset
+
+      - name: Run production-refusal Playwright tests
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-prodreject
+          PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-results/prodreject.json
+        run: E2E_SUITE=fixtures-prod-reject npx playwright test
+
+      - name: Assert production-refusal suite executed
+        if: ${{ !cancelled() }}
+        run: >-
+          node scripts/assert-e2e-results.mjs e2e-results/prodreject.json --min=1
+          --require=explore-materialize-prod-reject.spec.ts
 
       - name: Stop local Supabase stack
         if: ${{ always() }}
@@ -404,6 +446,43 @@ jobs:
           name: playwright-report-fixtures
           path: playwright-report-fixtures
           retention-days: 7
+
+      - name: Upload production-refusal Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-prodreject
+          path: playwright-report-prodreject
+          retention-days: 7
+
+      - name: Upload Playwright JSON results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results-explore-integration
+          path: e2e-results
+          retention-days: 14
+
+      # Raw lab evidence cited by docs/quality/baseline.md: configured
+      # production build, local Supabase, offline provider fixtures, fixture
+      # artwork. Not real-user or live-production data.
+      - name: Upload configured-fixture quality evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-evidence-configured-fixtures
+          path: quality-evidence
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload portfolio screenshots
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: portfolio-screenshots
+          path: portfolio-screenshots
+          if-no-files-found: warn
+          retention-days: 30
 
   # STRICT, secret-free social integration: the multi-user following-feed
   # journey (`@social`) needs service-role seeding, so it can only run against a

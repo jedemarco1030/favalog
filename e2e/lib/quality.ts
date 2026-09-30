@@ -1,3 +1,4 @@
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { Browser, BrowserContext, Page, TestInfo } from "@playwright/test";
@@ -138,10 +139,19 @@ const OBSERVER_SCRIPT = `
   } catch (e) {}
 `;
 
+export interface ProfileContextOptions {
+  reducedMotion?: "reduce" | "no-preference";
+  colorScheme?: "dark" | "light";
+  /** A signed-in storage state file; omit for a signed-out context. */
+  storageState?: string;
+  /** Runs after the context exists, before any navigation (e.g. routing). */
+  setup?: (context: BrowserContext) => Promise<void>;
+}
+
 export async function newProfileContext(
   browser: Browser,
   profile: MeasurementProfile,
-  options: { reducedMotion?: "reduce" | "no-preference" } = {},
+  options: ProfileContextOptions = {},
 ): Promise<BrowserContext> {
   const context = await browser.newContext({
     viewport: profile.viewport,
@@ -149,9 +159,11 @@ export async function newProfileContext(
     isMobile: profile.isMobile,
     hasTouch: profile.hasTouch,
     reducedMotion: options.reducedMotion ?? "no-preference",
-    colorScheme: "dark",
+    colorScheme: options.colorScheme ?? "dark",
+    storageState: options.storageState,
   });
   await context.addInitScript(OBSERVER_SCRIPT);
+  if (options.setup) await options.setup(context);
   return context;
 }
 
@@ -179,8 +191,9 @@ export async function measureRun(
   browser: Browser,
   profile: MeasurementProfile,
   url: string,
+  options: ProfileContextOptions = {},
 ): Promise<RunMetrics> {
-  const context = await newProfileContext(browser, profile);
+  const context = await newProfileContext(browser, profile, options);
   try {
     const page = await context.newPage();
     await applyThrottling(page, profile);
@@ -394,9 +407,17 @@ export async function recordEvidence(
   name: string,
   data: unknown,
 ) {
+  const body = JSON.stringify(data, null, 2);
   await testInfo.attach(`${name}.json`, {
-    body: JSON.stringify(data, null, 2),
+    body,
     contentType: "application/json",
   });
+  // CI uploads this directory as a raw artifact so the numbers in
+  // docs/quality/baseline.md can cite a downloadable file, not only a report.
+  const dir = process.env.QUALITY_EVIDENCE_DIR?.trim();
+  if (dir) {
+    await mkdir(dir, { recursive: true });
+    await writeFile(path.join(dir, `${name}.json`), body);
+  }
   console.log(`[quality] ${name} ${JSON.stringify(data).slice(0, 1500)}`);
 }
