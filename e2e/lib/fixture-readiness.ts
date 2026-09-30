@@ -54,15 +54,19 @@ export async function waitForFixtureSurface(page: Page, capture = false) {
       for (const image of images) (image as HTMLImageElement).loading = "eager";
     });
   }
-  const selector =
-    'main img[src*="image.tmdb.org"], main img[src*="covers.openlibrary.org"], main img[src*="media.rawg.io"]';
+  const selector = capture
+    ? "main img"
+    : 'main img[src*="image.tmdb.org"], main img[src*="covers.openlibrary.org"], main img[src*="media.rawg.io"]';
   await expect(page.locator(selector).first()).toBeAttached();
   await expect
     .poll(() =>
       page.locator(selector).evaluateAll((nodes) => {
         const required = nodes.filter((node) => {
           const rect = node.getBoundingClientRect();
-          return rect.width > 0 && rect.top < innerHeight && rect.bottom > 0;
+          return (
+            rect.width > 0 &&
+            (capture || (rect.top < innerHeight && rect.bottom > 0))
+          );
         });
         return (
           required.length > 0 &&

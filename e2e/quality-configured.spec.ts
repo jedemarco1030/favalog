@@ -169,7 +169,7 @@ test.describe("@fixtures quality configured", () => {
     > = {};
     for (const { id, url } of PAGES) {
       await page.goto(url, { waitUntil: "load" });
-      await waitForFixtureSurface(page);
+      await waitForFixtureSurface(page, true);
       results[id] = await horizontalOverflow(page);
     }
     await context.close();
@@ -199,7 +199,7 @@ test.describe("@fixtures quality configured", () => {
     > = {};
     for (const { id, url } of PAGES) {
       await page.goto(url, { waitUntil: "load" });
-      await waitForFixtureSurface(page);
+      await waitForFixtureSurface(page, true);
       results[id] = await horizontalOverflow(page);
     }
     await page.goto("/explore");
@@ -294,7 +294,7 @@ test.describe("@fixtures quality configured", () => {
         const page = await context.newPage();
         for (const { id, url } of PAGES) {
           await page.goto(url, { waitUntil: "load" });
-          await waitForFixtureSurface(page);
+          await waitForFixtureSurface(page, true);
           results[`${id}-${profile.name}-${colorScheme}`] =
             await runAxeDetails(page);
         }

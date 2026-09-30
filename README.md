@@ -5,7 +5,7 @@ organizing, and discovering **movies, TV series, books, and video games** in one
 cross-media record. Discovery is led by external providers. The canonical
 catalog stores only the titles people actually engage with.
 
-> Status is reconciled as of **2026-09-29** against reviewed `main` at
+> Status is reconciled as of **2026-09-30** against reviewed `main` at
 > `5d1663b` and closeout PR #21. **MVP 1 acceptance is still pending**; see the
 > [release checklist](docs/mvp1-release-checklist.md). Each capability
 > below is labelled by its evidence: implemented in code, CI-verified,
@@ -18,10 +18,17 @@ catalog stores only the titles people actually engage with.
 ## Live demo and screenshots
 
 - **Live deployment:** <https://favalog.vercel.app>
-- **Screenshots:** not yet committed. The v0 sandbox cannot run a browser, so
-  screenshots will be captured from CI Playwright runs or real sessions,
-  never mock-ups.
+- **Screenshots:** inspected, artwork-backed Home captures from the local/offline
+  fixture application in [CI 36666650203](https://github.com/jedemarco1030/favalog/actions/runs/36666650203)
+  (source `3bc4561`). These are synthetic fixture artwork, not authentic covers
+  or production captures; the overall run failed save/zoom checks and is not
+  release acceptance. Other captures remain under review.
 - **Engineering case study:** [`docs/case-study.md`](docs/case-study.md).
+
+![Desktop Home: offline fixtures with decoded hero and discovery artwork](docs/screenshots/home-desktop-fixture.png)
+
+[Mobile Home fixture capture](docs/screenshots/home-mobile-fixture.png).
+Both screenshots show the actual application, never mock-ups.
 
 ## What Favalog does
 

@@ -53,6 +53,38 @@ describe("discovery create-save JSON boundary", () => {
     },
   );
 
+  it("accepts the proxy's external origin when Request.url retains localhost", async () => {
+    getCurrentUser.mockResolvedValue(null);
+    const proxied = new Request(
+      "https://localhost:3000/api/discovery/create-and-save",
+      {
+        method: "POST",
+        headers: {
+          origin: ORIGIN,
+          host: "internal-host:3000",
+          "x-forwarded-host": "favalog.example",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(input),
+      },
+    );
+    expect((await POST(proxied)).status).toBe(401);
+    expect(getCurrentUser).toHaveBeenCalledOnce();
+    expect(createAndSave).not.toHaveBeenCalled();
+  });
+
+  it("rejects a cross-site origin at the forwarded-host boundary", async () => {
+    const response = await POST(
+      request(input, {
+        origin: "https://untrusted.example",
+        "x-forwarded-host": "favalog.example",
+      }),
+    );
+    expect(response.status).toBe(403);
+    expect(getCurrentUser).not.toHaveBeenCalled();
+    expect(createAndSave).not.toHaveBeenCalled();
+  });
+
   it("requires JSON, not a cross-site form payload", async () => {
     const response = await POST(
       request(input, { "content-type": "text/plain" }),

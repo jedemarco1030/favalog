@@ -54,6 +54,29 @@ final-commit artifact review remain release gates.
   navigation at 390×844 observed CLS 0, TTFB 701 ms, LCP 1,364 ms. This uses live
   provider reads and warm/unspecified caches, **not** production or fixture
   performance evidence, and establishes no improvement.
+- Continued closeout: the JSON endpoint initially rejected a valid anonymous
+  v0 preview request (403) because `Request.url` retained localhost while Origin
+  and the trusted proxy host were the external preview host. Its origin boundary
+  now follows the forwarded-host/Host convention used by Next Server Actions.
+  A fresh read-only browser request returns 401 with `Cache-Control: no-store`
+  and a safe same-card sign-in continuation; no database mutation occurred.
+  Two new proxy-origin regressions and the prior route/client/action/component
+  suite pass: **45 tests across four files**, without suppressed errors.
+- Inspected source `3bc4561` screenshots: Home desktop/mobile have decoded hero
+  and discovery shelves and are committed under `docs/screenshots/`, embedded
+  in README/case study. Explore/title captures were rejected for unrelated
+  local demo placeholders. Fixture-only artwork routing now also fulfills those
+  local SVG URLs with synthetic photographs; production/domain data is unchanged.
+  The zoom-equivalent failure was a readiness-harness defect: at 640×400,
+  Explore's first image is below the viewport. Reflow, zoom and contrast scans now
+  require **all** main artwork to load/decode; measured navigation profiles retain
+  initial-viewport readiness and navigation-start timing. Fresh captures and
+  configured accessibility/performance artifacts are still required.
+- JSON-boundary source `04e957a`, [CI 36668638263](https://github.com/jedemarco1030/favalog/actions/runs/36668638263):
+  source validation/build, database/RLS and default/no-env jobs passed at the
+  last inspection; isolated first-list/full-fixture evidence was still running.
+  This run predates the proxy-origin and full-capture corrections above, so it
+  cannot be presented as final-commit verification.
 - No final release/production performance or screen-reader pass is asserted.
 
 ## Functional acceptance

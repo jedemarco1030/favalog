@@ -46,7 +46,14 @@ async function readBody(request: Request): Promise<unknown> {
 }
 
 export async function POST(request: Request) {
-  if (request.headers.get("origin") !== new URL(request.url).origin) {
+  const url = new URL(request.url);
+  // Match Next's Server Action host boundary: the trusted deployment proxy
+  // supplies the external host, while Request.url may retain localhost.
+  const host =
+    request.headers.get("x-forwarded-host") ??
+    request.headers.get("host") ??
+    url.host;
+  if (request.headers.get("origin") !== `${url.protocol}//${host}`) {
     return respond({ status: "error", message: MESSAGE }, 403);
   }
   if (

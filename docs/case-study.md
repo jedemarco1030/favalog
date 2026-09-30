@@ -7,6 +7,19 @@ decisions behind it and the evidence for each claim. It does not claim
 anything that isn't verified in code, CI, or owner-confirmed production
 behaviour.
 
+## Inspected fixture captures
+
+![Desktop Home with decoded fixture hero and discovery shelves](screenshots/home-desktop-fixture.png)
+
+![Mobile Home with the same offline artwork-backed fixtures](screenshots/home-mobile-fixture.png)
+
+Actual application captures from local Supabase and offline provider fixtures,
+[CI 36666650203](https://github.com/jedemarco1030/favalog/actions/runs/36666650203),
+source `3bc4561`, inspected on desktop and mobile. Artwork is synthetic and is
+not an authentic cover for the fixture title. These are not production screenshots
+or evidence that the overall failing save/zoom run passed. Explore/title captures
+were rejected for unrelated placeholder cards and require a fresh fixture capture.
+
 ## The problem
 
 Entertainment trackers usually split by medium: one app for films, one for
@@ -53,8 +66,13 @@ stalled in seven of twenty retry-free attempts on `3bc4561`; thirteen reached
 success and persistence but exposed a separate, over-broad list-link assertion.
 The next candidate uses a bounded, same-origin JSON response with independent
 session validation and existing per-write authorization/RLS, so unrelated RSC
-refresh completion does not hold the dialog pending. Verification remains
-required; this is not a claim that the candidate has passed the browser gate.
+refresh completion does not hold the dialog pending. A preview check also caught
+and fixed a transport regression: external Origin must match the trusted proxy's
+forwarded host (or Host), not an internal localhost Request URL. Reverse proxies
+must overwrite forwarded headers, as with Next Server Actions. The read-only
+anonymous request now returns a safe sign-in continuation, not a 403. Isolated
+first-list/full-fixture verification remains required; this is not a claim that
+the candidate has passed the browser gate.
 A partial failure returns the created list; retry re-runs only save rather than
 creating another list. This is not a database transaction or a claim that network
 retries are atomic. Signed-out viewers go through sign-in and return to the same

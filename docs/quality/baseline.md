@@ -149,10 +149,13 @@ Medians of 3 cold runs. Axe counts are distinct rule violations per profile
 
 `e2e/quality-configured.spec.ts` runs in the `@fixtures` CI job against the
 production build, local Supabase, the offline provider fixtures, and a
-signed-in fixture user. Provider artwork is served from two committed fixture
-JPEGs (`e2e/fixtures/artwork/`, original abstract images at TMDB w500/w1280
-sizes), re-encoded with sharp at each requested width and quality. Byte counts
-are therefore representative. Image transfer time, CDN latency, and optimizer
+signed-in fixture user. Artwork is served from two committed synthetic
+photographs (`e2e/fixtures/artwork/`, at TMDB w500/w1280 sizes), re-encoded with
+sharp at each requested width and quality. Fixture routing also substitutes
+these photographs for local demo SVG posters/backdrops so selected captures
+are artwork-backed throughout; production artwork and domain data are unchanged.
+They are not authentic covers for any displayed title. Byte counts model these
+fixture assets, not a particular production catalog. Image transfer time, CDN latency, and optimizer
 CPU cost are not, because route-fulfilled responses bypass CDP throttling.
 
 | Check                                                                 | Kind                                    |
@@ -183,6 +186,17 @@ first-list/layout repetitions require zero retries. `@prodreject`, social,
 and likes have separate execution gates. Required quality/screenshot artifact
 checks fail if evidence is missing. See the [release ledger](../mvp1-release-checklist.md)
 for inspected source/run results rather than obsolete “first run pending” claims.
+
+Inspected Home desktop/mobile screenshots from source `3bc4561`, run
+36666650203, are committed in `docs/screenshots/` and embedded in README/case
+study. Explore/title captures from that run were rejected for local demo
+placeholder cards; fresh corrected captures remain required. The zoom-equivalent
+check failed at empty Explore because no artwork intersected the 400 px-high
+viewport, not because an image failed to load. Accessibility scans now load and
+decode all main artwork before scanning. Performance still observes initial
+viewport images from navigation start; no scroll or eager-image rewrite is
+introduced into measured runs. These differing readiness modes must not be
+compared as a performance improvement.
 
 Retry after a failed list add has no browser hook. It's covered by the action
 and component tests, not by Playwright.
