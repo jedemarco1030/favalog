@@ -204,9 +204,9 @@ function notFound(res) {
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${HOST}:${PORT}`);
-  const scenario = url.pathname.split("/")[1];
+  const scenario = url.pathname.split("/")[1].split("-")[0];
   const path = url.pathname.replace(
-    /^\/(slow|partial|empty|disabled)(?=\/)/,
+    /^\/(slow|partial|empty|disabled)(?:-(mobile|desktop|both))?(?=\/)/,
     "",
   );
   const discovery = /\/(trending|discover)\//.test(path);

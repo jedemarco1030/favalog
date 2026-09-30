@@ -436,14 +436,19 @@ jobs:
         env:
           QUALITY_EVIDENCE_DIR: quality-evidence
         run: |
+          status=0
           for scenario in slow partial empty disabled; do
-            E2E_SUITE=fixtures-layout E2E_DISCOVERY_SCENARIO="$scenario" \
-              PLAYWRIGHT_HTML_OUTPUT_DIR="playwright-report-layout-$scenario" \
-              PLAYWRIGHT_JSON_OUTPUT_NAME="e2e-results/layout-$scenario.json" \
-              npx playwright test --retries=0 || exit 1
-            node scripts/assert-e2e-results.mjs "e2e-results/layout-$scenario.json" \
-              --min=2 --require=discovery-layout.spec.ts --max-retried=0 || exit 1
+            for profile in mobile desktop; do
+              E2E_SUITE=fixtures-layout E2E_DISCOVERY_SCENARIO="$scenario" \
+                E2E_LAYOUT_PROFILE="$profile" \
+                PLAYWRIGHT_HTML_OUTPUT_DIR="playwright-report-layout-$scenario-$profile" \
+                PLAYWRIGHT_JSON_OUTPUT_NAME="e2e-results/layout-$scenario-$profile.json" \
+                npx playwright test --retries=0 || status=1
+              node scripts/assert-e2e-results.mjs "e2e-results/layout-$scenario-$profile.json" \
+                --min=1 --require=discovery-layout.spec.ts --max-retried=0 || status=1
+            done
           done
+          exit "$status"
 
       - name: Upload discovery scenario reports
         if: ${{ !cancelled() }}

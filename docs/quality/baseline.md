@@ -165,12 +165,24 @@ CPU cost are not, because route-fulfilled responses bypass CDP throttling.
 | axe `color-contrast` over fixture artwork                             | Asserted: no violations                 |
 
 Raw JSON is uploaded as `quality-evidence-configured-fixtures`, and
-`e2e/portfolio-screenshots.spec.ts` uploads `portfolio-screenshots`. Numbers
-are **pending the first CI run on this branch**; none are quoted here until
-they come from that artifact. Every Playwright step now writes a JSON report
-that `scripts/assert-e2e-results.mjs` checks, so a step that runs zero tests
-or skips everything fails instead of passing silently. `@prodreject` now has
-its own CI step.
+`e2e/portfolio-screenshots.spec.ts` uploads `portfolio-screenshots`. Candidate
+run 36664561980 produced layout-scenario evidence, but failed retry-free saves
+before full fixture capture; it is not a complete release evidence run.
+Its web-server health probe warmed discovery, so its slow-scenario medians do
+**not** establish a cold delayed-provider navigation. The corrected harness
+probes sign-in (no discovery), isolates server cache keys by scenario/profile,
+records `settledMs`, and requires the first slow sample to include the 2000 ms
+provider delay. Later repetitions remain warm-server samples, not cold ones.
+
+Each Playwright invocation writes its own JSON report checked by
+`scripts/assert-e2e-results.mjs`: no usable execution, missing required specs,
+failures and unexpected skips fail. Default no-env has six exactly named
+pre-existing exceptions; the configured semantic live-OpenAI journey is the
+one configured exception. Retries/flaky results are exposed separately, and
+first-list/layout repetitions require zero retries. `@prodreject`, social,
+and likes have separate execution gates. Required quality/screenshot artifact
+checks fail if evidence is missing. See the [release ledger](../mvp1-release-checklist.md)
+for inspected source/run results rather than obsolete “first run pending” claims.
 
 Retry after a failed list add has no browser hook. It's covered by the action
 and component tests, not by Playwright.

@@ -10,7 +10,11 @@ import {
 
 const scenario = process.env.E2E_DISCOVERY_SCENARIO ?? "slow";
 test.describe("@layout discovery first, settled provider scenarios", () => {
-  for (const profile of [PROFILES.mobile, PROFILES.desktop]) {
+  for (const profile of [PROFILES.mobile, PROFILES.desktop].filter(
+    (profile) =>
+      !process.env.E2E_LAYOUT_PROFILE ||
+      profile.name === process.env.E2E_LAYOUT_PROFILE,
+  )) {
     test(`${scenario} ${profile.name}`, async ({ browser }, testInfo) => {
       test.setTimeout(180_000);
       const runs = [];
@@ -50,11 +54,17 @@ test.describe("@layout discovery first, settled provider scenarios", () => {
           }),
         );
       }
+      if (scenario === "slow") {
+        expect(
+          runs[0].settledMs,
+          "cold navigation must include the 2000ms provider delay",
+        ).toBeGreaterThanOrEqual(1900);
+      }
       await recordEvidence(testInfo, `layout-${scenario}-${profile.name}`, {
         scenario,
         environment:
           "configured local Supabase, offline providers, production build",
-        note: "Observer begins before navigation; first run may fill server cache, subsequent runs share that cache. Slow fixture adds 2000ms to cold provider reads. No real CDN/optimizer latency.",
+        note: "Observer begins before navigation. Separate server/cache key per scenario and profile; health probe does not warm discovery. First sample includes cold provider reads (2000ms delay in slow); subsequent samples use warm server cache. Browser cache is disabled; route-fulfilled artwork does not reproduce CDN/optimizer latency. Inspect cold sample as well as median.",
         ...summarizeRuns(runs),
       });
     });

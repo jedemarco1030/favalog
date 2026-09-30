@@ -291,7 +291,12 @@ function SaveDialog({
   const ids = useId();
 
   const [createdLists, setCreatedLists] = useState<SaveListOption[]>([]);
-  const lists = [...createdLists, ...initialLists];
+  const lists = [
+    ...createdLists,
+    ...initialLists.filter(
+      (list) => !createdLists.some((created) => created.id === list.id),
+    ),
+  ];
   const [mode, setMode] = useState<"pick" | "create">(() =>
     initialLists.length === 0 ? "create" : "pick",
   );

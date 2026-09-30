@@ -83,6 +83,7 @@ export interface LayoutShiftSample {
 }
 
 export interface RunMetrics {
+  settledMs: number;
   ttfbMs: number;
   domContentLoadedMs: number;
   loadMs: number;
@@ -201,13 +202,14 @@ export async function measureRun(
     await applyThrottling(page, profile);
     await page.goto(url, { waitUntil: "load", timeout: 90_000 });
     if (options.ready) await options.ready(page);
+    const settledMs = await page.evaluate(() => Math.round(performance.now()));
     await page
       .waitForLoadState("networkidle", { timeout: 20_000 })
       .catch(() => undefined);
     // Let late layout shifts and LCP candidates land.
     await page.waitForTimeout(1_500);
 
-    return await page.evaluate(() => {
+    const metrics = await page.evaluate(() => {
       type Lab = {
         lcp: number | null;
         lcpElement: string | null;
@@ -269,6 +271,7 @@ export async function measureRun(
         images,
       };
     });
+    return { settledMs, ...metrics };
   } finally {
     await context.close();
   }
@@ -290,6 +293,7 @@ export function summarizeRuns(runs: RunMetrics[]) {
     runs: runs.length,
     samples: runs,
     median: {
+      settledMs: pick("settledMs"),
       ttfbMs: pick("ttfbMs"),
       domContentLoadedMs: pick("domContentLoadedMs"),
       loadMs: pick("loadMs"),

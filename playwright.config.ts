@@ -60,7 +60,10 @@ const isNoEnvSuite = suite === "no-env";
 const isFixturesSuite = suite === "fixtures";
 const isLayoutSuite = suite === "fixtures-layout";
 const layoutScenario = process.env.E2E_DISCOVERY_SCENARIO ?? "slow";
-const fixturePrefix = isLayoutSuite ? `/${layoutScenario}` : "";
+const layoutProfile = process.env.E2E_LAYOUT_PROFILE ?? "both";
+const fixturePrefix = isLayoutSuite
+  ? `/${layoutScenario}-${layoutProfile}`
+  : "";
 const isFixturesProdRejectSuite = suite === "fixtures-prod-reject";
 const isSocialSuite = suite === "social";
 const isLikesSuite = suite === "likes";
@@ -242,7 +245,7 @@ export default defineConfig({
             // Reuse the configured build; federation + the loopback transport are
             // runtime, server-only env, so no rebuild is needed.
             command: `npm run start -- --port ${FIXTURES_PORT}`,
-            url: fixturesBaseURL,
+            url: `${fixturesBaseURL}/auth/sign-in`,
             reuseExistingServer: !isCI,
             timeout: 120_000,
             env: fixtureTransportEnv,
