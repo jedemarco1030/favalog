@@ -1,25 +1,36 @@
 # CI handoff: catalog metadata refresh scheduler
 
-## Current operational state (2026-09-29)
+## Current operational state (2026-09-30)
 
-The workflow is now installed at
+The workflow is installed at
 [`.github/workflows/catalog-refresh.yml`](../../.github/workflows/catalog-refresh.yml).
-The installation instructions below are retained as historical handoff, not a
-current missing-file requirement. The five latest observed runs all skipped
+The installation instructions below are historical handoff, not a
+missing-file requirement. A fresh read-only inspection after PR #22 merged
+found that the five latest scheduled runs all skipped
 `Bounded refresh + stale-embedding backfill`; the latest is
-[36557022714](https://github.com/jedemarco1030/favalog/actions/runs/36557022714).
+[36702695138](https://github.com/jedemarco1030/favalog/actions/runs/36702695138).
 No processing or successful metadata refresh is established by those runs.
+
+The GitHub environment API returned `protection_rules: []` and
+`deployment_branch_policy: null` for `catalog-refresh`. The environment exists,
+but reviewer and branch protections are **not configured**, not verified
+protections. The owner must review this before any hosted rehearsal. No
+configuration, secrets, scheduling or hosted data was changed here.
 
 The scheduled job requires the **GitHub repository/environment variable**
 `CATALOG_REFRESH_ENABLED` to equal the string `true`. Vercel project variables
 are not inherited. Manual dispatch bypasses this gate and defaults to
-`dry_run=true`; the embedding step is skipped in that mode. The connected
-GitHub account returned HTTP 403 when listing Actions variables, so activation
-configuration and required secrets have not been verified or changed. No
-hosted dispatch was attempted without verifying the required configuration.
+`dry_run=true`; the embedding step is skipped in that mode. A fresh read of
+`CATALOG_REFRESH_ENABLED` returned HTTP 403, so its current value and the
+required secret configuration remain owner checks, not confirmed disabled
+settings. No hosted dispatch was attempted.
 
-Before acceptance, follow the owner steps in the
-[release checklist](../mvp1-release-checklist.md#operational-acceptance).
+Before acceptance, follow step 5 of the
+[browser-only owner acceptance checklist](../mvp1-release-checklist.md#browser-only-owner-acceptance):
+review reviewer/branch protections and secret names, keep scheduled writes off,
+then select reviewed branch `main`, `dry_run=true`, `limit=1`. Expect zero
+writes/embedding calls and a skipped stale-embedding backfill step. `checked=0`
+is only a no-work rehearsal; processing acceptance needs an eligible row.
 
 ## Historical installation handoff
 
@@ -60,8 +71,10 @@ for exercising a single live refresh, and it **defaults to a read-only preview**
   `EXTERNAL_CATALOG_ENABLED`, `TMDB_ENABLED`, and `TMDB_EMBEDDING_ENABLED` are
   configured explicitly on the steps that need them (fail-closed if a required
   credential is absent).
-- **Protected secrets + explicit target**: all credentials come from the
-  `catalog-refresh` GitHub **Environment**, and the hosted project is pinned with
+- **Environment-scoped secrets + explicit target**: all credentials come from
+  the `catalog-refresh` GitHub **Environment**. Reviewer/branch protection is
+  supported but currently unconfigured (see operational state above). The hosted
+  project is pinned with
   `--confirm-project-ref` so the CLI's remote-write guard authorizes the write
   only when the resolved Supabase URL matches that exact ref. There is no
   inferred project.

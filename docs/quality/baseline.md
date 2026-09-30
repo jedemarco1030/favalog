@@ -10,6 +10,61 @@ explicitly, and the parts that need a human are listed under "Manual checks".
 
 ## Current inspected closeout evidence (2026-09-30)
 
+[Final PR CI 36771309279](https://github.com/jedemarco1030/favalog/actions/runs/36771309279)
+completed successfully on application source
+`cf82d647d5ccbb685ec5aba25b9c5e48a7ecaa37`. The owner merged PR #22 into
+`f1a392e2d43dad39e690383451b829b77824f361` with an identical tree; the distinct
+[post-merge main run](https://github.com/jedemarco1030/favalog/actions/runs/36773633454)
+is **completed, success**. Its separately downloaded invocation reports,
+quality JSON and all ten desktop/mobile fixture captures were inspected.
+Every count/skip/zero-retry outcome below is confirmed independently on main,
+not inferred from the identical source tree or PR results. Main generated types
+match the committed file; validation and database logs confirm the test counts.
+The authoritative decision is **MVP 1 engineering closeout complete; beta
+acceptance pending these owner checks**, detailed in the
+[release checklist](../mvp1-release-checklist.md#final-pr-and-post-merge-verification).
+
+Retained main ready Save captures:
+[desktop](../screenshots/save-dialog-desktop-fixture-main.png) and
+[mobile](../screenshots/save-dialog-mobile-fixture-main.png), exact main source
+`f1a392e`, 1280×800 and 390×844, synthetic offline fixture artwork/content.
+These do not show genuine provider covers or establish hosted Save acceptance.
+The genuine-provider captures below retain source `5847189`; its application
+`app`/`components`/`lib`/`public` trees match final `cf82d64` byte-for-byte.
+
+The final PR and main reports were independently inspected: 1,615
+unit/component passes across 166 files, 617 pgTAP passes across 19 files,
+byte-identical generated types, 34 offline fixtures, 20 first-list repetitions
+plus auth setup, configured Explore 15 passes/one paid-semantic skip, eight
+separate provider-layout passes, production fixture-refusal one pass, and
+likes/feed one pass each. Default no-env has 44 passes/six intentional skips;
+explicit no-env has five passes. No E2E retries, flaky outcomes, unexpected
+skips, failures, invalid tests or runner errors occurred.
+
+Final PR configured quality evidence retains zero page-focus escapes, initial
+Close focus, create-name input focus and Escape restoration. Save dialog/form
+axe violation and incomplete arrays are empty. All four surfaces have 320 px
+reflow without overflow; reduced-motion maximum duration is 0.00001 seconds.
+The 640 px report is still **viewport equivalence, not actual 200% browser
+zoom**. Sixteen theme/viewport/surface contrast checks retain ARIA and mobile
+Explore contrast incomplete targets; zero violations does not establish
+compliance. Manual screen-reader announcements, actual browser zoom and
+incomplete-target acceptance remain owner gates. Fixture performance is
+laboratory evidence, never production speed.
+
+Final-source fixture title/Explore/Save captures were visually inspected.
+Explore's similarly named catalog examples are distinct `test-fixture:`
+identities added only by local `seed.sql`, not preserved historical records or
+production data. This is synthetic test evidence, not a portfolio of authentic
+covers. The genuine-provider captures linked below remain separately labelled
+with their original source/environment; no hosted save was performed.
+Fresh read-only production checks found no local Paper Watch search result and
+an accessible `/title/paper-watch` with its demonstration notice. These narrow
+checks do not establish migration history, deployed SHA, full retrieval
+exclusion or authenticated owner access.
+
+### Historical baseline and local verification limits
+
 Source `1c076a3eb4b94672251ca64e6ab33475a4311fe1`,
 [post-merge CI 36749917450](https://github.com/jedemarco1030/favalog/actions/runs/36749917450):
 34 offline fixture passes and 20 retry-free first-list passes (plus auth setup),
@@ -53,7 +108,7 @@ five browser-launch failures and no behavior passes (`libnspr4.so` absent).
 One dependency-recovery attempt failed because `apt-get` is unavailable. Docker
 is also absent: final-source pgTAP/type-drift and configured fixtures/social/likes
 are not verified locally. See the [release checklist](../mvp1-release-checklist.md)
-for per-invocation counts, owner steps and the incomplete release decision.
+for current per-invocation counts, owner steps and the release decision.
 
 ## Follow-up source evidence (2026-09-30)
 
