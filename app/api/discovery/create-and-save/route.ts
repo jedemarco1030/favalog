@@ -1,4 +1,8 @@
-import { createAndSaveDiscoveredTitleAction } from "@/app/discovery/actions";
+import {
+  createAndSaveDiscoveredTitleAction,
+  saveDiscoveredTitleAction,
+} from "@/app/discovery/actions";
+import { initialDiscoverySaveState } from "@/app/discovery/save-form";
 import { initialCreateListFormState } from "@/app/lists/list-form";
 import { getCurrentUser } from "@/lib/auth/data";
 import { getSafeRedirectPath } from "@/lib/auth/safe-redirect";
@@ -73,8 +77,19 @@ export async function POST(request: Request) {
     return respond({ status: "error", message: MESSAGE }, 400);
   }
   const values = body as Record<string, unknown>;
+  if (
+    values.intent !== undefined &&
+    values.intent !== "create" &&
+    values.intent !== "save"
+  ) {
+    return respond({ status: "error", message: MESSAGE }, 400);
+  }
+  const saving = values.intent === "save";
+  const fields = saving
+    ? ["listId", "provider", "kind", "externalId", "returnTo"]
+    : FIELDS;
   const formData = new FormData();
-  for (const field of FIELDS) {
+  for (const field of fields) {
     const value = values[field];
     if (value === undefined) continue;
     if (typeof value !== "string" || value.length > 1024) {
@@ -99,7 +114,9 @@ export async function POST(request: Request) {
       return respond(
         {
           status: "unauthenticated",
-          message: "Please sign in to create a list.",
+          message: saving
+            ? "Please sign in to save this title."
+            : "Please sign in to create a list.",
           redirectTo: `/auth/sign-in?returnTo=${encodeURIComponent(returnTo)}`,
         },
         401,
@@ -108,12 +125,22 @@ export async function POST(request: Request) {
     // Keep the mutation result independent of unrelated streamed RSC refreshes.
     // The existing action still re-authenticates each write and relies on RLS.
     return respond(
-      await createAndSaveDiscoveredTitleAction(
-        initialCreateListFormState,
-        formData,
-      ),
+      saving
+        ? await saveDiscoveredTitleAction(initialDiscoverySaveState, formData)
+        : await createAndSaveDiscoveredTitleAction(
+            initialCreateListFormState,
+            formData,
+          ),
     );
   } catch {
-    return respond({ status: "error", message: MESSAGE }, 500);
+    return respond(
+      {
+        status: "error",
+        message: saving
+          ? "We couldn't save that just now. Try again."
+          : MESSAGE,
+      },
+      500,
+    );
   }
 }

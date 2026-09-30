@@ -50,6 +50,44 @@ is also absent: final-source pgTAP/type-drift and configured fixtures/social/lik
 are not verified locally. See the [release checklist](../mvp1-release-checklist.md)
 for per-invocation counts, owner steps and the incomplete release decision.
 
+## Follow-up source evidence (2026-09-30)
+
+[PR #22 CI 36760089274](https://github.com/jedemarco1030/favalog/actions/runs/36760089274)
+uses application source `76bb60866b896d246923932a9bc03e2ba0054814`. The database
+job checks out that exact SHA. Other PR jobs exercise GitHub's temporary merge
+`1c0ebde696dcc614fe659ccc7f9c4e494da0725a` into baseline `1c076a3`; this is not
+a new post-merge main run. Source formatting, lint, typecheck, coverage and
+production/Storybook builds passed, as did pgTAP and generated-type drift.
+The downloaded `database-types-76bb60866b896d246923932a9bc03e2ba0054814`
+artifact is byte-identical to the committed types.
+
+Downloaded `e2e-results-no-env` confirms default 44 first-attempt passes and
+six intentional no-auth/list skips; explicit no-env confirms five passes.
+Both have zero retries/flaky outcomes. The exact skip allowlist was checked,
+not inferred from green job status. `quality-evidence-no-env` Home reports zero
+axe violations, a retained incomplete `aria-valid-attr-value` finding on the
+menu button, a skip link and no long animations under reduced motion.
+These are no-env laboratory observations, not production accessibility or
+performance certification. Likes and following feed executed successfully;
+complete configured/first-list evidence remains pending review.
+
+Genuine-provider development-preview screenshots were visually inspected at
+942×664 and 390×844 after required visible images decoded and fonts settled.
+All four surfaces have viewport-equal scroll widths (942/390 px):
+
+| Surface | Desktop                                                        | Mobile                                                        | Observed content                                                                       |
+| ------- | -------------------------------------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Home    | [Capture](../screenshots/home-desktop-provider-preview.png)    | [Capture](../screenshots/home-mobile-provider-preview.png)    | Genuine RAWG hero, provider shelves                                                    |
+| Explore | [Capture](../screenshots/explore-desktop-provider-preview.png) | [Capture](../screenshots/explore-mobile-provider-preview.png) | Genuine TMDB discovery artwork                                                         |
+| Search  | [Capture](../screenshots/search-desktop-provider-preview.png)  | [Capture](../screenshots/search-mobile-provider-preview.png)  | `q=portal`, scrolled to genuine TMDB results; missing artwork intentionally falls back |
+| Title   | [Capture](../screenshots/title-desktop-provider-preview.png)   | [Capture](../screenshots/title-mobile-provider-preview.png)   | `/title/dune`, genuine Open Library cover, Fiction/Science Fiction labels              |
+
+Search had zero local matches and genuine federated results below the empty
+local section; these captures do not claim local corpus completeness. They use
+the unchanged hosted schema: migrated search exclusion and actual browser zoom
+are not established. No hosted saves/writes were performed. Authenticated Save
+captures belong to isolated CI fixtures or an owner-controlled session.
+
 ## Historical status
 
 | Item                                                               | State                                                        |

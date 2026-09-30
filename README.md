@@ -6,9 +6,10 @@ cross-media record. Discovery is led by external providers. The canonical
 catalog stores only the titles people actually engage with.
 
 > Status is reconciled as of **2026-09-30** against post-merge `main` at
-> `1c076a3` (merged PR #21). **Engineering closeout remains incomplete**: likes
-> did not execute, and the demonstration-separation follow-up still needs
-> final-source and post-merge CI. **MVP 1 acceptance is still pending**; see the
+> `1c076a3` (merged PR #21) and [PR #22](https://github.com/jedemarco1030/favalog/pull/22)
+> application source `76bb608`. Likes and following feed now execute and pass on
+> the follow-up CI attempt; complete final-branch and post-merge CI remain release
+> gates. **MVP 1 acceptance is still pending**; see the
 > [release checklist](docs/mvp1-release-checklist.md). Each capability
 > below is labelled by its evidence: implemented in code, CI-verified,
 > owner-confirmed in production, or unverified/deferred. The authoritative
@@ -24,6 +25,11 @@ catalog stores only the titles people actually engage with.
   with decoded genuine RAWG artwork, at 1280×900 and 390×844. They show the
   deployed baseline, not this unapplied follow-up or release acceptance.
   Offline fixture captures are separate test evidence, never authentic covers.
+- **Genuine provider preview captures:** final application-source desktop/mobile
+  Home, Explore, search and title images are retained in the
+  [quality evidence index](docs/quality/baseline.md#follow-up-source-evidence-2026-09-30).
+  The hosted retrieval migration is not yet applied; authenticated Save evidence
+  comes separately from isolated CI fixtures.
 - **Engineering case study:** [`docs/case-study.md`](docs/case-study.md).
 
 ![Production Home with genuine RAWG artwork, captured read-only](docs/screenshots/home-desktop-production.png)

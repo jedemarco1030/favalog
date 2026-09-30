@@ -13,7 +13,10 @@ behaviour.
 source `1c076a3`, confirms 20 first-list repetitions without retries, 34 fixture
 passes and one following-feed pass. This supersedes the earlier pending JSON
 transport verification described as history below. Likes failed before browser
-execution, so **engineering closeout and beta acceptance remain incomplete**.
+execution on that baseline. [PR #22 CI 36760089274](https://github.com/jedemarco1030/favalog/actions/runs/36760089274),
+application source `76bb608`, now executes likes and following feed successfully.
+Complete final-branch and post-merge evidence plus owner acceptance still gate
+the release.
 
 The follow-up addresses a separate identity/presentation defect: exact legacy
 mock identities persisted as ordinary catalog rows. Its forward-only retrieval
@@ -33,6 +36,14 @@ new scoped startup diagnostics are not a claimed root-cause fix.
 Captured read-only on 2026-09-30 at 1280×900 and 390×844 after visible artwork
 decoded. These are genuine deployed-baseline captures, not images of the
 unapplied follow-up or proof of release acceptance.
+
+Additional final-application-source development-preview captures use genuine
+provider content, not synthetic covers, and were visually inspected after
+visible images decoded. Desktop/mobile Home, Explore, provider search and
+Open Library title captures are linked in the
+[quality evidence index](quality/baseline.md#follow-up-source-evidence-2026-09-30).
+The hosted retrieval migration remains unapplied; these captures do not prove
+its search exclusion or authenticated Save behavior.
 
 The current follow-up passed 1,562 unit/component tests and focused browser
 presentation checks. Native Playwright and local database verification remain

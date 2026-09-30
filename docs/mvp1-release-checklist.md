@@ -72,12 +72,18 @@ first-list claims are superseded by the baseline above, not by a final-source pa
   reports remain mandatory when their test step runs. Cleanup remains limited to
   this local Supabase project. No listener/container is indiscriminately killed.
 
-**Likes infrastructure is NOT yet resolved.** The historical failure is an
-Inbucket bind conflict on host port `54324`; the owner of that listener was not
-captured. One requested rerun was denied by GitHub (`Resource not accessible by
-integration`). A transient or recurrent cause therefore cannot be asserted.
-Do not change ports, suppress failures, disable likes, or repeatedly rerun until
-green. The next runner attempt must retain the new listener/container diagnostics.
+**The likes startup failure did not recur on the follow-up runner attempt.**
+[PR #22 CI 36760089274](https://github.com/jedemarco1030/favalog/actions/runs/36760089274),
+source `76bb60866b896d246923932a9bc03e2ba0054814`, successfully started local
+Supabase, executed the likes journey, enforced the execution-count gate, uploaded
+its JSON report and cleaned up. Following feed also executed successfully.
+The original Inbucket `54324` conflict's listener owner was never captured; the
+prior requested rerun was denied by GitHub. A fresh successful attempt is evidence
+of non-recurrence, not proof of the original owner or a permanent root-cause fix.
+Ports, assertions, skips and failure semantics were not relaxed, and no unknown
+listener/container was killed. Scoped startup diagnostics remain in every
+DB-backed job. Complete Explore evidence and final branch CI must still be
+reviewed before engineering closeout.
 
 Local follow-up checks: 1,562 unit/component tests across 163 files passed with
 coverage (93.66% statements, 86.31% branches, 96.20% functions, 94.57% lines);
@@ -91,11 +97,17 @@ errors and **zero behavior passes**, caused by missing `libnspr4.so`; one
 timeouts or skip allowlists were relaxed. Final-source CI remains mandatory.
 
 Fresh read-only dark desktop/mobile Home, Explore, search and title checks used
-real provider content in the development preview. Search still exposed legacy
-rows because the hosted migration is intentionally unapplied: these checks do
-not prove migrated retrieval. Authentic production Home captures are committed
-under `docs/screenshots/home-*-production.png`; production search still showed
-legacy titles. A fresh authenticated Save capture requires isolated CI or an
+real provider content in the development preview. Final application-source
+captures at 942×664 and 390×844 were visually inspected, with required visible
+images decoded and no horizontal overflow; the
+[quality evidence index](quality/baseline.md#follow-up-source-evidence-2026-09-30)
+links the retained `*-provider-preview.png` images. `q=portal` shows genuine
+federated TMDB results below the empty local section; missing artwork is honest.
+Other search inspection still exposed legacy rows because the hosted migration
+is intentionally unapplied: these checks do not prove migrated retrieval.
+Authentic production Home captures remain under
+`docs/screenshots/home-*-production.png`; production search still showed legacy
+titles. A fresh authenticated Save capture requires isolated CI or an
 owner-controlled session, not an unauthorized hosted save.
 
 ## Remaining engineering and deployment gates

@@ -18,13 +18,18 @@ validation/build jobs passed. Likes failed during local Inbucket binding on
 54324, before Playwright; the overall run failed. A single requested rerun was
 denied by GitHub permissions, so the conflict is not yet classified as transient.
 
-This follow-up separates the exact historical demonstration identities without
-rewriting user references, fixes mock-first title rendering and safe artwork
-fallbacks, and captures scoped CI startup diagnostics. It is not production
-applied or final-source CI-verified. Local verification: 1,562 unit/component
-passes and 131 focused regressions; Docker-backed checks remain unavailable,
-and native Playwright is blocked by missing system libraries. The full
-[release checklist](mvp1-release-checklist.md) is authoritative.
+[PR #22](https://github.com/jedemarco1030/favalog/pull/22), application source
+`76bb60866b896d246923932a9bc03e2ba0054814`, separates the exact historical
+demonstration identities without rewriting user references, fixes mock-first
+title rendering and safe artwork fallbacks, and captures scoped CI startup
+diagnostics. [Follow-up CI 36760089274](https://github.com/jedemarco1030/favalog/actions/runs/36760089274)
+passed source validation/builds and database/type drift; likes and following
+feed executed successfully. The historical bind failure did not recur on that
+attempt, but its original listener owner remains unknown. Complete Explore and
+final branch CI remain required, and nothing is production-applied here.
+Local verification: 1,562 unit/component passes and 131 focused regressions;
+Docker and native Playwright remain unavailable in this sandbox, not in CI.
+The full [release checklist](mvp1-release-checklist.md) is authoritative.
 
 The five latest inspected refresh schedules skipped; newest
 [36702695138](https://github.com/jedemarco1030/favalog/actions/runs/36702695138).

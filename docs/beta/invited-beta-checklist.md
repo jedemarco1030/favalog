@@ -8,10 +8,13 @@ behavioral tracking. Each of those needs separate owner approval.
 ## Release gate (2026-09-30)
 
 **Do not invite participants yet.** Post-merge source `1c076a3` passed the
-retry-free first-list and fixture journeys, but likes did not execute because
-local Supabase startup failed. The demonstration-separation follow-up still
-needs complete final-source CI, owner migration/deployment approval, new
-post-merge main CI, and explicit owner accessibility/operational acceptance.
+retry-free first-list and fixture journeys, but likes did not execute on that
+baseline. [PR #22 CI 36760089274](https://github.com/jedemarco1030/favalog/actions/runs/36760089274)
+now executes likes and following feed successfully on application source
+`76bb608`; the historical startup conflict did not recur on this attempt.
+The demonstration-separation follow-up still needs complete final-branch CI,
+owner migration/deployment approval, new post-merge main CI, and explicit owner
+accessibility/operational acceptance.
 Use the browser-only steps in the
 [release checklist](../mvp1-release-checklist.md). No gate has been silently
 deferred. Games support keyword discovery/search; do not promise RAWG live

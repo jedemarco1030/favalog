@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { materializeExternalTitleAction } from "@/app/explore/actions";
-import { saveDiscoveredTitleAction } from "@/app/discovery/actions";
 import { getDiscoveryShelf } from "@/lib/discovery/service";
 import {
   parseDiscoveryPage,
@@ -95,7 +94,6 @@ export async function DiscoveryBrowse({
             lists={lists}
             returnTo={returnTo}
             openAction={materializeExternalTitleAction}
-            saveAction={saveDiscoveredTitleAction}
           />
           {result.page.candidates.length === 0 && (
             <p className="text-sm text-foreground/60">
