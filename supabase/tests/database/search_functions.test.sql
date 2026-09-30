@@ -16,7 +16,7 @@
 -- Run with the local stack: `npm run db:test` (requires Docker + Supabase CLI).
 
 begin;
-select plan(85);
+select plan(90);
 
 -- ---------------------------------------------------------------------------
 -- 1. Extension: pgvector installed, and living in the `extensions` schema.
@@ -624,6 +624,64 @@ select is(
     limit 1),
   'quiet-signal',
   'a resurrected row returns first with its preserved embedding');
+
+-- ---------------------------------------------------------------------------
+-- 14. Games in the shared hybrid corpus.
+--     'lantern-drift' carries an axis-4 embedding in the same space as the
+--     seeded film/book vectors; 'unembedded-quest' has no embedding (as if the
+--     backfill has not reached it or it failed). Retrieval is kind-agnostic,
+--     so games need no separate path.
+-- ---------------------------------------------------------------------------
+insert into public.media_items (id, kind, source, external_id, slug, title, year, details)
+values
+  ('30000000-0000-0000-0000-0000000000a1', 'game', 'favalog', 'lantern-drift',
+   'lantern-drift', 'Lantern Drift', 2024,
+   '{"platforms":["PC"],"developers":["Ember Works"],"publishers":["Northlight"]}'),
+  ('30000000-0000-0000-0000-0000000000a2', 'game', 'favalog', 'unembedded-quest',
+   'unembedded-quest', 'Unembedded Quest', 2023,
+   '{"platforms":["Switch"],"developers":["Quiet Co"],"publishers":["Quiet Co"]}');
+insert into public.media_search_documents
+  (media_id, content, content_hash, document_version, embedding,
+   embedding_model, embedding_provider, embedding_dimensions, embedded_at)
+values ('30000000-0000-0000-0000-0000000000a1', 'x', repeat('d', 64), 'v1',
+        ('[0,0,0,1' || repeat(',0', 508) || ']')::extensions.vector,
+        'fake', 'fake', 512, now());
+
+select is(
+  public.compatible_embedding_count('fake', 'fake', 512, 'v1'),
+  3,
+  'an embedded game joins the same compatible corpus as films and books');
+select is(
+  (select slug from public.hybrid_search(
+     'zznomatchquery',
+     ('[0,0,0,1' || repeat(',0', 508) || ']')::extensions.vector,
+     'fake', 'fake', 512, 'v1', null, 5)
+    limit 1),
+  'lantern-drift',
+  'All-media hybrid_search returns a semantically nearest game');
+select is(
+  (select count(*)::int from public.hybrid_search(
+     'quiet',
+     ('[1' || repeat(',0', 511) || ']')::extensions.vector,
+     'fake', 'fake', 512, 'v1', 'game'::public.media_kind, 10)
+    where kind <> 'game'),
+  0,
+  'p_kind=game narrows hybrid_search to games only');
+select is(
+  (select slug from public.hybrid_search(
+     'Unembedded Quest',
+     ('[1' || repeat(',0', 511) || ']')::extensions.vector,
+     'fake', 'fake', 512, 'v1', null, 5)
+    limit 1),
+  'unembedded-quest',
+  'a game without an embedding is still found first by exact title');
+select is(
+  (select count(*)::int from public.semantic_search(
+     ('[0,0,0,1' || repeat(',0', 508) || ']')::extensions.vector,
+     'fake', 'fake', 512, 'v1', 'game'::public.media_kind, 5)
+    where slug = 'unembedded-quest'),
+  0,
+  'semantic_search never returns a game that has no embedding');
 
 select * from finish();
 rollback;

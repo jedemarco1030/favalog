@@ -51,7 +51,11 @@ import {
   SEMANTIC_MAX_COSINE_DISTANCE,
 } from "../lib/search/config.ts";
 import { CANONICAL_DOCUMENT_VERSION } from "../lib/search/canonical-document.ts";
-import { EMBEDDABLE_SOURCES } from "../lib/search/embedding-source-policy.ts";
+import { embeddableSourcesFor } from "../lib/search/embedding-source-policy.ts";
+import {
+  isRawgEmbeddingEnabled,
+  isTmdbEmbeddingEnabled,
+} from "../lib/catalog/feature-flag.ts";
 import { compareThresholds, evaluate } from "../lib/search/eval/metrics.ts";
 import {
   DEFAULT_THRESHOLDS,
@@ -204,10 +208,20 @@ async function main() {
   // expected in the compatible corpus or the gate would falsely fail-closed the
   // moment a TMDB row is materialized locally. This uses the same allowlist the
   // embedding pipeline applies.
+  // The same policy the pipeline applies for this mode: gated sources (TMDB,
+  // RAWG) count only when their flags are on, and RAWG only for fake vectors
+  // until live permission is documented. Provider-removed rows are never
+  // embedded, so they are not expected in the corpus either.
+  const embeddableSources = embeddableSourcesFor({
+    tmdbEmbeddingEnabled: isTmdbEmbeddingEnabled(process.env),
+    rawgEmbeddingEnabled: isRawgEmbeddingEnabled(process.env),
+    liveSubmission: args.live,
+  });
   const { count: catalogCount, error: catalogError } = await supabase
     .from("media_items")
     .select("*", { count: "exact", head: true })
-    .in("source", [...EMBEDDABLE_SOURCES]);
+    .in("source", embeddableSources)
+    .is("provider_removed_at", null);
   if (catalogError) {
     console.error(
       `[eval:search] Failed to count the catalog: ${catalogError.message}`,

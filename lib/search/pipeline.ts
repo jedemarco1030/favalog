@@ -91,6 +91,18 @@ export interface PipelineReport {
   failed: number;
   tokens: number;
   durationMs: number;
+  /** Stale records left for a later run because `maxEmbed` capped this one. */
+  deferred?: number;
+  /**
+   * Dry runs only: an approximate token count for the records that would be
+   * embedded (about 4 characters per token). A cost estimate, not a bill.
+   */
+  estimatedTokens?: number;
+}
+
+/** Approximate tokens for a document (~4 characters per token, rounded up). */
+export function estimateTokens(document: string): number {
+  return Math.ceil(document.length / 4);
 }
 
 /** Options for {@link runEmbeddingPipeline}. */
@@ -111,6 +123,12 @@ export interface PipelineOptions {
    * it only forces work the detection would otherwise skip.
    */
   force?: boolean;
+  /**
+   * Cap on how many STALE records this run embeds. Applied after staleness
+   * detection, so repeated bounded runs make progress (resumable) instead of
+   * re-reading the same already-fresh rows.
+   */
+  maxEmbed?: number;
   /** Optional safe progress callback (never receives keys/vectors). */
   onProgress?: (info: {
     batch: number;
@@ -208,9 +226,17 @@ export async function runEmbeddingPipeline(
     dimensions: provider.dimensions,
     documentVersion: options.documentVersion,
   };
-  const { toEmbed, unchanged } = selectStale(records, existing, expected, {
-    force: options.force,
-  });
+  const { toEmbed: stale, unchanged } = selectStale(
+    records,
+    existing,
+    expected,
+    { force: options.force },
+  );
+  const cap =
+    options.maxEmbed !== undefined && options.maxEmbed >= 0
+      ? Math.floor(options.maxEmbed)
+      : stale.length;
+  const toEmbed = stale.slice(0, cap);
 
   const report: PipelineReport = {
     attempted: toEmbed.length,
@@ -220,6 +246,15 @@ export async function runEmbeddingPipeline(
     tokens: 0,
     durationMs: 0,
   };
+  if (stale.length > toEmbed.length) {
+    report.deferred = stale.length - toEmbed.length;
+  }
+  if (options.dryRun) {
+    report.estimatedTokens = toEmbed.reduce(
+      (sum, record) => sum + estimateTokens(record.document),
+      0,
+    );
+  }
 
   if (options.dryRun || toEmbed.length === 0) {
     report.durationMs = now() - startedAt;

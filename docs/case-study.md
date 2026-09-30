@@ -93,7 +93,8 @@ document.
 
 ## What's not done
 
-- RAWG content is not semantically searchable.
+- RAWG content is not semantically searchable. The pipeline is implemented and
+  fixture-tested, but it stays off until RAWG permission is documented.
 - Some community-review surfaces still use the labelled mock layer.
 - The `social` and `likes` Playwright suites run locally, not in CI.
 - The scheduled catalog-refresh workflow has no recorded run.

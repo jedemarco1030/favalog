@@ -31,9 +31,12 @@ catalog stores only the titles people actually engage with.
 | Games      | RAWG                          | `rawg` + numeric id   | **No**: keyword search only |
 
 The **RAWG limitation**: game discovery, import, and keyword search work, and
-title pages credit RAWG. Live semantic embedding of RAWG content is blocked in
-code (`RAWG_LIVE_EMBEDDING_PERMISSION_DOCUMENTED = false`) and by the
-`RAWG_EMBEDDING_ENABLED` flag until RAWG's permission is documented.
+title pages credit RAWG. Game semantic search is implemented and covered by
+fixture tests, but it is not enabled: live embedding of RAWG content is refused
+in code (`RAWG_EMBEDDING_PERMISSION.status = "unresolved"`) and gated by the
+`RAWG_EMBEDDING_ENABLED` flag until RAWG's permission is documented. See the
+roadmap's "RAWG semantic search status" for the outstanding question and the
+activation steps.
 
 ### Current user journeys
 
