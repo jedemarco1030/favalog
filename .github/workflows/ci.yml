@@ -409,8 +409,12 @@ jobs:
           --require=portfolio-screenshots.spec.ts
 
       # `@prodreject`: the same build started with a PRODUCTION runtime marker
-      # must refuse the loopback transport override. Read-only against the
-      # fixture database, so it shares this job's stack without a reset.
+      # must refuse the loopback transport override. The fixtures suite imports
+      # titles into the local catalog, so reset before asserting they are absent;
+      # otherwise local search can return them even when the override is refused.
+      - name: Reset local database for production-refusal suite
+        run: npx supabase db reset
+
       - name: Run production-refusal Playwright tests
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-prodreject
