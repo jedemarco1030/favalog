@@ -7,7 +7,36 @@ behavioral tracking. Each of those needs separate owner approval.
 
 ## Release gate (2026-09-30)
 
-**Do not invite participants yet.** Post-merge source `1c076a3` passed the
+**Do not invite participants yet.** The owner merged
+[PR #22](https://github.com/jedemarco1030/favalog/pull/22) at main
+`f1a392e2d43dad39e690383451b829b77824f361`, identical tree to final review source
+`cf82d647d5ccbb685ec5aba25b9c5e48a7ecaa37`.
+[Final PR CI 36771309279](https://github.com/jedemarco1030/favalog/actions/runs/36771309279)
+passed with 1,615 unit/component tests, 617 pgTAP tests, unchanged types,
+34 retry-free fixtures, 20 retry-free first-list repetitions plus setup, and
+executed feed/likes. Configured Explore has 15 passes/one paid-semantic skip;
+eight provider-layout invocations each pass, as does production fixture-refusal.
+Default no-env has 44 passes/six intentional skips; explicit no-env has five
+passes. No E2E retries/flaky outcomes occurred. New post-merge main
+[CI 36773633454](https://github.com/jedemarco1030/favalog/actions/runs/36773633454)
+completed successfully. Its separately downloaded reports confirm the same
+counts, zero retries/flaky outcomes, required quality/capture artifacts and
+unchanged generated types. **MVP 1 engineering closeout complete; beta
+acceptance pending these owner checks.** The
+[release checklist](../mvp1-release-checklist.md) records the inspected evidence;
+engineering completion alone does not authorize invitations.
+
+Before invitations, the owner must confirm migration/deployment status, verify
+saved-record access and real-account isolation/save/social flows, perform
+screen-reader/actual-zoom/incomplete-target acceptance, and complete the approved
+read-only refresh rehearsal. `catalog-refresh` currently has no reviewer or
+branch protections configured; review these before rehearsal. Keep schedules
+and paid embeddings off. This document does not authorize any hosted operation
+or invitation, and no acceptance gate is silently waived.
+
+### Historical candidates
+
+Post-merge source `1c076a3` passed the
 retry-free first-list and fixture journeys, but likes did not execute on that
 baseline. [PR #22 CI 36760089274](https://github.com/jedemarco1030/favalog/actions/runs/36760089274)
 now executes likes and following feed successfully on application source
@@ -21,9 +50,10 @@ completed successfully: 1,574 unit/component tests, 34 retry-free fixtures,
 executed likes/feed. Configured Explore has 15 passes/one paid-semantic skip;
 default no-env has 44 passes/six intentional skips; explicit no-env has five
 passes/no skips. No revised-source E2E retries or flaky outcomes were recorded.
-The demonstration-separation follow-up still needs final documentation/capture-branch CI,
-owner migration/deployment approval, new post-merge main CI, and explicit owner
-accessibility/operational acceptance.
+At that point the demonstration-separation follow-up still needed final
+workflow/documentation-branch and new main CI; current evidence is above.
+Owner migration/deployment and accessibility/operational acceptance remain
+separate gates.
 Use the browser-only steps in the
 [release checklist](../mvp1-release-checklist.md). No gate has been silently
 deferred. Games support keyword discovery/search; do not promise RAWG live

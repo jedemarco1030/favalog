@@ -1,14 +1,48 @@
 # Favalog product roadmap
 
 > Living document. Last reconciled: 2026-09-30 (Phase 4E closeout), against
-> post-merge `main` at `1c076a3` (merged PR #21). Engineering closeout is incomplete;
-> the demonstration-separation follow-up still requires final-source CI. Release acceptance
-> is pending; see [the release checklist](mvp1-release-checklist.md). Update this file whenever a phase
+> post-merge `main` at `f1a392e` (merged PR #22). Final PR evidence is verified;
+> the new main run is reviewed separately in
+> [the release checklist](mvp1-release-checklist.md). Beta acceptance still needs
+> explicit owner migration/deployment, accessibility and operational checks.
+> Update this file whenever a phase
 > ships, a capability becomes production-verified, or the agreed sequence
 > changes. When a statement is only true at a point in time, keep it and date it
 > rather than deleting the history.
 
 ## Current closeout evidence (2026-09-30)
+
+The owner merged [PR #22](https://github.com/jedemarco1030/favalog/pull/22),
+final source `cf82d647d5ccbb685ec5aba25b9c5e48a7ecaa37`, into main
+`f1a392e2d43dad39e690383451b829b77824f361` with an identical tree.
+[Final PR CI 36771309279](https://github.com/jedemarco1030/favalog/actions/runs/36771309279)
+completed successfully. Downloaded reports confirm **1,615 unit/component tests
+across 166 files**, **617 pgTAP tests across 19 files**, unchanged generated
+types, 34 fixture passes, 20 first-list repetitions plus auth setup, configured
+Explore 15 passes/one intentional paid-semantic skip, eight provider-layout
+passes, production fixture-refusal one pass, feed and likes one pass each.
+Default no-env has 44 passes/six intentional skips; explicit no-env has five
+passes. Every executed E2E test passed first attempt, with zero retries/flaky
+outcomes or runner errors. Formatting, lint, typecheck and both builds passed.
+
+The final CI fix reserves local Supabase ports before image pulls, preserving
+Linux reservations, and prevents dependent Explore suites running after failed
+setup while still failing the job. No tests, report requirements, assertions,
+retries or timeouts were weakened. Original historical socket ownership remains
+unknown. [New main CI 36773633454](https://github.com/jedemarco1030/favalog/actions/runs/36773633454)
+completed successfully. Separately downloaded main reports confirm every
+count and zero-retry result above, along with quality/screenshot artifacts and
+byte-identical generated types; validation/database logs confirm both test
+counts. **MVP 1 engineering closeout complete; beta acceptance pending these
+owner checks.** Hosted migration/deployment, real-account saved-record flows,
+manual accessibility and operational rehearsal remain acceptance dependencies.
+
+Fresh refresh inspection found five skipped schedules, no configured reviewer
+or branch protections on `catalog-refresh`, and a 403 when reading the activation
+variable. Owner review and a separately approved read-only rehearsal remain
+required. Nothing was activated or written remotely.
+
+### Historical candidates and baseline
 
 [Post-merge CI 36749917450](https://github.com/jedemarco1030/favalog/actions/runs/36749917450)
 ran source `1c076a3eb4b94672251ca64e6ab33475a4311fe1`: 20 retry-free first-list
@@ -41,8 +75,9 @@ passed on their first attempt, with zero retries/flaky outcomes. Default no-env
 has 44 passes/six intentional skips; explicit no-env has five passes/no skips.
 Builds, pgTAP/RLS and generated-type drift passed; generated types are
 byte-identical. Fresh genuine-provider Home/Explore/search/title screenshots and
-ready fixture Save captures were inspected. Final documentation/capture-branch
-and post-merge main CI remain required. Nothing is production-applied here.
+ready fixture Save captures were inspected. At that point final
+workflow/documentation-branch and post-merge main CI remained required;
+current source evidence is recorded above. No hosted write was performed here.
 Earlier local verification: 1,562 unit/component passes and 131 focused regressions;
 Docker and native Playwright remain unavailable in this sandbox, not in CI.
 The full [release checklist](mvp1-release-checklist.md) is authoritative.

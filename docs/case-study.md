@@ -9,6 +9,42 @@ behaviour.
 
 ## Current release evidence (2026-09-30)
 
+The owner merged [PR #22](https://github.com/jedemarco1030/favalog/pull/22) into
+main `f1a392e2d43dad39e690383451b829b77824f361`, an identical tree to final
+review source `cf82d647d5ccbb685ec5aba25b9c5e48a7ecaa37`.
+[Final PR CI 36771309279](https://github.com/jedemarco1030/favalog/actions/runs/36771309279)
+completed successfully: 1,615 unit/component tests across 166 files, 617 pgTAP
+tests across 19 files, byte-identical generated types and both builds passed.
+Downloaded reports confirm 34 retry-free fixtures, 20 retry-free first-list
+repetitions plus setup, configured Explore 15 passes/one paid-semantic skip,
+eight provider-layout passes, production fixture-refusal one pass, and feed
+and likes one pass each. Default no-env has 44 passes/six intentional skips;
+explicit no-env has five passes/no skips. No E2E failures, retries or flaky
+outcomes occurred. The [new main run](https://github.com/jedemarco1030/favalog/actions/runs/36773633454)
+completed successfully. Its independently downloaded reports confirm all
+counts above, byte-identical types, the required quality evidence and ten fresh
+desktop/mobile captures. **MVP 1 engineering closeout complete; beta acceptance
+pending these owner checks.** The
+[release checklist](mvp1-release-checklist.md) retains explicit owner
+migration/deployment, real-account, accessibility and operational acceptance.
+
+The final CI hardening reserves Supabase ports before Docker image pulls so
+outbound ephemeral allocation cannot consume them, retains owner/socket
+state diagnostics, and gates dependent Explore invocations on successful
+prerequisites. It does not kill unknown listeners, relax assertions or hide
+setup failures. Read-only Auth readiness avoids starting fixtures before the
+local admin endpoint returns usable data. The original listener's identity
+remains unknown; passing later attempts do not erase that limitation.
+
+Fresh read-only production inspection confirms that Paper Watch is absent
+from the local query result and its saved title route carries a demonstration
+notice. That is not full migrated retrieval or authenticated owner acceptance.
+The refresh environment currently lacks reviewer and branch protections; its
+five latest schedules skipped, and activation-variable access returned 403.
+No hosted migration, dispatch, save, embedding job or secret change was made.
+
+### Historical candidate evidence
+
 [Post-merge main CI 36749917450](https://github.com/jedemarco1030/favalog/actions/runs/36749917450),
 source `1c076a3`, confirms 20 first-list repetitions without retries, 34 fixture
 passes and one following-feed pass. This supersedes the earlier pending JSON
@@ -31,8 +67,8 @@ fixture-refusal one pass, and likes/feed one pass each. Default no-env has
 44 passes/six intentional skips; explicit no-env has five passes/no skips.
 There are no retries or flaky outcomes in any revised-source invocation.
 Validation, builds and database/type drift pass, with byte-identical generated
-types. Final documentation/capture-branch and post-merge evidence plus owner
-acceptance still gate the release.
+types. Final documentation/capture-branch and post-merge evidence were still
+gates on that historical candidate; see current evidence above.
 
 The follow-up addresses a separate identity/presentation defect: exact legacy
 mock identities persisted as ordinary catalog rows. Its forward-only retrieval
@@ -65,8 +101,9 @@ The earlier follow-up passed 1,562 unit/component tests and focused browser
 presentation checks. Revised-source CI completed 1,574 tests across 163 files
 and both builds; local coverage reported the same tests but exited 137 even
 after one single-worker recovery, so that local check remains incomplete.
-Native Playwright and local database verification remain blocked by unavailable
-browser libraries/Docker; full final-branch CI is still required.
+Native Playwright and local database verification were blocked by unavailable
+browser libraries/Docker. The final PR and post-merge main CI recorded above now
+complete the required independent CI gate; those local checks remain incomplete.
 The synthetic golden evaluation corpus is explicitly local-only; live semantic
 quality requires a reviewed genuine-provider dataset and is not claimed here.
 

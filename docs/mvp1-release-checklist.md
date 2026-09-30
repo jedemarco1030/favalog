@@ -1,13 +1,99 @@
 # MVP 1 release checklist — Phase 4E
 
-**Decision, 2026-09-30: engineering closeout INCOMPLETE; MVP 1 NOT ACCEPTED.**
-Invited beta cannot begin yet. This follow-up starts from merged PR
-[#21](https://github.com/jedemarco1030/favalog/pull/21), `main` at
-`1c076a3eb4b94672251ca64e6ab33475a4311fe1`. No merge, deployment, hosted
+**Decision, 2026-09-30: MVP 1 engineering closeout complete; beta acceptance pending these owner checks.**
+**MVP 1 NOT ACCEPTED.** Invited beta cannot begin until owner acceptance is
+recorded. The checklist below retains migration/deployment, real-account,
+manual accessibility and operational gates. The owner merged
+[PR #22](https://github.com/jedemarco1030/favalog/pull/22) into `main` at
+`f1a392e2d43dad39e690383451b829b77824f361`. No new merge, deployment, hosted
 migration/write, user-record deletion, secret change, schedule activation, or
 paid embedding invocation is authorized by this checklist.
 
-## Inspected post-merge baseline
+## Final PR and post-merge verification
+
+[Final PR CI 36771309279](https://github.com/jedemarco1030/favalog/actions/runs/36771309279)
+is **completed, success**, application source
+`cf82d647d5ccbb685ec5aba25b9c5e48a7ecaa37`. The merged `f1a392e` tree is identical
+to that reviewed source. Reports were downloaded and independently summarized;
+execution counts are not inferred from green job conclusions.
+
+| Invocation                            |                       First-attempt passes |                            Intentional skips | Retries / flaky |
+| ------------------------------------- | -----------------------------------------: | -------------------------------------------: | --------------- |
+| Unit/component coverage               |                     1,615 across 166 files |                                            0 | Not Playwright  |
+| Strict configured Explore             |                                         15 |                    1 paid live-semantic test | 0 / 0           |
+| First-list repetitions                |                          20 + 1 auth setup |                                            0 | 0 / 0           |
+| Offline provider fixtures             |                   34, including auth setup |                                            0 | 0 / 0           |
+| Slow/partial/empty/disabled discovery | 1 per scenario per viewport; 8 invocations |                                            0 | 0 / 0           |
+| Production fixture-refusal            |                                          1 |                                            0 | 0 / 0           |
+| Following feed                        |                                          1 |                                            0 | 0 / 0           |
+| Likes                                 |                                          1 |                                            0 | 0 / 0           |
+| Default no-env                        |                                         44 | 6 existing placeholders/auth-dependent cases | 0 / 0           |
+| Explicit no-env                       |                                          5 |                                            0 | 0 / 0           |
+
+Formatting, lint, typecheck, coverage, production/Storybook builds and database
+checks passed. pgTAP records **617 tests across 19 files**. Generated types are
+byte-identical to the committed file (SHA-256
+`72f4b396a36b70146cc61442c0eeb3d61ba695504373e2b644e4c07522020702`).
+All E2E invocations have zero failed/invalid tests and zero runner errors.
+The configured skip needs real paid-semantic credentials/corpus; the six no-env
+skips are four list placeholders plus authenticated deletion/favorites.
+
+Inspected artifacts: `e2e-results-explore-integration`, `e2e-results-social`,
+`e2e-results-likes`, `e2e-results-no-env`, `quality-evidence-configured-fixtures`,
+`quality-evidence-no-env`, `portfolio-screenshots`, and
+`database-types-cf82d647d5ccbb685ec5aba25b9c5e48a7ecaa37`.
+
+[Post-merge main CI 36773633454](https://github.com/jedemarco1030/favalog/actions/runs/36773633454)
+is **completed, success** on exact source
+`f1a392e2d43dad39e690383451b829b77824f361`. All six jobs passed, including
+cleanup and mandatory report/quality/screenshot uploads. Downloaded main
+reports independently confirm **every count, skip and zero-retry outcome in
+the table above**, not merely equivalent PR job conclusions. Main validation
+records 1,615 tests across 166 files and successful formatting/lint/typecheck,
+coverage and both builds; database logs record 617 pgTAP tests across 19 files.
+Main's generated types are byte-identical to the committed file. The same
+artifact names above were inspected from this main run, with generated types
+named `database-types-f1a392e2d43dad39e690383451b829b77824f361`.
+
+Main quality evidence confirms Save focus trapping/restoration, zero dialog/form
+axe violations or incomplete targets, no 320 px overflow and reduced-motion
+maximum duration 0.00001 seconds. Sixteen contrast scans retain ARIA and mobile
+Explore contrast incomplete targets; the 640 px report is only a zoom proxy.
+Manual screen-reader, actual browser zoom and incomplete-target acceptance are
+not automated passes. All ten main desktop/mobile Home, Explore, search,
+title and ready Save captures were visually inspected after the capture
+harness's image-decode/readiness gates. Retained
+[desktop](screenshots/save-dialog-desktop-fixture-main.png) and
+[mobile](screenshots/save-dialog-mobile-fixture-main.png) Save captures are
+**synthetic local fixture evidence**, not authentic covers or production
+portfolio evidence. Genuine-provider captures remain separately dated; the
+application `app`, `components`, `lib` and `public` trees are unchanged between
+capture source `5847189` and final source `cf82d64`.
+
+This evidence-only documentation update does not change application code,
+workflow behavior or schema. Its formatting/diff checks are separate from
+the verified main application source. No CI rerun was dispatched to obtain
+these results.
+
+The final runner fix reserves ports 54320–54329 before local Supabase image
+pulls, preserving existing Linux reservations. Those ports overlap the runner's
+ephemeral range, so outbound connections can occupy them before Docker binds.
+Startup diagnostics retain listening and non-listening socket owners. This
+prevents that allocation race, but does not establish the original failed
+listener's identity or prove every possible bind conflict impossible. Explore
+prerequisite gating now records setup failures as **tests not executed**, avoids
+running dependent suites, and still fails the job; reports remain mandatory
+when tests execute. Auth readiness is bounded, local-only and read-only.
+
+Fresh production read-only checks at 942×664 dark found zero local results for
+`/explore?q=paper%20watch`; `/title/paper-watch` still resolves with the explicit
+Demonstration title notice and no fabricated rating distribution. These are
+individual deployed observations, not proof of migration history, complete
+search exclusion, exact deployed SHA or authenticated saved-record access.
+No hosted write was performed. Owner-controlled migration/deployment status
+must be confirmed before beta acceptance.
+
+## Historical inspected post-merge baseline
 
 [CI 36749917450](https://github.com/jedemarco1030/favalog/actions/runs/36749917450)
 ran against the exact main source above. Its overall conclusion is **failure**,
@@ -41,7 +127,7 @@ credible evidence of authentic covers. Historical failed candidates
 `629fa3a`, `3bc4561`, and `04e957a` predate this inspected main run; their pending
 first-list claims are superseded by the baseline above, not by a final-source pass.
 
-## Follow-up fixes and current limits
+## Follow-up fixes and historical verification limits
 
 - Exact `source=favalog` plus the 28 immutable legacy identifiers distinguishes
   demonstrations from genuine internal curation. Home and browse apply the
@@ -138,8 +224,9 @@ Auth setup failed to create its user with an invalid upstream response; all
 proof that screenshots were captured. A bounded, loopback-only, read-only Auth
 admin readiness probe now gates both fixture invocations. Artifact requirements,
 application assertions and Playwright retries/timeouts remain unchanged. This
-readiness change needs fresh CI verification; engineering closeout remains
-incomplete until that gate is inspected.
+readiness change needed fresh CI verification at that point. Final source
+`cf82d64` subsequently passed the inspected run recorded above; its new main
+run is a separate gate.
 
 Earlier local follow-up checks: 1,562 unit/component tests across 163 files
 passed with coverage (93.66% statements, 86.31% branches, 96.20% functions,
@@ -155,7 +242,8 @@ and successful production/Storybook builds. Docker is absent, so local pgTAP,
 type generation and configured/social/likes/fixture E2E could not execute. Native no-env Playwright had five browser-launch
 errors and **zero behavior passes**, caused by missing `libnspr4.so`; one
 `install-deps` recovery failed because this OS has no `apt-get`. No assertions,
-timeouts or skip allowlists were relaxed. Final-source CI remains mandatory.
+timeouts or skip allowlists were relaxed. Final-source CI was mandatory; the
+final PR and post-merge main evidence above now clear that independent gate.
 
 Fresh read-only dark desktop/mobile Home, Explore, search and title checks used
 real provider content in the development preview. Final application-source
@@ -178,29 +266,41 @@ owner-controlled session, not an unauthorized hosted save.
 - [x] Retain a scoped follow-up runner attempt where likes execute and pass
       (`36760089274`); the bind failure did not recur. Original ownership remains
       unknown, so this is not a permanent root-cause-fix claim.
-- [ ] Review complete final-source CI, including all mandatory invocation counts,
-      first-list repetitions without retries, provider failure scenarios, feed,
-      likes, pgTAP and generated types. Signatures/types are unchanged by the
-      migration, but drift must still be checked rather than assumed.
+- [x] Review complete final-source PR CI `36771309279` at `cf82d64`, including
+      all mandatory invocation counts, 20 retry-free first-list repetitions,
+      provider failure scenarios, executed feed/likes, 617 pgTAP tests and
+      byte-identical generated types. Post-merge main is inspected separately.
 - [x] Fresh application-source desktop/mobile captures for Home, Explore,
       search, genuine-provider title detail and ready Save dialog were visually
       inspected. Provider captures use `5847189`; Save uses its isolated CI
       fixtures, clearly labelled as synthetic test evidence only.
-- [ ] Owner reviews and merges only after engineering gates pass. Verify the
-      **new post-merge main CI**, not merely PR CI, before the release decision.
-- [ ] Owner separately approves/applies the forward migration after a fresh
-      alias-conflict check, then deploys the reviewed application. Never apply
+- [x] Owner merged reviewed PR #22 after successful final-source PR CI.
+- [x] Verify **new post-merge main CI `36773633454`**, completed success on
+      `f1a392e`, and independently inspect all required invocation reports,
+      quality evidence, screenshots, pgTAP logs and generated types.
+- [ ] Owner confirms whether forward migration
+      `20260930180000_separate_demonstration_catalog.sql` is already applied.
+      If not, separately approve/apply it after a fresh alias-conflict check,
+      then deploy/confirm the reviewed application revision. Never apply
       `seed.sql` to hosted production. Verify exclusion and saved-record access
       before inviting participants. No backfill or identity reconciliation is
       implicitly authorized.
 
 ## Browser-only owner acceptance
 
-1. In GitHub Actions, open the failed baseline likes job and **Re-run failed
-   jobs once** if still appropriate. On the review PR, inspect all final-source
-   jobs and artifacts; if binding recurs, retain the port-owner diagnostics and
-   request a cause-specific fix. After merge, verify the new main CI run.
-2. Following separate migration/deployment approval: signed out, check Home and
+1. In GitHub Actions, retain final-source PR run `36771309279` and new main
+   run `36773633454` with their required reports; the historical failed job does
+   not need another rerun to substitute for current evidence. If binding recurs,
+   retain scoped socket-owner diagnostics and request a cause-specific fix,
+   rather than rerunning until green. Follow the current engineering decision
+   above before proceeding.
+2. In Supabase Dashboard, confirm the applied-migration history for
+   `20260930180000_separate_demonstration_catalog.sql`. If absent, first obtain
+   separate migration approval and inspect its exact alias-conflict guard against
+   the intended project. Apply only that reviewed forward SQL, never `seed.sql`;
+   an alias conflict blocks application and needs separate reconciliation.
+   In Vercel's project Deployments, confirm the reviewed main revision is Ready
+   after the schema gate. Then, signed out, check Home and
    Explore discovery first across all media types; search real TMDB/Open Library/
    RAWG titles, inspect attribution, counts/filters/page URLs and artwork. Paper
    Watch/Under the Eaves must not appear as ordinary production results. A saved
@@ -215,8 +315,9 @@ owner-controlled session, not an unauthorized hosted save.
    failure rehearsal. Record VoiceOver/Safari or NVDA/browser versions and actual
    announcements. Check **actual 200% browser zoom**, 320 px reflow, reduced
    motion and light/dark artwork contrast. Review axe incomplete targets.
-5. GitHub **Settings → Environments → catalog-refresh**: inspect protections and
-   secret names `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_PROJECT_REF`,
+5. GitHub **Settings → Environments → catalog-refresh**: the read-only API
+   currently reports **no reviewer protections and no branch policy**. Review
+   and configure owner-approved protections before rehearsal; verify secret names `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_PROJECT_REF`,
    `TMDB_API_READ_TOKEN`; do not share their values. Ensure the URL's project ref
    matches the intended project. Keep `CATALOG_REFRESH_ENABLED` unset/`false`.
    **Actions → Catalog metadata refresh → Run workflow → branch `main` after
@@ -238,6 +339,7 @@ keyword discovery/search only until permission **and** independent activation
 are verified. Optional deferral must be owner-recorded with user impact, never
 silently converted into a passed release gate.
 
-When engineering gates actually pass but owner acceptance remains, use exactly:
+The inspected final PR and new post-merge main evidence now support:
 **“MVP 1 engineering closeout complete; beta acceptance pending these owner checks.”**
-That decision is **not yet supported** by the current evidence.
+This is not MVP 1 acceptance and does not authorize invitations, hosted writes,
+live scheduling, or paid embedding work. Owner acceptance must be explicit.
