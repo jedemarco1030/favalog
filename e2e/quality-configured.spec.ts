@@ -1,4 +1,9 @@
-import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import type { BrowserContext, Page } from "@playwright/test";
+import { expect, test } from "./fixtures/test";
+import {
+  FIXTURE_SURFACES,
+  waitForFixtureSurface,
+} from "./lib/fixture-readiness";
 
 import { routeProviderArtwork, type ArtworkStats } from "./lib/fixture-artwork";
 import {
@@ -8,7 +13,7 @@ import {
   measureRun,
   newProfileContext,
   recordEvidence,
-  runAxe,
+  runAxeDetails,
   summarizeRuns,
 } from "./lib/quality";
 
@@ -27,12 +32,7 @@ import {
 const STORAGE_STATE = "e2e/.auth/fixtures-user.json";
 const DISCOVERY_TITLE = "Fixture Lantern Coast";
 
-const PAGES = [
-  { id: "home", url: "/" },
-  { id: "explore-empty", url: "/explore" },
-  { id: "explore-search", url: "/explore?q=dune" },
-  { id: "title-detail", url: "/title/dune-part-two" },
-] as const;
+const PAGES = FIXTURE_SURFACES;
 
 async function horizontalOverflow(page: Page) {
   return page.evaluate(() => {
@@ -87,11 +87,27 @@ test.describe("@fixtures quality configured", () => {
           runs.push(
             await measureRun(browser, profile, url, {
               storageState: STORAGE_STATE,
+              ready: waitForFixtureSurface,
               setup: async (context) => {
                 artwork.push(await routeProviderArtwork(context));
               },
             }),
           );
+        }
+        for (let i = 0; i < RUNS; i++) {
+          expect(
+            artwork[i].requests,
+            `${id}: expected offline artwork requests`,
+          ).toBeGreaterThan(0);
+          expect(
+            runs[i].imageCount,
+            `${id}: expected measured image resources`,
+          ).toBeGreaterThan(0);
+          expect(
+            runs[i].images.filter(
+              (image) => image.inInitialViewport && image.naturalWidth > 0,
+            ).length,
+          ).toBeGreaterThan(0);
         }
         await recordEvidence(
           testInfo,
@@ -153,6 +169,7 @@ test.describe("@fixtures quality configured", () => {
     > = {};
     for (const { id, url } of PAGES) {
       await page.goto(url, { waitUntil: "load" });
+      await waitForFixtureSurface(page, true);
       results[id] = await horizontalOverflow(page);
     }
     await context.close();
@@ -165,7 +182,7 @@ test.describe("@fixtures quality configured", () => {
     }
   });
 
-  test("200% zoom keeps content reachable without horizontal scrolling", async ({
+  test("200% zoom-equivalent viewport keeps content reachable (not actual browser zoom)", async ({
     browser,
   }, testInfo) => {
     // 200% browser zoom of a 1280x800 window is a 640x400 CSS viewport at 2x.
@@ -182,6 +199,7 @@ test.describe("@fixtures quality configured", () => {
     > = {};
     for (const { id, url } of PAGES) {
       await page.goto(url, { waitUntil: "load" });
+      await waitForFixtureSurface(page, true);
       results[id] = await horizontalOverflow(page);
     }
     await page.goto("/explore");
@@ -262,28 +280,33 @@ test.describe("@fixtures quality configured", () => {
   test("text over artwork passes automated contrast checks", async ({
     browser,
   }, testInfo) => {
-    const results: Record<string, unknown> = {};
-    for (const profile of [PROFILES.mobile, PROFILES.desktop]) {
-      const context = await newProfileContext(browser, profile, {
-        storageState: STORAGE_STATE,
-        setup: withArtworkContext,
-      });
-      const page = await context.newPage();
-      for (const { id, url } of PAGES) {
-        await page.goto(url, { waitUntil: "load" });
-        const violations = await runAxe(page);
-        results[`${id}-${profile.name}`] = violations.filter(
-          (v) => v.id === "color-contrast",
-        );
+    const results: Record<
+      string,
+      Awaited<ReturnType<typeof runAxeDetails>>
+    > = {};
+    for (const colorScheme of ["dark", "light"] as const) {
+      for (const profile of [PROFILES.mobile, PROFILES.desktop]) {
+        const context = await newProfileContext(browser, profile, {
+          colorScheme,
+          storageState: STORAGE_STATE,
+          setup: withArtworkContext,
+        });
+        const page = await context.newPage();
+        for (const { id, url } of PAGES) {
+          await page.goto(url, { waitUntil: "load" });
+          await waitForFixtureSurface(page, true);
+          results[`${id}-${profile.name}-${colorScheme}`] =
+            await runAxeDetails(page);
+        }
+        await context.close();
       }
-      await context.close();
     }
     await recordEvidence(testInfo, "configured-contrast", {
       note: "axe color-contrast over fixture artwork. axe reports text on images as incomplete, not passing; see docs/quality/baseline.md for the manual review.",
       results,
     });
-    for (const [id, violations] of Object.entries(results)) {
-      expect(violations, id).toEqual([]);
+    for (const [id, findings] of Object.entries(results)) {
+      expect(findings.violations, id).toEqual([]);
     }
   });
 });

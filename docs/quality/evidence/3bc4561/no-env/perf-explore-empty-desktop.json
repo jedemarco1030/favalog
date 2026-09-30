@@ -1,0 +1,98 @@
+{
+  "runs": 3,
+  "samples": [
+    {
+      "settledMs": 267,
+      "ttfbMs": 26,
+      "domContentLoadedMs": 124,
+      "loadMs": 209,
+      "lcpMs": 144,
+      "lcpElement": "p(Search the catalog by title, creator, ge)",
+      "cls": 0.0026,
+      "shifts": [
+        {
+          "value": 0.0026,
+          "atMs": 104,
+          "nodes": [
+            "form.relative.flex.w-full(Search Favalog⌘K)",
+            "div.ml-auto.flex.items-center(Sign inStart your FavalogSign )"
+          ]
+        }
+      ],
+      "scriptBytes": 183979,
+      "scriptCount": 13,
+      "imageBytes": 0,
+      "imageCount": 0,
+      "totalBytes": 462560,
+      "images": []
+    },
+    {
+      "settledMs": 269,
+      "ttfbMs": 30,
+      "domContentLoadedMs": 128,
+      "loadMs": 214,
+      "lcpMs": 168,
+      "lcpElement": "p(Search the catalog by title, creator, ge)",
+      "cls": 0,
+      "shifts": [],
+      "scriptBytes": 183979,
+      "scriptCount": 13,
+      "imageBytes": 0,
+      "imageCount": 0,
+      "totalBytes": 462561,
+      "images": []
+    },
+    {
+      "settledMs": 252,
+      "ttfbMs": 29,
+      "domContentLoadedMs": 118,
+      "loadMs": 198,
+      "lcpMs": 144,
+      "lcpElement": "p(Search the catalog by title, creator, ge)",
+      "cls": 0,
+      "shifts": [],
+      "scriptBytes": 183979,
+      "scriptCount": 13,
+      "imageBytes": 0,
+      "imageCount": 0,
+      "totalBytes": 462565,
+      "images": []
+    }
+  ],
+  "median": {
+    "settledMs": 267,
+    "ttfbMs": 29,
+    "domContentLoadedMs": 124,
+    "loadMs": 209,
+    "lcpMs": 144,
+    "cls": 0,
+    "scriptBytes": 183979,
+    "imageBytes": 0,
+    "totalBytes": 462561
+  },
+  "lcpElements": [
+    "p(Search the catalog by title, creator, ge)",
+    "p(Search the catalog by title, creator, ge)",
+    "p(Search the catalog by title, creator, ge)"
+  ],
+  "layoutShifts": [
+    [
+      {
+        "value": 0.0026,
+        "atMs": 104,
+        "nodes": [
+          "form.relative.flex.w-full(Search Favalog⌘K)",
+          "div.ml-auto.flex.items-center(Sign inStart your FavalogSign )"
+        ]
+      }
+    ],
+    [],
+    []
+  ],
+  "scriptCount": 13,
+  "imageCount": 0,
+  "oversizedImages": [],
+  "lazyInInitialViewport": [],
+  "highPriorityImages": [],
+  "imagesMissingAlt": []
+}

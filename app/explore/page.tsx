@@ -200,24 +200,22 @@ export default async function ExplorePage({
 
   const defaultSections = browseOutcome ? (
     <div className="flex flex-col gap-12">
-      <CatalogBrowse outcome={browseOutcome} />
-      {/* Streams in below the stable catalog so its resolved height cannot
-          push already-painted content down (desktop CLS 0.0897 in the 4E
-          baseline when it sat above). */}
-      {showOverview && (
-        <Suspense fallback={<SectionSkeleton heading="Discover" />}>
-          <ExploreDiscoveryOverview />
-        </Suspense>
-      )}
-      {discoveryKind && (
-        <Suspense fallback={<SectionSkeleton heading="Discover" />}>
-          <DiscoveryBrowse
-            kind={discoveryKind}
-            rawSort={firstParam(params.discover)}
-            rawPage={firstParam(params.dpage)}
-          />
-        </Suspense>
-      )}
+      <Suspense fallback={<DiscoveryLoading />}>
+        <DiscoveryAndCatalog
+          discovery={
+            showOverview ? (
+              <ExploreDiscoveryOverview />
+            ) : discoveryKind ? (
+              <DiscoveryBrowse
+                kind={discoveryKind}
+                rawSort={firstParam(params.discover)}
+                rawPage={firstParam(params.dpage)}
+              />
+            ) : null
+          }
+          catalog={<CatalogBrowse outcome={browseOutcome} />}
+        />
+      </Suspense>
     </div>
   ) : (
     editorialExampleSections
@@ -241,6 +239,55 @@ export default async function ExplorePage({
         externalSections={externalSections}
       />
     </Container>
+  );
+}
+
+// Keep downstream catalog content inside the same boundary: the number of
+// available shelves is unknowable until providers settle. Reserving all four
+// would leave large holes on failure; painting the catalog first would shift it.
+async function DiscoveryAndCatalog({
+  discovery,
+  catalog,
+}: {
+  discovery: ReactNode;
+  catalog: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-12" data-discovery-settled>
+      {discovery}
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-foreground/70">
+          Local catalog · titles already added to Favalog
+        </p>
+        {catalog}
+      </div>
+    </div>
+  );
+}
+
+function DiscoveryLoading() {
+  return (
+    <section
+      aria-label="Loading discovery"
+      aria-busy="true"
+      className="flex flex-col gap-6"
+    >
+      <p role="status" className="text-sm text-foreground/70">
+        Loading provider discovery…
+      </p>
+      <div
+        aria-hidden="true"
+        className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-5"
+      >
+        {Array.from({ length: 5 }, (_, index) => (
+          <div key={index} className="flex flex-col gap-3">
+            <div className="aspect-[2/3] rounded-xl bg-surface-2 motion-safe:animate-pulse" />
+            <div className="h-6 rounded bg-surface-2" />
+            <div className="h-8 rounded bg-surface-2" />
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 

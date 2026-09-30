@@ -5,7 +5,9 @@ organizing, and discovering **movies, TV series, books, and video games** in one
 cross-media record. Discovery is led by external providers. The canonical
 catalog stores only the titles people actually engage with.
 
-> Status is reconciled as of **2026-09-29** against `main`. Each capability
+> Status is reconciled as of **2026-09-30** against reviewed `main` at
+> `5d1663b` and closeout PR #21. **MVP 1 acceptance is still pending**; see the
+> [release checklist](docs/mvp1-release-checklist.md). Each capability
 > below is labelled by its evidence: implemented in code, CI-verified,
 > owner-confirmed in production, or unverified/deferred. The authoritative
 > per-capability table is the "Status reconciliation" section of
@@ -16,10 +18,17 @@ catalog stores only the titles people actually engage with.
 ## Live demo and screenshots
 
 - **Live deployment:** <https://favalog.vercel.app>
-- **Screenshots:** not yet committed. The v0 sandbox cannot run a browser, so
-  screenshots will be captured from CI Playwright runs or real sessions,
-  never mock-ups.
+- **Screenshots:** inspected, artwork-backed Home captures from the local/offline
+  fixture application in [CI 36666650203](https://github.com/jedemarco1030/favalog/actions/runs/36666650203)
+  (source `3bc4561`). These are synthetic fixture artwork, not authentic covers
+  or production captures; the overall run failed save/zoom checks and is not
+  release acceptance. Other captures remain under review.
 - **Engineering case study:** [`docs/case-study.md`](docs/case-study.md).
+
+![Desktop Home: offline fixtures with decoded hero and discovery artwork](docs/screenshots/home-desktop-fixture.png)
+
+[Mobile Home fixture capture](docs/screenshots/home-mobile-fixture.png).
+Both screenshots show the actual application, never mock-ups.
 
 ## What Favalog does
 
@@ -40,7 +49,9 @@ activation steps.
 
 ### Current user journeys
 
-All of these are implemented and owner-confirmed in production:
+These journeys are implemented and owner-confirmed in the production baseline
+through 2026-09-29. Closeout presentation/reliability changes require fresh
+release acceptance; fixture CI is not production confirmation:
 
 1. **Discover without searching.** Home and the empty-query Explore view show
    provider-ranked shelves (Trending, New releases, Coming soon, Highest
@@ -119,7 +130,7 @@ Operator scripts: `npm run catalog` (import), `npm run refresh:catalog`,
 | Seeded Explore journeys                       | `npm run test:e2e:configured`        | Yes (local Supabase)                              |
 | Quality baseline (performance and a11y lab)   | runs inside the `default` project    | Yes; evidence in the `playwright-report` artifact |
 | `@fixtures` (offline provider fixture server) | `npm run test:e2e:fixtures`          | Yes (local Supabase)                              |
-| `social`, `likes` journeys                    | `npm run test:e2e:social` / `:likes` | **Not yet**: run locally                          |
+| `social`, `likes` journeys                    | `npm run test:e2e:social` / `:likes` | Yes (separate local Supabase jobs)                |
 
 Tests never mutate hosted production. The `@fixtures` suite refuses to start
 when `SUPABASE_URL` points at a hosted project. Laboratory measurements are
@@ -127,9 +138,9 @@ documented in [`docs/quality/baseline.md`](docs/quality/baseline.md). They are
 not real-user metrics, and a passing automated accessibility scan does not
 establish accessibility compliance.
 
-Development happens in a browser-only environment (v0 on a sandbox VM without
-a browser runtime). Browser evidence therefore comes from GitHub Actions, and a
-successful compile is never treated as verification. The project is built with
+Development happens in v0. Read-only preview checks can use its remote browser;
+Docker-backed fixture verification and portfolio capture run in GitHub Actions.
+A successful compile is never treated as verification. The project is built with
 AI assistance: the owner sets requirements and reviews, merges, and confirms
 production behavior.
 
@@ -137,9 +148,13 @@ production behavior.
 
 - RAWG content is not semantically searchable (see above).
 - Community reviews on some surfaces still come from the labelled mock layer.
-- `catalog-refresh.yml` is on `main`, but no run has been recorded, and
-  whether it is enabled on the hosting side is unverified.
-- The `social` and `likes` Playwright suites are not yet in CI.
+- Catalog-refresh scheduling exists, but the five latest observed scheduled
+  runs skipped the refresh job (latest: `36557022714`). This is not evidence
+  of processing. Activation is a **GitHub Actions** variable, not a Vercel
+  environment variable; owner operational acceptance is still required.
+- MVP 1 is **not yet accepted**. See the
+  [release checklist](docs/mvp1-release-checklist.md) for outstanding evidence
+  and owner screen-reader/operational checks.
 - Possible duplicate RAWG candidates are tracked as a data-quality issue.
   Records are never merged on title similarity alone.
 - There are no notifications, comments, blocking, or private accounts yet.

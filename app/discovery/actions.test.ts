@@ -41,7 +41,17 @@ vi.mock("@/lib/supabase/lists", () => ({
   addListItem: (input: unknown) => addListItem(input),
 }));
 
-import { saveDiscoveredTitleAction } from "@/app/discovery/actions";
+const createListAction = vi.fn();
+vi.mock("@/app/lists/actions", () => ({
+  createListAction: (state: unknown, data: FormData) =>
+    createListAction(state, data),
+}));
+
+import {
+  createAndSaveDiscoveredTitleAction,
+  saveDiscoveredTitleAction,
+} from "@/app/discovery/actions";
+import { initialCreateListFormState } from "@/app/lists/list-form";
 import { initialDiscoverySaveState } from "@/app/discovery/save-form";
 import {
   AMBIGUOUS_MATERIALIZE_MESSAGE,
@@ -85,6 +95,87 @@ describe("saveDiscoveredTitleAction", () => {
       listId: LIST_ID,
       alreadyPresent: false,
     });
+  });
+
+  it("creates and saves once, ignoring caller ownership and initial membership fields", async () => {
+    createListAction.mockResolvedValue({
+      status: "success",
+      listId: LIST_ID,
+      title: "Games",
+      slug: "games",
+    });
+    const result = await createAndSaveDiscoveredTitleAction(
+      initialCreateListFormState,
+      form({
+        title: "Games",
+        visibility: "private",
+        userId: "other-user",
+        mediaSlug: "other-title",
+        returnTo: "https://evil.example",
+      }),
+    );
+    expect(result.save).toMatchObject({
+      status: "success",
+      listId: LIST_ID,
+      mediaSlug: "hades",
+    });
+    expect(createListAction).toHaveBeenCalledTimes(1);
+    expect(addListItem).toHaveBeenCalledTimes(1);
+    expect([...createListAction.mock.calls[0][1].entries()]).toEqual([
+      ["title", "Games"],
+      ["visibility", "private"],
+      ["returnTo", "/explore"],
+    ]);
+  });
+
+  it("does not save when the authenticated creation gate rejects the caller", async () => {
+    createListAction.mockResolvedValue({
+      status: "unauthenticated",
+      redirectTo: "/auth/sign-in",
+    });
+    const result = await createAndSaveDiscoveredTitleAction(
+      initialCreateListFormState,
+      form(),
+    );
+    expect(result.status).toBe("unauthenticated");
+    expect(materialize).not.toHaveBeenCalled();
+    expect(addListItem).not.toHaveBeenCalled();
+  });
+
+  it("retains the created list after an add failure and retries without creation", async () => {
+    createListAction.mockResolvedValue({
+      status: "success",
+      listId: LIST_ID,
+      title: "Games",
+      slug: "games",
+    });
+    addListItem.mockResolvedValueOnce({
+      status: "error",
+      message: "Try again.",
+    });
+    const result = await createAndSaveDiscoveredTitleAction(
+      initialCreateListFormState,
+      form(),
+    );
+    expect(result).toMatchObject({
+      status: "success",
+      listId: LIST_ID,
+      save: { status: "error" },
+    });
+    expect((await save(form({ listId: result.listId! }))).status).toBe(
+      "success",
+    );
+    expect(createListAction).toHaveBeenCalledTimes(1);
+    expect(addListItem).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not create a list for invalid provider identity", async () => {
+    const result = await createAndSaveDiscoveredTitleAction(
+      initialCreateListFormState,
+      form({ provider: "invalid" }),
+    );
+    expect(result.status).toBe("error");
+    expect(createListAction).not.toHaveBeenCalled();
   });
 
   it("materializes then adds to the list, revalidating both pages", async () => {

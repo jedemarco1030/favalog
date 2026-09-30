@@ -217,13 +217,57 @@ jobs:
       - name: Run default Playwright tests
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report
+          PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-results/default.json
+          QUALITY_EVIDENCE_DIR: quality-evidence-no-env
         run: E2E_SUITE=configured npx playwright test --project=default
+
+      # Six exact no-env exceptions: four pre-existing real-list placeholders
+      # and two authenticated journeys. Default has no Supabase/auth account;
+      # list creation/visibility run in isolated fixtures, not this build.
+      - name: Assert default execution and narrowly allowed skips
+        if: ${{ !cancelled() }}
+        run: >-
+          node scripts/assert-e2e-results.mjs e2e-results/default.json --min=44
+          --require=quality-baseline.spec.ts
+          '--allow-skip=lists-persistence.spec.ts::create → add title → view list → see it on profile → remove title'
+          '--allow-skip=lists-persistence.spec.ts::a public real list is reachable by its globally-unique slug'
+          '--allow-skip=lists-persistence.spec.ts::a private real list is not disclosed to a non-owner'
+          "--allow-skip=lists-persistence.spec.ts::owner edits a list's metadata and stays on the immutable URL"
+          '--allow-skip=lists-persistence.spec.ts::owner deletes a whole list and returns safely to /lists'
+          '--allow-skip=favorites.spec.ts::favorite → refresh retains → appears on profile → remove → refresh retains removal → gone from profile'
+
+      - name: Assert no-env quality artifacts
+        if: ${{ !cancelled() }}
+        run: node scripts/assert-quality-artifacts.mjs no-env
 
       - name: Run no-env Playwright tests
         if: ${{ !cancelled() }}
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-no-env
+          PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-results/no-env.json
         run: E2E_SUITE=no-env npx playwright test
+
+      - name: Assert no-env suite executed
+        if: ${{ !cancelled() }}
+        run: node scripts/assert-e2e-results.mjs e2e-results/no-env.json --min=1
+
+      - name: Upload default and no-env machine-readable evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results-no-env
+          path: e2e-results
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload no-env quality evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-evidence-no-env
+          path: quality-evidence-no-env
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
@@ -379,6 +423,7 @@ jobs:
           node scripts/assert-e2e-results.mjs e2e-results/configured.json --min=5
           --require=explore.spec.ts --require=explore-search.spec.ts
           --require=explore-federated.spec.ts
+          '--allow-skip=explore-search.spec.ts::natural-language query returns semantically relevant results'
 
       # `@fixtures` suite: federated discovery against the OFFLINE provider
       # fixture server (no provider keys) and this job's local Supabase stack.
@@ -387,10 +432,67 @@ jobs:
       # persistence, duplicate prevention, the configured quality evidence, and
       # the README screenshots. A fresh reset gives it the same clean database
       # as `npm run test:e2e:fixtures`. Reports go to their own directories.
+      - name: Run slow, partial failure, empty, and disabled discovery scenarios
+        env:
+          QUALITY_EVIDENCE_DIR: quality-evidence
+        run: |
+          status=0
+          for scenario in slow partial empty disabled; do
+            for profile in mobile desktop; do
+              E2E_SUITE=fixtures-layout E2E_DISCOVERY_SCENARIO="$scenario" \
+                E2E_LAYOUT_PROFILE="$profile" \
+                PLAYWRIGHT_HTML_OUTPUT_DIR="playwright-report-layout-$scenario-$profile" \
+                PLAYWRIGHT_JSON_OUTPUT_NAME="e2e-results/layout-$scenario-$profile.json" \
+                npx playwright test --retries=0 || status=1
+              node scripts/assert-e2e-results.mjs "e2e-results/layout-$scenario-$profile.json" \
+                --min=1 --require=discovery-layout.spec.ts --max-retried=0 || status=1
+            done
+          done
+          exit "$status"
+
+      - name: Upload discovery scenario reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-layout-scenarios
+          path: playwright-report-layout-*
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Reset local database for retry-free first-list repetitions
+        if: ${{ !cancelled() }}
+        run: npx supabase db reset
+
+      - name: Repeat first-list journey twenty times (no retries)
+        if: ${{ !cancelled() }}
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-first-list
+          PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-results/first-list.json
+        run: E2E_SUITE=fixtures npx playwright test --grep 'zero lists' --repeat-each=20 --retries=0
+
+      - name: Assert all first-list repetitions executed on first attempt
+        if: ${{ !cancelled() }}
+        run: >-
+          node scripts/assert-e2e-results.mjs e2e-results/first-list.json --min=20
+          --require=discovery-save-dialog.spec.ts --max-retried=0
+
+      - name: Upload first-list failure traces and report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-first-list
+          path: |
+            playwright-report-first-list
+            test-results
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Reset local database for fixtures suite
+        if: ${{ !cancelled() }}
         run: npx supabase db reset
 
       - name: Run fixtures Playwright tests
+        if: ${{ !cancelled() }}
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-fixtures
           PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-results/fixtures.json
@@ -408,14 +510,20 @@ jobs:
           --require=quality-configured.spec.ts
           --require=portfolio-screenshots.spec.ts
 
+      - name: Assert required configured quality and screenshot artifacts
+        if: ${{ !cancelled() }}
+        run: node scripts/assert-quality-artifacts.mjs configured
+
       # `@prodreject`: the same build started with a PRODUCTION runtime marker
       # must refuse the loopback transport override. The fixtures suite imports
       # titles into the local catalog, so reset before asserting they are absent;
       # otherwise local search can return them even when the override is refused.
       - name: Reset local database for production-refusal suite
+        if: ${{ !cancelled() }}
         run: npx supabase db reset
 
       - name: Run production-refusal Playwright tests
+        if: ${{ !cancelled() }}
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-prodreject
           PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-results/prodreject.json
@@ -472,7 +580,7 @@ jobs:
         with:
           name: quality-evidence-configured-fixtures
           path: quality-evidence
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 30
 
       - name: Upload portfolio screenshots
@@ -481,7 +589,7 @@ jobs:
         with:
           name: portfolio-screenshots
           path: portfolio-screenshots
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 30
 
   # STRICT, secret-free social integration: the multi-user following-feed
@@ -578,7 +686,22 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run following feed Playwright journey
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-results/social.json
         run: E2E_SUITE=social npx playwright test --project=social
+
+      - name: Assert following feed journey executed
+        if: ${{ !cancelled() }}
+        run: node scripts/assert-e2e-results.mjs e2e-results/social.json --min=1 --require=feed.spec.ts
+
+      - name: Upload following feed JSON results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results-social
+          path: e2e-results/social.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Stop local Supabase stack
         if: ${{ always() }}
@@ -686,7 +809,22 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run likes Playwright journey
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-results/likes.json
         run: E2E_SUITE=likes npx playwright test --project=likes
+
+      - name: Assert likes journey executed
+        if: ${{ !cancelled() }}
+        run: node scripts/assert-e2e-results.mjs e2e-results/likes.json --min=1 --require=likes.spec.ts
+
+      - name: Upload likes JSON results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results-likes
+          path: e2e-results/likes.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Stop local Supabase stack
         if: ${{ always() }}

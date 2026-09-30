@@ -1,7 +1,9 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./fixtures/test";
 
 import {
   ensureFixtureAccounts,
+  countMediaByExternalId,
   FIXTURE_USER,
   seedList,
   type FixtureAccount,
@@ -168,5 +170,27 @@ test.describe.serial("@fixtures discovery save continuation", () => {
     await expect(
       dialog.getByText(`Created ${firstList} and saved ${DISCOVERY_TITLE}.`),
     ).toBeVisible({ timeout: 30_000 });
+    await expect(dialog.getByRole("status")).toContainText(
+      `Created ${firstList}`,
+    );
+    await dialog.getByRole("link", { name: "View list" }).click();
+    await page.waitForURL(/\/list\/[^/]+$/);
+    await page.reload();
+    await expect(
+      page.getByRole("heading", { level: 1, name: firstList }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("region", { name: "List contents" }).getByRole("link", {
+        name: DISCOVERY_TITLE,
+        exact: true,
+      }),
+    ).toHaveCount(1);
+    expect(await countMediaByExternalId("tmdb", "movie:999101")).toBe(1);
+    await page.goto("/lists");
+    await expect(
+      page
+        .getByRole("region", { name: "Your lists", exact: true })
+        .getByRole("link", { name: firstList, exact: true }),
+    ).toHaveCount(1);
   });
 });

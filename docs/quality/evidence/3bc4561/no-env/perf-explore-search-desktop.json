@@ -1,0 +1,76 @@
+{
+  "runs": 3,
+  "samples": [
+    {
+      "settledMs": 210,
+      "ttfbMs": 35,
+      "domContentLoadedMs": 117,
+      "loadMs": 184,
+      "lcpMs": 148,
+      "lcpElement": "p(You can keep browsing the catalog while )",
+      "cls": 0,
+      "shifts": [],
+      "scriptBytes": 183979,
+      "scriptCount": 13,
+      "imageBytes": 0,
+      "imageCount": 0,
+      "totalBytes": 439112,
+      "images": []
+    },
+    {
+      "settledMs": 206,
+      "ttfbMs": 13,
+      "domContentLoadedMs": 154,
+      "loadMs": 154,
+      "lcpMs": 144,
+      "lcpElement": "p(You can keep browsing the catalog while )",
+      "cls": 0,
+      "shifts": [],
+      "scriptBytes": 183979,
+      "scriptCount": 13,
+      "imageBytes": 0,
+      "imageCount": 0,
+      "totalBytes": 439118,
+      "images": []
+    },
+    {
+      "settledMs": 190,
+      "ttfbMs": 17,
+      "domContentLoadedMs": 83,
+      "loadMs": 158,
+      "lcpMs": 104,
+      "lcpElement": "p(You can keep browsing the catalog while )",
+      "cls": 0,
+      "shifts": [],
+      "scriptBytes": 183979,
+      "scriptCount": 13,
+      "imageBytes": 0,
+      "imageCount": 0,
+      "totalBytes": 439116,
+      "images": []
+    }
+  ],
+  "median": {
+    "settledMs": 206,
+    "ttfbMs": 17,
+    "domContentLoadedMs": 117,
+    "loadMs": 158,
+    "lcpMs": 144,
+    "cls": 0,
+    "scriptBytes": 183979,
+    "imageBytes": 0,
+    "totalBytes": 439116
+  },
+  "lcpElements": [
+    "p(You can keep browsing the catalog while )",
+    "p(You can keep browsing the catalog while )",
+    "p(You can keep browsing the catalog while )"
+  ],
+  "layoutShifts": [[], [], []],
+  "scriptCount": 13,
+  "imageCount": 0,
+  "oversizedImages": [],
+  "lazyInInitialViewport": [],
+  "highPriorityImages": [],
+  "imagesMissingAlt": []
+}

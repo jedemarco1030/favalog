@@ -1,0 +1,520 @@
+{
+  "runs": 3,
+  "samples": [
+    {
+      "settledMs": 263,
+      "ttfbMs": 7,
+      "domContentLoadedMs": 123,
+      "loadMs": 207,
+      "lcpMs": 168,
+      "lcpElement": "h1(Everything you watch, read, and play.)",
+      "cls": 0,
+      "shifts": [],
+      "scriptBytes": 173399,
+      "scriptCount": 12,
+      "imageBytes": 3348,
+      "imageCount": 6,
+      "totalBytes": 422609,
+      "images": [
+        {
+          "src": "/media/avatars/ravi.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/sana.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/camille.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/jules.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/mira.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/devon.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/ravi.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/jules.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/mira.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/camille.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        }
+      ]
+    },
+    {
+      "settledMs": 224,
+      "ttfbMs": 8,
+      "domContentLoadedMs": 66,
+      "loadMs": 175,
+      "lcpMs": 152,
+      "lcpElement": "h1(Everything you watch, read, and play.)",
+      "cls": 0,
+      "shifts": [],
+      "scriptBytes": 173399,
+      "scriptCount": 12,
+      "imageBytes": 3348,
+      "imageCount": 6,
+      "totalBytes": 422604,
+      "images": [
+        {
+          "src": "/media/avatars/ravi.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/sana.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/camille.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/jules.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/mira.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/devon.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/ravi.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/jules.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/mira.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/camille.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        }
+      ]
+    },
+    {
+      "settledMs": 237,
+      "ttfbMs": 10,
+      "domContentLoadedMs": 98,
+      "loadMs": 181,
+      "lcpMs": 144,
+      "lcpElement": "h1(Everything you watch, read, and play.)",
+      "cls": 0,
+      "shifts": [],
+      "scriptBytes": 173399,
+      "scriptCount": 12,
+      "imageBytes": 3348,
+      "imageCount": 6,
+      "totalBytes": 422614,
+      "images": [
+        {
+          "src": "/media/avatars/ravi.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/sana.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/camille.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/jules.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/mira.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/devon.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/ravi.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/jules.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/mira.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/camille.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 5.36,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        }
+      ]
+    }
+  ],
+  "median": {
+    "settledMs": 237,
+    "ttfbMs": 8,
+    "domContentLoadedMs": 98,
+    "loadMs": 181,
+    "lcpMs": 152,
+    "cls": 0,
+    "scriptBytes": 173399,
+    "imageBytes": 3348,
+    "totalBytes": 422609
+  },
+  "lcpElements": [
+    "h1(Everything you watch, read, and play.)",
+    "h1(Everything you watch, read, and play.)",
+    "h1(Everything you watch, read, and play.)"
+  ],
+  "layoutShifts": [[], [], []],
+  "scriptCount": 12,
+  "imageCount": 6,
+  "oversizedImages": [
+    {
+      "src": "/media/avatars/ravi.svg",
+      "alt": "",
+      "loading": "lazy",
+      "fetchPriority": "auto",
+      "renderedWidth": 28,
+      "naturalWidth": 150,
+      "oversizeRatio": 5.36,
+      "inInitialViewport": false,
+      "transferBytes": 558
+    },
+    {
+      "src": "/media/avatars/sana.svg",
+      "alt": "",
+      "loading": "lazy",
+      "fetchPriority": "auto",
+      "renderedWidth": 28,
+      "naturalWidth": 150,
+      "oversizeRatio": 5.36,
+      "inInitialViewport": false,
+      "transferBytes": 558
+    },
+    {
+      "src": "/media/avatars/camille.svg",
+      "alt": "",
+      "loading": "lazy",
+      "fetchPriority": "auto",
+      "renderedWidth": 28,
+      "naturalWidth": 150,
+      "oversizeRatio": 5.36,
+      "inInitialViewport": false,
+      "transferBytes": 558
+    },
+    {
+      "src": "/media/avatars/jules.svg",
+      "alt": "",
+      "loading": "lazy",
+      "fetchPriority": "auto",
+      "renderedWidth": 28,
+      "naturalWidth": 150,
+      "oversizeRatio": 5.36,
+      "inInitialViewport": false,
+      "transferBytes": 558
+    },
+    {
+      "src": "/media/avatars/mira.svg",
+      "alt": "",
+      "loading": "lazy",
+      "fetchPriority": "auto",
+      "renderedWidth": 28,
+      "naturalWidth": 150,
+      "oversizeRatio": 5.36,
+      "inInitialViewport": false,
+      "transferBytes": 558
+    },
+    {
+      "src": "/media/avatars/devon.svg",
+      "alt": "",
+      "loading": "lazy",
+      "fetchPriority": "auto",
+      "renderedWidth": 28,
+      "naturalWidth": 150,
+      "oversizeRatio": 5.36,
+      "inInitialViewport": false,
+      "transferBytes": 558
+    },
+    {
+      "src": "/media/avatars/ravi.svg",
+      "alt": "",
+      "loading": "lazy",
+      "fetchPriority": "auto",
+      "renderedWidth": 28,
+      "naturalWidth": 150,
+      "oversizeRatio": 5.36,
+      "inInitialViewport": false,
+      "transferBytes": 558
+    },
+    {
+      "src": "/media/avatars/jules.svg",
+      "alt": "",
+      "loading": "lazy",
+      "fetchPriority": "auto",
+      "renderedWidth": 28,
+      "naturalWidth": 150,
+      "oversizeRatio": 5.36,
+      "inInitialViewport": false,
+      "transferBytes": 558
+    },
+    {
+      "src": "/media/avatars/mira.svg",
+      "alt": "",
+      "loading": "lazy",
+      "fetchPriority": "auto",
+      "renderedWidth": 28,
+      "naturalWidth": 150,
+      "oversizeRatio": 5.36,
+      "inInitialViewport": false,
+      "transferBytes": 558
+    },
+    {
+      "src": "/media/avatars/camille.svg",
+      "alt": "",
+      "loading": "lazy",
+      "fetchPriority": "auto",
+      "renderedWidth": 28,
+      "naturalWidth": 150,
+      "oversizeRatio": 5.36,
+      "inInitialViewport": false,
+      "transferBytes": 558
+    }
+  ],
+  "lazyInInitialViewport": [],
+  "highPriorityImages": [],
+  "imagesMissingAlt": []
+}

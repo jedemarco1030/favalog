@@ -1,0 +1,178 @@
+{
+  "runs": 3,
+  "samples": [
+    {
+      "settledMs": 2315,
+      "ttfbMs": 17,
+      "domContentLoadedMs": 654,
+      "loadMs": 2241,
+      "lcpMs": 808,
+      "lcpElement": "p(A composer returns to the coastal town w)",
+      "cls": 0.0006,
+      "shifts": [],
+      "scriptBytes": 187103,
+      "scriptCount": 13,
+      "imageBytes": 2012,
+      "imageCount": 3,
+      "totalBytes": 425637,
+      "images": [
+        {
+          "src": "/media/backdrops/afterglow.svg",
+          "alt": "",
+          "loading": "auto",
+          "fetchPriority": "auto",
+          "renderedWidth": 342,
+          "naturalWidth": 267,
+          "oversizeRatio": 0.26,
+          "inInitialViewport": true,
+          "transferBytes": 896
+        },
+        {
+          "src": "/media/avatars/mira.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 1.79,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/jamie.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 1.79,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        }
+      ]
+    },
+    {
+      "settledMs": 2318,
+      "ttfbMs": 17,
+      "domContentLoadedMs": 641,
+      "loadMs": 2245,
+      "lcpMs": 796,
+      "lcpElement": "p(A composer returns to the coastal town w)",
+      "cls": 0.0006,
+      "shifts": [],
+      "scriptBytes": 187103,
+      "scriptCount": 13,
+      "imageBytes": 2012,
+      "imageCount": 3,
+      "totalBytes": 425640,
+      "images": [
+        {
+          "src": "/media/backdrops/afterglow.svg",
+          "alt": "",
+          "loading": "auto",
+          "fetchPriority": "auto",
+          "renderedWidth": 342,
+          "naturalWidth": 267,
+          "oversizeRatio": 0.26,
+          "inInitialViewport": true,
+          "transferBytes": 896
+        },
+        {
+          "src": "/media/avatars/mira.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 1.79,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/jamie.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 1.79,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        }
+      ]
+    },
+    {
+      "settledMs": 2324,
+      "ttfbMs": 16,
+      "domContentLoadedMs": 658,
+      "loadMs": 2246,
+      "lcpMs": 804,
+      "lcpElement": "p(A composer returns to the coastal town w)",
+      "cls": 0.0006,
+      "shifts": [],
+      "scriptBytes": 187103,
+      "scriptCount": 13,
+      "imageBytes": 2012,
+      "imageCount": 3,
+      "totalBytes": 425640,
+      "images": [
+        {
+          "src": "/media/backdrops/afterglow.svg",
+          "alt": "",
+          "loading": "auto",
+          "fetchPriority": "auto",
+          "renderedWidth": 342,
+          "naturalWidth": 267,
+          "oversizeRatio": 0.26,
+          "inInitialViewport": true,
+          "transferBytes": 896
+        },
+        {
+          "src": "/media/avatars/mira.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 1.79,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        },
+        {
+          "src": "/media/avatars/jamie.svg",
+          "alt": "",
+          "loading": "lazy",
+          "fetchPriority": "auto",
+          "renderedWidth": 28,
+          "naturalWidth": 150,
+          "oversizeRatio": 1.79,
+          "inInitialViewport": false,
+          "transferBytes": 558
+        }
+      ]
+    }
+  ],
+  "median": {
+    "settledMs": 2318,
+    "ttfbMs": 17,
+    "domContentLoadedMs": 654,
+    "loadMs": 2245,
+    "lcpMs": 804,
+    "cls": 0.0006,
+    "scriptBytes": 187103,
+    "imageBytes": 2012,
+    "totalBytes": 425640
+  },
+  "lcpElements": [
+    "p(A composer returns to the coastal town w)",
+    "p(A composer returns to the coastal town w)",
+    "p(A composer returns to the coastal town w)"
+  ],
+  "layoutShifts": [[], [], []],
+  "scriptCount": 13,
+  "imageCount": 3,
+  "oversizedImages": [],
+  "lazyInInitialViewport": [],
+  "highPriorityImages": [],
+  "imagesMissingAlt": []
+}

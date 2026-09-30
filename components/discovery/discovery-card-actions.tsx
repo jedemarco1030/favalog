@@ -5,7 +5,7 @@ import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useFormStatus } from "react-dom";
 import { Bookmark, Loader2, Plus, X } from "lucide-react";
-import { createListAction } from "@/app/lists/actions";
+import { createAndSaveDiscoveredTitle } from "@/lib/discovery/create-save-client";
 import {
   initialCreateListFormState,
   type CreateListFormState,
@@ -18,6 +18,7 @@ import {
 } from "@/lib/discovery/save-intent";
 import {
   initialDiscoverySaveState,
+  type DiscoveryCreateListState,
   type DiscoverySaveState,
 } from "@/app/discovery/save-form";
 import {
@@ -40,7 +41,7 @@ export type DiscoveryOpenAction = (
 export type DiscoveryCreateListAction = (
   state: CreateListFormState,
   formData: FormData,
-) => Promise<CreateListFormState>;
+) => Promise<DiscoveryCreateListState>;
 
 export interface SaveListOption {
   id: string;
@@ -149,7 +150,7 @@ export function DiscoveryCardActions({
   returnTo,
   openAction,
   saveAction,
-  createAction = createListAction,
+  createAction = createAndSaveDiscoveredTitle,
 }: DiscoveryCardActionsProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -290,7 +291,12 @@ function SaveDialog({
   const ids = useId();
 
   const [createdLists, setCreatedLists] = useState<SaveListOption[]>([]);
-  const lists = [...createdLists, ...initialLists];
+  const lists = [
+    ...createdLists,
+    ...initialLists.filter(
+      (list) => !createdLists.some((created) => created.id === list.id),
+    ),
+  ];
   const [mode, setMode] = useState<"pick" | "create">(() =>
     initialLists.length === 0 ? "create" : "pick",
   );
@@ -341,7 +347,7 @@ function SaveDialog({
       };
     }
 
-    let create: CreateListFormState;
+    let create: DiscoveryCreateListState;
     try {
       create = await createAction(initialCreateListFormState, formData);
     } catch {
@@ -367,10 +373,11 @@ function SaveDialog({
     setDraftName("");
     setDraftVisibility("public");
 
-    const save = await runSave(
-      initialDiscoverySaveState,
-      saveFormData(created.id),
-    );
+    // Production returns both writes as JSON, independent of streamed page
+    // refresh completion. Create-only injected actions retain the retry seam.
+    const save =
+      create.save ??
+      (await runSave(initialDiscoverySaveState, saveFormData(created.id)));
     focusTargetRef.current =
       save.status === "success" ? "status" : "save-button";
     return {
@@ -503,6 +510,7 @@ function SaveDialog({
             aria-labelledby={`${ids}-create-title`}
           >
             <input type="hidden" name="intent" value="create" />
+            <IdentityFields identity={identity} />
             <input
               type="hidden"
               name="returnTo"

@@ -1,0 +1,76 @@
+{
+  "runs": 3,
+  "samples": [
+    {
+      "settledMs": 2322,
+      "ttfbMs": 21,
+      "domContentLoadedMs": 686,
+      "loadMs": 2270,
+      "lcpMs": 824,
+      "lcpElement": "p(Search the catalog by title, creator, ge)",
+      "cls": 0.0009,
+      "shifts": [],
+      "scriptBytes": 183979,
+      "scriptCount": 13,
+      "imageBytes": 0,
+      "imageCount": 0,
+      "totalBytes": 439121,
+      "images": []
+    },
+    {
+      "settledMs": 2307,
+      "ttfbMs": 14,
+      "domContentLoadedMs": 678,
+      "loadMs": 2261,
+      "lcpMs": 804,
+      "lcpElement": "p(Search the catalog by title, creator, ge)",
+      "cls": 0.0009,
+      "shifts": [],
+      "scriptBytes": 183979,
+      "scriptCount": 13,
+      "imageBytes": 0,
+      "imageCount": 0,
+      "totalBytes": 439109,
+      "images": []
+    },
+    {
+      "settledMs": 2312,
+      "ttfbMs": 23,
+      "domContentLoadedMs": 681,
+      "loadMs": 2265,
+      "lcpMs": 808,
+      "lcpElement": "p(Search the catalog by title, creator, ge)",
+      "cls": 0.0009,
+      "shifts": [],
+      "scriptBytes": 183979,
+      "scriptCount": 13,
+      "imageBytes": 0,
+      "imageCount": 0,
+      "totalBytes": 439110,
+      "images": []
+    }
+  ],
+  "median": {
+    "settledMs": 2312,
+    "ttfbMs": 21,
+    "domContentLoadedMs": 681,
+    "loadMs": 2265,
+    "lcpMs": 808,
+    "cls": 0.0009,
+    "scriptBytes": 183979,
+    "imageBytes": 0,
+    "totalBytes": 439110
+  },
+  "lcpElements": [
+    "p(Search the catalog by title, creator, ge)",
+    "p(Search the catalog by title, creator, ge)",
+    "p(Search the catalog by title, creator, ge)"
+  ],
+  "layoutShifts": [[], [], []],
+  "scriptCount": 13,
+  "imageCount": 0,
+  "oversizedImages": [],
+  "lazyInInitialViewport": [],
+  "highPriorityImages": [],
+  "imagesMissingAlt": []
+}

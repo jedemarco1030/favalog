@@ -17,9 +17,10 @@ explicitly, and the parts that need a human are listed under "Manual checks".
 | Save-dialog quality (`e2e/quality-discovery.spec.ts`, `@fixtures`) | Runs in CI `explore-integration` job; results recorded below |
 | Numbers in this document                                           | Copied from CI artifacts of runs 36629764589 and 36631595301 |
 
-The v0 development sandbox cannot launch Chromium (missing system libraries),
-so no browser measurement has been run locally. Every number recorded here
-must come from a GitHub Actions artifact and cite its run URL and commit.
+Native Chromium in the v0 sandbox lacked system libraries during the historical
+baseline work. Remote-browser preview checks are now available, but configured
+Docker-backed fixture measurements still run in GitHub CI. Every recorded lab
+number here must cite its evidence environment, run URL, and source commit.
 
 ## Surfaces
 
@@ -119,11 +120,12 @@ Medians of 3 cold runs. Axe counts are distinct rule violations per profile
   points at the results region, and only while a query is active. The region
   falls back to `aria-label` when there's no heading (empty, error, or
   unavailable).
-- **Explore discovery desktop CLS 0.0897:** layout-shift attribution traced
-  it to the stable catalog-browse section being pushed down when the streamed
-  discovery shelves above it resolved. The streamed section now renders below
-  the catalog browse, so it can't move already-painted content, and the shift
-  is gone.
+- **Historical Explore discovery desktop CLS 0.0897:** layout-shift attribution
+  traced it to catalog browse being pushed down when discovery above it resolved.
+  The historical fix moved discovery below the catalog and reported CLS 0.
+  That sacrificed discovery-first presentation and is **superseded by PR #21**:
+  discovery and downstream catalog share a loading boundary. Do not present
+  the historical metric as verification of the restored discovery-first page.
 - **Skip link:** a "Skip to content" link was added to the root layout,
   targeting `<main id="main-content">`. It's now the first tab stop on every
   page.
@@ -147,31 +149,112 @@ Medians of 3 cold runs. Axe counts are distinct rule violations per profile
 
 `e2e/quality-configured.spec.ts` runs in the `@fixtures` CI job against the
 production build, local Supabase, the offline provider fixtures, and a
-signed-in fixture user. Provider artwork is served from two committed fixture
-JPEGs (`e2e/fixtures/artwork/`, original abstract images at TMDB w500/w1280
-sizes), re-encoded with sharp at each requested width and quality. Byte counts
-are therefore representative. Image transfer time, CDN latency, and optimizer
+signed-in fixture user. Artwork is served from two committed synthetic
+photographs (`e2e/fixtures/artwork/`, at TMDB w500/w1280 sizes), re-encoded with
+sharp at each requested width and quality. Fixture routing also substitutes
+these photographs for local demo SVG posters/backdrops so selected captures
+are artwork-backed throughout; production artwork and domain data are unchanged.
+They are not authentic covers for any displayed title. Byte counts model these
+fixture assets, not a particular production catalog. Image transfer time, CDN latency, and optimizer
 CPU cost are not, because route-fulfilled responses bypass CDP throttling.
 
-| Check                                          | Kind                                    |
-| ---------------------------------------------- | --------------------------------------- |
-| Home, empty Explore, search, title detail perf | Recorded, not gated (mobile/desktop)    |
-| Save dialog open latency                       | Recorded, not gated                     |
-| 320 px reflow on the same pages                | Asserted: no page-level overflow        |
-| 200% zoom (640 px CSS viewport at 2x)          | Asserted: no overflow, submit reachable |
-| Reduced motion with the dialog open            | Asserted: no motion longer than 10 ms   |
-| axe `color-contrast` over fixture artwork      | Asserted: no violations                 |
+| Check                                                                 | Kind                                    |
+| --------------------------------------------------------------------- | --------------------------------------- |
+| Home, empty Explore, search, title detail perf                        | Recorded, not gated (mobile/desktop)    |
+| Save dialog open latency                                              | Recorded, not gated                     |
+| 320 px reflow on the same pages                                       | Asserted: no page-level overflow        |
+| 200% zoom-equivalent viewport (640 px at 2x; not actual browser zoom) | Asserted: no overflow, submit reachable |
+| Reduced motion with the dialog open                                   | Asserted: no motion longer than 10 ms   |
+| axe `color-contrast` over fixture artwork                             | Asserted: no violations                 |
 
 Raw JSON is uploaded as `quality-evidence-configured-fixtures`, and
-`e2e/portfolio-screenshots.spec.ts` uploads `portfolio-screenshots`. Numbers
-are **pending the first CI run on this branch**; none are quoted here until
-they come from that artifact. Every Playwright step now writes a JSON report
-that `scripts/assert-e2e-results.mjs` checks, so a step that runs zero tests
-or skips everything fails instead of passing silently. `@prodreject` now has
-its own CI step.
+`e2e/portfolio-screenshots.spec.ts` uploads `portfolio-screenshots`. Candidate
+run 36664561980 produced layout-scenario evidence, but failed retry-free saves
+before full fixture capture; it is not a complete release evidence run.
+Its web-server health probe warmed discovery, so its slow-scenario medians do
+**not** establish a cold delayed-provider navigation. The corrected harness
+probes sign-in (no discovery), isolates server cache keys by scenario/profile,
+records `settledMs`, and requires the first slow sample to include the 2000 ms
+provider delay. Later repetitions remain warm-server samples, not cold ones.
+
+Each Playwright invocation writes its own JSON report checked by
+`scripts/assert-e2e-results.mjs`: no usable execution, missing required specs,
+failures and unexpected skips fail. Default no-env has six exactly named
+pre-existing exceptions; the configured semantic live-OpenAI journey is the
+one configured exception. Retries/flaky results are exposed separately, and
+first-list/layout repetitions require zero retries. `@prodreject`, social,
+and likes have separate execution gates. Required quality/screenshot artifact
+checks fail if evidence is missing. See the [release ledger](../mvp1-release-checklist.md)
+for inspected source/run results rather than obsolete “first run pending” claims.
+
+Inspected Home desktop/mobile screenshots from source `3bc4561`, run
+36666650203, are committed in `docs/screenshots/` and embedded in README/case
+study. Explore/title captures from that run were rejected for local demo
+placeholder cards; fresh corrected captures remain required. The zoom-equivalent
+check failed at empty Explore because no artwork intersected the 400 px-high
+viewport, not because an image failed to load. Accessibility scans now load and
+decode all main artwork before scanning. Performance still observes initial
+viewport images from navigation start; no scroll or eager-image rewrite is
+introduced into measured runs. These differing readiness modes must not be
+compared as a performance improvement.
 
 Retry after a failed list add has no browser hook. It's covered by the action
 and component tests, not by Playwright.
+
+### Closeout discovery scenarios — source `3bc4561`
+
+The `playwright-report-layout-scenarios` artifact from
+[CI 36666650203](https://github.com/jedemarco1030/favalog/actions/runs/36666650203)
+was downloaded and its eight embedded reports inspected. All eight invocations
+executed once, passed without skips/retries, and retained three raw navigation
+samples. Chromium uses the profiles above: mobile 390×844/3x, 4x CPU, 150 ms
+latency and 1.6 Mbps down; desktop 1440×900/1x, unthrottled. Browser caches are
+disabled; only the first sample has a cold scenario/profile server cache.
+
+| Scenario                      | Mobile CLS samples     | Desktop CLS samples | Mobile settled ms samples | Desktop settled ms samples |
+| ----------------------------- | ---------------------- | ------------------- | ------------------------- | -------------------------- |
+| Slow (2000 ms provider delay) | 0.0003, 0.0004, 0.0004 | 0, 0, 0             | 3477, 3029, 3134          | 2560, 858, 522             |
+| Partial provider failure      | 0.0004, 0.0004, 0.0004 | 0.0026, 0, 0        | 3213, 3124, 3094          | 981, 922, 1026             |
+| Empty shelves                 | 0.0005, 0.0005, 0.0005 | 0.0026, 0.0026, 0   | 2843, 2792, 2757          | 564, 399, 454              |
+| Providers disabled            | 0.0005, 0.0005, 0.0005 | 0.0026, 0, 0        | 2795, 2735, 2747          | 521, 577, 626              |
+
+The cold slow samples include the provider delay; low warm desktop medians
+must not hide that wait. Discovery remains before the catalog, and the tests
+assert that loading space disappears after empty/disabled results, the failed
+book shelf disappears without removing films, and no editorial examples leak.
+The shared loading boundary trades immediate catalog visibility for a stable,
+discovery-first reveal. Layout-shift observation starts before navigation, not
+after readiness. Nonzero desktop shifts are attributed to header search/auth
+controls, not shelves pushing down the catalog. This is lab evidence from local
+Supabase and offline providers, **not a comparable performance improvement**
+or live-production/CDN evidence. Route-fulfilled artwork bypasses real image
+latency and optimizer cost.
+
+### Closeout no-env inspection — source `3bc4561`
+
+[CI 36666650203](https://github.com/jedemarco1030/favalog/actions/runs/36666650203)
+completed the default/no-env job. Downloaded JSON records 44 first-attempt
+passes and six narrowly allow-listed skips for `default`, and five first-attempt
+passes with no skips for `no-env`. Both report zero flaky or unexpected results.
+The separate following-feed and likes jobs each report one first-attempt pass,
+zero skips and zero flaky results. This does not establish configured provider
+presentation, production behavior, or completion of the still-running Explore job.
+
+[Committed no-env raw samples and axe findings](evidence/3bc4561/no-env/) retain
+all three navigations per surface/profile. Empty Explore measured median CLS
+0.0003 on mobile and 0 on desktop, with **zero artwork bytes**. This is the
+no-provider configuration and must not be substituted for artwork-heavy fixture
+or live-production evidence. No comparable improvement is claimed.
+
+All four no-env surfaces report no axe violations, but **not zero incomplete
+findings**: the collapsed theme popup produces `aria-valid-attr-value` manual
+review on both profiles, and mobile Home also reports `color-contrast` review
+for the active navigation link and icon-only Search control. A read-only
+942×664 dark development-preview check confirmed that opening the theme popup
+creates the referenced `role="menu"` target and Escape restores trigger focus.
+This explains that relationship, not a screen-reader pass or clearance of the
+contrast findings. Review all remaining artwork-backed incomplete targets and
+perform the owner checks in the release checklist.
 
 ## Manual checks (not automatable)
 

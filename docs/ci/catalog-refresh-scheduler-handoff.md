@@ -1,5 +1,28 @@
 # CI handoff: catalog metadata refresh scheduler
 
+## Current operational state (2026-09-29)
+
+The workflow is now installed at
+[`.github/workflows/catalog-refresh.yml`](../../.github/workflows/catalog-refresh.yml).
+The installation instructions below are retained as historical handoff, not a
+current missing-file requirement. The five latest observed runs all skipped
+`Bounded refresh + stale-embedding backfill`; the latest is
+[36557022714](https://github.com/jedemarco1030/favalog/actions/runs/36557022714).
+No processing or successful metadata refresh is established by those runs.
+
+The scheduled job requires the **GitHub repository/environment variable**
+`CATALOG_REFRESH_ENABLED` to equal the string `true`. Vercel project variables
+are not inherited. Manual dispatch bypasses this gate and defaults to
+`dry_run=true`; the embedding step is skipped in that mode. The connected
+GitHub account returned HTTP 403 when listing Actions variables, so activation
+configuration and required secrets have not been verified or changed. No
+hosted dispatch was attempted without verifying the required configuration.
+
+Before acceptance, follow the owner steps in the
+[release checklist](../mvp1-release-checklist.md#operational-acceptance).
+
+## Historical installation handoff
+
 Section 5 (the executable scheduling path for periodic provider-metadata
 refresh) is delivered here as an **applyable workflow file**, not committed to
 `.github/workflows/` directly, because the v0 GitHub App lacks the `workflows`

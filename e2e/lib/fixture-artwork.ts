@@ -13,7 +13,10 @@ import sharp from "sharp";
  * `/_next/image` requests for the allow-listed provider CDNs to two committed
  * fixture JPEGs (500x750 poster, 1280x720 backdrop — TMDB w500/w1280 sizes),
  * re-encoded with sharp at the requested width and quality, which is what the
- * Next.js optimizer itself does.
+ * Next.js optimizer itself does. Local demo SVG posters/backdrops are routed
+ * to these same synthetic photographs in fixture contexts only; application
+ * records, labels, and production artwork remain unchanged. These are not
+ * authentic covers for the displayed titles.
  *
  * What this does NOT represent, and must be stated next to any number it
  * produces: CDN fetch latency, optimizer CPU cost, and network throttling of
@@ -25,6 +28,7 @@ const ARTWORK_DIR = path.join(process.cwd(), "e2e/fixtures/artwork");
 const PROVIDER_CDN =
   /^https:\/\/(image\.tmdb\.org|covers\.openlibrary\.org|media\.rawg\.io)\//;
 const LANDSCAPE_TMDB_SIZE = /\/t\/p\/(w780|w1280|original)\//;
+const LOCAL_PLACEHOLDER = /^\/media\/(posters|backdrops)\/[^/]+\.svg$/;
 
 export interface ArtworkStats {
   requests: number;
@@ -55,11 +59,14 @@ export async function routeProviderArtwork(
 
   await context.route(
     (url) =>
-      url.pathname === "/_next/image" &&
-      PROVIDER_CDN.test(url.searchParams.get("url") ?? ""),
+      PROVIDER_CDN.test(url.href) ||
+      LOCAL_PLACEHOLDER.test(url.pathname) ||
+      (url.pathname === "/_next/image" &&
+        (PROVIDER_CDN.test(url.searchParams.get("url") ?? "") ||
+          LOCAL_PLACEHOLDER.test(url.searchParams.get("url") ?? ""))),
     async (route) => {
       const url = new URL(route.request().url());
-      const source = url.searchParams.get("url") ?? "";
+      const source = url.searchParams.get("url") ?? url.href;
       const width = Math.min(
         Math.max(Number(url.searchParams.get("w")) || 640, 16),
         3840,
@@ -68,7 +75,11 @@ export async function routeProviderArtwork(
         Math.max(Number(url.searchParams.get("q")) || 75, 1),
         100,
       );
-      const asset = isLandscapeArtwork(source) ? "backdrop" : "poster";
+      const asset =
+        isLandscapeArtwork(source) ||
+        new URL(source, url.origin).pathname.startsWith("/media/backdrops/")
+          ? "backdrop"
+          : "poster";
       const key = `${asset}:${width}:${quality}`;
       let body = cache.get(key);
       if (!body) {
