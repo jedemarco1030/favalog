@@ -60,12 +60,12 @@ export async function waitForFixtureSurface(page: Page, capture = false) {
   await expect(page.locator(selector).first()).toBeAttached();
   await expect
     .poll(() =>
-      page.locator(selector).evaluateAll((nodes) => {
+      page.locator(selector).evaluateAll((nodes, includeOffscreen) => {
         const required = nodes.filter((node) => {
           const rect = node.getBoundingClientRect();
           return (
             rect.width > 0 &&
-            (capture || (rect.top < innerHeight && rect.bottom > 0))
+            (includeOffscreen || (rect.top < innerHeight && rect.bottom > 0))
           );
         });
         return (
@@ -75,7 +75,7 @@ export async function waitForFixtureSurface(page: Page, capture = false) {
             return image.complete && image.naturalWidth > 0;
           })
         );
-      }),
+      }, capture),
     )
     .toBe(true);
   await page.locator(selector).evaluateAll(async (nodes) => {
