@@ -146,6 +146,8 @@ export interface ProfileContextOptions {
   storageState?: string;
   /** Runs after the context exists, before any navigation (e.g. routing). */
   setup?: (context: BrowserContext) => Promise<void>;
+  /** Observation endpoint only; the observer starts before navigation. */
+  ready?: (page: Page) => Promise<void>;
 }
 
 export async function newProfileContext(
@@ -198,6 +200,7 @@ export async function measureRun(
     const page = await context.newPage();
     await applyThrottling(page, profile);
     await page.goto(url, { waitUntil: "load", timeout: 90_000 });
+    if (options.ready) await options.ready(page);
     await page
       .waitForLoadState("networkidle", { timeout: 20_000 })
       .catch(() => undefined);
@@ -285,6 +288,7 @@ export function summarizeRuns(runs: RunMetrics[]) {
   const last = runs[runs.length - 1];
   return {
     runs: runs.length,
+    samples: runs,
     median: {
       ttfbMs: pick("ttfbMs"),
       domContentLoadedMs: pick("domContentLoadedMs"),
@@ -323,20 +327,22 @@ const AXE_PATH = path.join(process.cwd(), "node_modules/axe-core/axe.min.js");
  * the page or a scoped selector. Automated checks find only a subset of
  * accessibility problems; a clean run is not a compliance claim.
  */
-export async function runAxe(
+export async function runAxeDetails(
   page: Page,
   include?: string,
-): Promise<AxeViolationSummary[]> {
+): Promise<{
+  violations: AxeViolationSummary[];
+  incomplete: AxeViolationSummary[];
+}> {
   await page.addScriptTag({ path: AXE_PATH });
   return page.evaluate(async (scope) => {
-    type AxeResult = {
-      violations: {
-        id: string;
-        impact: string | null;
-        help: string;
-        nodes: { target: string[] }[];
-      }[];
+    type AxeFinding = {
+      id: string;
+      impact: string | null;
+      help: string;
+      nodes: { target: string[] }[];
     };
+    type AxeResult = { violations: AxeFinding[]; incomplete: AxeFinding[] };
     const axe = (
       window as unknown as {
         axe: { run: (ctx: unknown, opts: unknown) => Promise<AxeResult> };
@@ -348,14 +354,26 @@ export async function runAxe(
         values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "best-practice"],
       },
     });
-    return result.violations.map((v) => ({
-      id: v.id,
-      impact: v.impact,
-      help: v.help,
-      nodes: v.nodes.length,
-      targets: v.nodes.slice(0, 5).map((n) => n.target.join(" ")),
-    }));
+    const summarize = (findings: AxeFinding[]) =>
+      findings.map((v) => ({
+        id: v.id,
+        impact: v.impact,
+        help: v.help,
+        nodes: v.nodes.length,
+        targets: v.nodes.slice(0, 5).map((n) => n.target.join(" ")),
+      }));
+    return {
+      violations: summarize(result.violations),
+      incomplete: summarize(result.incomplete),
+    };
   }, include ?? null);
+}
+
+export async function runAxe(
+  page: Page,
+  include?: string,
+): Promise<AxeViolationSummary[]> {
+  return (await runAxeDetails(page, include)).violations;
 }
 
 /** Describes the focused element in a stable, human-readable way. */

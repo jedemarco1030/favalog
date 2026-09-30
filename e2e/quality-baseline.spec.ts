@@ -8,7 +8,7 @@ import {
   measureRun,
   newProfileContext,
   recordEvidence,
-  runAxe,
+  runAxeDetails,
   summarizeRuns,
   type ProfileName,
 } from "./lib/quality";
@@ -77,7 +77,7 @@ test.describe("quality baseline", () => {
         const page = await context.newPage();
         await page.goto(pageDef.url);
         await expect(page.locator("main")).toBeVisible();
-        evidence[`axe-${profileName}`] = await runAxe(page);
+        evidence[`axe-${profileName}`] = await runAxeDetails(page);
         await context.close();
       }
 

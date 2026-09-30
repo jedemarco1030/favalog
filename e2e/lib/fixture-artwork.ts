@@ -55,11 +55,12 @@ export async function routeProviderArtwork(
 
   await context.route(
     (url) =>
-      url.pathname === "/_next/image" &&
-      PROVIDER_CDN.test(url.searchParams.get("url") ?? ""),
+      PROVIDER_CDN.test(url.href) ||
+      (url.pathname === "/_next/image" &&
+        PROVIDER_CDN.test(url.searchParams.get("url") ?? "")),
     async (route) => {
       const url = new URL(route.request().url());
-      const source = url.searchParams.get("url") ?? "";
+      const source = url.searchParams.get("url") ?? url.href;
       const width = Math.min(
         Math.max(Number(url.searchParams.get("w")) || 640, 16),
         3840,

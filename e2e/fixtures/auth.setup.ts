@@ -1,4 +1,4 @@
-import { expect, test as setup } from "@playwright/test";
+import { expect, test as setup } from "./test";
 
 import { ensureFixtureUser, FIXTURE_USER } from "./admin";
 
@@ -27,5 +27,14 @@ setup("provision + sign in fixture user", async ({ page }) => {
   // Sanity: the account-required "Sign in" affordance is gone once signed in.
   await expect(page.getByRole("link", { name: /^sign in$/i })).toHaveCount(0);
 
+  await page.goto("/explore");
+  await page
+    .getByRole("button", { name: "Open Fixture Lantern Coast", exact: true })
+    .first()
+    .click();
+  await page.waitForURL("**/title/fixture-lantern-coast");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Fixture Lantern Coast" }),
+  ).toBeVisible();
   await page.context().storageState({ path: STORAGE_STATE });
 });

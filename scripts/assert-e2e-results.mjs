@@ -35,16 +35,26 @@ try {
   process.exit(1);
 }
 
+const allowedSkips = flags
+  .filter((f) => f.startsWith("--allow-skip="))
+  .map((f) => f.slice(13));
+const maxRetried = Number(
+  flags.find((f) => f.startsWith("--max-retried="))?.slice(14) ?? "Infinity",
+);
 const summary = summarizeReport(report);
 for (const [spec, counts] of Object.entries(summary.files).sort()) {
-  console.log(
-    `[e2e results] ${spec}: executed=${counts.executed} skipped=${counts.skipped} failed=${counts.failed}`,
-  );
+  console.log(`[e2e results] ${spec}: ${JSON.stringify(counts)}`);
 }
 console.log(
   `[e2e results] total: executed=${summary.executed} skipped=${summary.skipped} failed=${summary.failed}`,
 );
 
-const problems = findCoverageProblems(summary, { requiredSpecs, minExecuted });
+console.log(JSON.stringify(summary, null, 2));
+const problems = findCoverageProblems(summary, {
+  requiredSpecs,
+  minExecuted,
+  allowedSkips,
+  maxRetried,
+});
 for (const problem of problems) console.error(`::error::${problem}`);
 process.exit(problems.length > 0 ? 1 : 0);

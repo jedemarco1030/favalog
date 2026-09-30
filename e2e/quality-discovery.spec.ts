@@ -1,4 +1,7 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./fixtures/test";
+import { routeProviderArtwork } from "./lib/fixture-artwork";
+import { waitForFixtureSurface } from "./lib/fixture-readiness";
 
 import {
   PROFILES,
@@ -6,7 +9,7 @@ import {
   describeFocus,
   measureRun,
   recordEvidence,
-  runAxe,
+  runAxeDetails,
   summarizeRuns,
 } from "./lib/quality";
 
@@ -23,6 +26,7 @@ const DISCOVERY_TITLE = "Fixture Lantern Coast";
 
 async function openSaveDialog(page: Page) {
   await page.goto("/explore");
+  await waitForFixtureSurface(page);
   const save = page
     .getByRole("button", { name: `Save ${DISCOVERY_TITLE} to a list` })
     .first();
@@ -46,7 +50,14 @@ test.describe("@fixtures quality discovery", () => {
     for (const profile of [PROFILES.mobile, PROFILES.desktop]) {
       const runs = [];
       for (let i = 0; i < RUNS; i++) {
-        runs.push(await measureRun(browser, profile, "/explore"));
+        runs.push(
+          await measureRun(browser, profile, "/explore", {
+            setup: async (context) => {
+              await routeProviderArtwork(context);
+            },
+            ready: waitForFixtureSurface,
+          }),
+        );
       }
       await recordEvidence(
         testInfo,
@@ -62,7 +73,7 @@ test.describe("@fixtures quality discovery", () => {
     const { dialog, trigger } = await openSaveDialog(page);
 
     const initialFocus = await describeFocus(page);
-    const dialogAxe = await runAxe(page, "dialog[open]");
+    const dialogAxe = await runAxeDetails(page, "dialog[open]");
 
     // Tab through twelve stops. A native modal <dialog> makes the page inert,
     // so after the last control Chromium hands focus to the browser chrome,
@@ -72,7 +83,7 @@ test.describe("@fixtures quality discovery", () => {
     const escapedFocus: string[] = [];
     let browserChromeStops = 0;
     for (let i = 0; i < 12; i++) {
-      await page.keyboard.press("Tab");
+      await page.keyboard.press(i < 6 ? "Tab" : "Shift+Tab");
       const where = await page.evaluate(() => {
         const el = document.activeElement;
         if (!el || el === document.body) return "chrome";
@@ -85,7 +96,7 @@ test.describe("@fixtures quality discovery", () => {
     await dialog.getByRole("button", { name: "Create new list" }).focus();
     await page.keyboard.press("Enter");
     const createFormFocus = await describeFocus(page);
-    const createFormAxe = await runAxe(page, "dialog[open]");
+    const createFormAxe = await runAxeDetails(page, "dialog[open]");
 
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
@@ -93,6 +104,11 @@ test.describe("@fixtures quality discovery", () => {
       (el) => el === document.activeElement,
     );
 
+    expect(escapedFocus).toEqual([]);
+    expect(focusReturnedToTrigger).toBe(true);
+    expect(createFormFocus).toContain("input");
+    expect(dialogAxe.violations).toEqual([]);
+    expect(createFormAxe.violations).toEqual([]);
     await recordEvidence(testInfo, "a11y-save-dialog", {
       initialFocus,
       escapedFocus,

@@ -32,6 +32,7 @@
  */
 
 import { createServer } from "node:http";
+import { setTimeout as delay } from "node:timers/promises";
 
 const PORT = Number(process.env.FIXTURE_PORT ?? 5599);
 const HOST = "127.0.0.1";
@@ -126,7 +127,8 @@ function tmdbSearchResult(work) {
     title: work.title,
     original_title: work.title,
     release_date: work.releaseDate,
-    poster_path: null, // null → graceful fallback, no external image fetch
+    poster_path: `/fixture-${work.id}.jpg`,
+    backdrop_path: `/fixture-backdrop-${work.id}.jpg`,
   };
 }
 
@@ -139,8 +141,8 @@ function tmdbMovieDetail(work) {
     release_date: work.releaseDate,
     runtime: work.runtime,
     genres: work.genres,
-    poster_path: null,
-    backdrop_path: null,
+    poster_path: `/fixture-${work.id}.jpg`,
+    backdrop_path: `/fixture-backdrop-${work.id}.jpg`,
     vote_average: 0,
     credits: {
       cast: work.cast.map((name, order) => ({ name, order })),
@@ -159,7 +161,7 @@ function olSearchDoc(book) {
     title: book.title,
     author_name: [book.authorName],
     first_publish_year: book.firstPublishYear,
-    cover_i: null,
+    cover_i: 9000001,
     subject: book.subjects,
   };
 }
@@ -170,7 +172,7 @@ function olWork(book) {
     title: book.title,
     description: { value: book.description },
     subjects: book.subjects,
-    covers: [],
+    covers: [9000001],
     first_publish_date: String(book.firstPublishYear),
     authors: [{ author: { key: `/authors/${book.authorId}` } }],
   };
@@ -200,9 +202,24 @@ function notFound(res) {
   res.end("fixture: not found");
 }
 
-const server = createServer((req, res) => {
+const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${HOST}:${PORT}`);
-  const path = url.pathname;
+  const scenario = url.pathname.split("/")[1];
+  const path = url.pathname.replace(
+    /^\/(slow|partial|empty|disabled)(?=\/)/,
+    "",
+  );
+  const discovery = /\/(trending|discover)\//.test(path);
+  if (discovery && scenario === "slow") await delay(2000);
+  if (discovery && scenario === "partial" && path.startsWith("/ol/"))
+    return sendJson(res, 503, {});
+  if (discovery && scenario === "empty")
+    return sendJson(res, 200, {
+      results: [],
+      works: [],
+      page: 1,
+      total_pages: 1,
+    });
   const query = (
     url.searchParams.get("query") ??
     url.searchParams.get("q") ??
@@ -242,16 +259,26 @@ const server = createServer((req, res) => {
       page: 1,
       total_pages: 1,
       total_results: 1,
-      // Explore's overview only promotes titles with provider artwork, so this
-      // card needs a well-formed poster path. The image itself 404s upstream
-      // and the card falls back to its typeset artwork, which the app handles.
+      results: [tmdbSearchResult(LANTERN)],
+    });
+  }
+  if (path === "/tmdb/trending/tv/week") {
+    return sendJson(res, 200, {
+      page: 1,
+      total_pages: 1,
+      total_results: 1,
       results: [
         {
-          ...tmdbSearchResult(LANTERN),
-          poster_path: "/fixture-lantern-coast.jpg",
+          id: 999201,
+          name: "Fixture Signal Station",
+          first_air_date: "2025-01-01",
+          poster_path: "/fixture-series.jpg",
         },
       ],
     });
+  }
+  if (path === "/ol/trending/weekly.json") {
+    return sendJson(res, 200, { works: [olSearchDoc(FIXTURE_BOOK)] });
   }
   if (
     path.startsWith("/tmdb/trending/") ||

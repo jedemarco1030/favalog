@@ -58,6 +58,9 @@ const isCI = !!process.env.CI;
 const suite = process.env.E2E_SUITE;
 const isNoEnvSuite = suite === "no-env";
 const isFixturesSuite = suite === "fixtures";
+const isLayoutSuite = suite === "fixtures-layout";
+const layoutScenario = process.env.E2E_DISCOVERY_SCENARIO ?? "slow";
+const fixturePrefix = isLayoutSuite ? `/${layoutScenario}` : "";
 const isFixturesProdRejectSuite = suite === "fixtures-prod-reject";
 const isSocialSuite = suite === "social";
 const isLikesSuite = suite === "likes";
@@ -92,7 +95,8 @@ const FIXTURES_STORAGE_STATE = "e2e/.auth/fixtures-user.json";
 
 /** Server-only env that turns on federation + the loopback transport override. */
 const fixtureTransportEnv: Record<string, string> = {
-  EXTERNAL_CATALOG_ENABLED: "true",
+  EXTERNAL_CATALOG_ENABLED:
+    isLayoutSuite && layoutScenario === "disabled" ? "false" : "true",
   TMDB_ENABLED: "true",
   OPEN_LIBRARY_ENABLED: "true",
   // Any non-blank token/contact "configures" the providers; the real network is
@@ -101,8 +105,8 @@ const fixtureTransportEnv: Record<string, string> = {
   OPEN_LIBRARY_CONTACT_EMAIL:
     process.env.OPEN_LIBRARY_CONTACT_EMAIL || "e2e@example.com",
   CATALOG_TEST_TRANSPORT: "1",
-  CATALOG_TEST_TMDB_BASE_URL: `http://127.0.0.1:${FIXTURE_SERVER_PORT}/tmdb`,
-  CATALOG_TEST_OPENLIBRARY_BASE_URL: `http://127.0.0.1:${FIXTURE_SERVER_PORT}/ol`,
+  CATALOG_TEST_TMDB_BASE_URL: `http://127.0.0.1:${FIXTURE_SERVER_PORT}${fixturePrefix}/tmdb`,
+  CATALOG_TEST_OPENLIBRARY_BASE_URL: `http://127.0.0.1:${FIXTURE_SERVER_PORT}${fixturePrefix}/ol`,
 };
 
 /** The local fixture provider server, shared by both fixture suites. */
@@ -166,7 +170,8 @@ const configuredProjects = [
     // Every existing spec (auth, diary, lists, favorites, …). These are
     // written to be local-safe and run against the configured server.
     name: "default",
-    grepInvert: /@configured|@no-env|@fixtures|@prodreject|@social|@likes/,
+    grepInvert:
+      /@configured|@no-env|@fixtures|@prodreject|@social|@likes|@layout/,
     use: { ...devices["Desktop Chrome"], baseURL: configuredBaseURL },
   },
   {
@@ -200,19 +205,27 @@ export default defineConfig({
   // PLAYWRIGHT_JSON_OUTPUT_NAME so suites never overwrite each other.
   reporter: isCI ? [["github"], ["html", { open: "never" }], ["json"]] : "list",
   use: {
-    trace: "on-first-retry",
+    trace: "retain-on-failure",
   },
   projects: isNoEnvSuite
     ? noEnvProjects
-    : isFixturesSuite
-      ? fixturesProjects
-      : isFixturesProdRejectSuite
-        ? fixturesProdRejectProjects
-        : isSocialSuite
-          ? socialProjects
-          : isLikesSuite
-            ? likesProjects
-            : configuredProjects,
+    : isLayoutSuite
+      ? [
+          {
+            name: "fixtures-layout",
+            grep: /@layout\b/,
+            use: { ...devices["Desktop Chrome"], baseURL: fixturesBaseURL },
+          },
+        ]
+      : isFixturesSuite
+        ? fixturesProjects
+        : isFixturesProdRejectSuite
+          ? fixturesProdRejectProjects
+          : isSocialSuite
+            ? socialProjects
+            : isLikesSuite
+              ? likesProjects
+              : configuredProjects,
   webServer: isNoEnvSuite
     ? {
         // The no-env build must already exist (produced with the public Supabase
@@ -222,7 +235,7 @@ export default defineConfig({
         reuseExistingServer: !isCI,
         timeout: 120_000,
       }
-    : isFixturesSuite
+    : isFixturesSuite || isLayoutSuite
       ? [
           fixtureServer,
           {

@@ -1,82 +1,87 @@
 import { describe, expect, it } from "vitest";
-
 import { findCoverageProblems, summarizeReport } from "./e2e-results.mjs";
 
-const report = {
+const passed = {
+  status: "expected",
+  results: [{ status: "passed", retry: 0 }],
+};
+const rules = { requiredSpecs: ["save.spec.ts"], minExecuted: 1 };
+const report = (test: object) => ({
   suites: [
     {
-      file: "likes.spec.ts",
-      specs: [{ tests: [{ status: "expected" }, { status: "flaky" }] }],
-    },
-    {
-      file: "feed.spec.ts",
-      suites: [{ specs: [{ tests: [{ status: "skipped" }] }] }],
-    },
-    {
       file: "save.spec.ts",
-      specs: [{ tests: [{ status: "unexpected" }] }],
+      suites: [{ specs: [{ title: "save", tests: [test] }] }],
     },
   ],
-};
-
-describe("summarizeReport", () => {
-  it("counts executed, skipped, and failed tests per spec file, including nested suites", () => {
-    const summary = summarizeReport(report);
-    expect(summary.files["likes.spec.ts"]).toEqual({
-      executed: 2,
-      skipped: 0,
-      failed: 0,
-    });
-    expect(summary.files["feed.spec.ts"]).toEqual({
-      executed: 0,
-      skipped: 1,
-      failed: 0,
-    });
-    expect(summary).toMatchObject({ executed: 3, skipped: 1, failed: 1 });
-  });
 });
 
-describe("findCoverageProblems", () => {
-  it("flags a required spec whose tests were all skipped", () => {
-    const summary = summarizeReport(report);
-    expect(
-      findCoverageProblems(summary, {
-        requiredSpecs: ["likes.spec.ts", "feed.spec.ts"],
-        minExecuted: 1,
-      }),
-    ).toEqual([
-      "required spec feed.spec.ts executed 0 tests (1 skipped)",
-      "1 test(s) failed",
-    ]);
+describe("Playwright execution evidence", () => {
+  it("accepts an actually executed first-attempt pass", () => {
+    const summary = summarizeReport(report(passed));
+    expect(summary).toMatchObject({
+      executed: 1,
+      firstAttemptPasses: 1,
+      attempts: 1,
+      flaky: 0,
+      retried: 0,
+    });
+    expect(findCoverageProblems(summary, rules)).toEqual([]);
   });
-
-  it("flags a required spec that is missing and a too-low total", () => {
-    const summary = summarizeReport({ suites: [] });
-    expect(
-      findCoverageProblems(summary, {
-        requiredSpecs: ["likes.spec.ts"],
-        minExecuted: 5,
-      }),
-    ).toEqual([
-      "expected at least 5 executed tests, got 0",
-      "required spec likes.spec.ts did not appear in the report",
-    ]);
+  it("does not count configured tests with no results as execution", () => {
+    const summary = summarizeReport(report({ status: "expected" }));
+    expect(summary.executed).toBe(0);
+    expect(findCoverageProblems(summary, rules)).toContain(
+      "no usable execution results: save.spec.ts::save",
+    );
   });
-
-  it("passes when every required spec executed", () => {
-    const summary = summarizeReport({
-      suites: [
-        {
-          file: "e2e/likes.spec.ts",
-          specs: [{ tests: [{ status: "expected" }] }],
-        },
-      ],
+  it("exposes flakes and retries separately from first-attempt passes", () => {
+    const summary = summarizeReport(
+      report({
+        status: "flaky",
+        results: [
+          { status: "timedOut", retry: 0 },
+          { status: "passed", retry: 1 },
+        ],
+      }),
+    );
+    expect(summary).toMatchObject({
+      executed: 1,
+      flaky: 1,
+      retried: 1,
+      attempts: 2,
+      firstAttemptPasses: 0,
     });
     expect(
+      findCoverageProblems(summary, { ...rules, maxRetried: 0 }),
+    ).toContain("1 retried test(s), allowed 0");
+  });
+  it("rejects missing required specs, runner errors and failed tests", () => {
+    expect(
+      findCoverageProblems(
+        summarizeReport({ suites: [], errors: [{ message: "server failed" }] }),
+        rules,
+      ),
+    ).toContain("1 Playwright runner error(s)");
+    const summary = summarizeReport(
+      report({ status: "unexpected", results: [{ status: "failed" }] }),
+    );
+    expect(findCoverageProblems(summary, rules)).toContain("1 test(s) failed");
+  });
+  it("permits only individually named skips and still rejects entirely skipped required specs", () => {
+    const summary = summarizeReport(
+      report({ status: "skipped", results: [{ status: "skipped" }] }),
+    );
+    expect(findCoverageProblems(summary, rules)).toContain(
+      "unapproved skipped journey: save.spec.ts::save",
+    );
+    expect(
       findCoverageProblems(summary, {
-        requiredSpecs: ["likes.spec.ts"],
-        minExecuted: 1,
+        ...rules,
+        allowedSkips: ["save.spec.ts::save"],
       }),
-    ).toEqual([]);
+    ).toEqual([
+      "expected at least 1 executed tests, got 0",
+      "required spec save.spec.ts executed 0 tests (1 skipped)",
+    ]);
   });
 });
