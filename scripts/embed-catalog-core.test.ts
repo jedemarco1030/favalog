@@ -408,6 +408,21 @@ describe("authorizeEmbeddingWrite", () => {
 // ---------------------------------------------------------------------------
 
 describe("runEmbedCatalog", () => {
+  it("excludes known demonstrations while retaining legitimate internal catalog rows", async () => {
+    const h = createHarness({
+      mediaRows: [
+        SAMPLE_ROW,
+        { ...SAMPLE_ROW, id: "legacy-demo", external_id: "m_afterglow" },
+      ],
+    });
+    expect(await runEmbedCatalog(["--fake"], h.deps)).toBe(0);
+    expect(h.captured.records?.map((row) => row.mediaId)).toEqual([
+      SAMPLE_ROW.id,
+    ]);
+    expect(h.logs.join("\n")).toContain(
+      "Skipped 1 provider-removed or demonstration row(s)",
+    );
+  });
   it("allows a LOCAL fake write and reaches the pipeline", async () => {
     const h = createHarness({
       env: { SUPABASE_URL: LOCAL_URL, SUPABASE_SECRET_KEY: SERVICE_KEY },

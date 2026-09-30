@@ -17,6 +17,12 @@
 begin;
 select plan(43);
 
+-- This suite exercises legitimate internal curation, not a historical demo.
+-- Changes exist only inside this rolled-back, disposable test transaction.
+delete from public.media_items where source = 'favalog' and external_id = 'test-fixture:m_duneparttwo';
+update public.media_items set external_id = 'curation-fixture:dune'
+where source = 'favalog' and external_id = 'm_duneparttwo';
+
 -- The full function identity, reused by the privilege assertions.
 \set fn 'public.materialize_external_media(text, public.media_kind, text, text, text, text, integer, text, text, numeric, text[], jsonb, text, text)'
 

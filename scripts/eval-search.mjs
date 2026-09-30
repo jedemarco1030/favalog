@@ -43,6 +43,7 @@ import { existsSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 
 import { FakeEmbeddingProvider } from "../lib/search/embedding-provider.ts";
+import { PRODUCTION_CATALOG_FILTER } from "../lib/media/demonstration.ts";
 import { createOpenAIEmbeddingProvider } from "../lib/search/openai-embedding-provider.ts";
 import {
   EMBEDDING_DIMENSIONS,
@@ -77,7 +78,13 @@ function parseArgs(argv) {
 
 async function runArm(supabase, rpc, buildArgs) {
   const results = [];
-  for (const testCase of GOLDEN_CASES) {
+  for (const originalCase of GOLDEN_CASES) {
+    const testCase = {
+      ...originalCase,
+      relevantSlugs: originalCase.relevantSlugs.map(
+        (slug) => `fixture-${slug}`,
+      ),
+    };
     const started = performance.now();
     const args = await buildArgs(testCase);
     const { data, error } = await supabase.rpc(rpc, args);
@@ -126,6 +133,11 @@ function printSummary(label, metrics) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  if (args.live) {
+    throw new Error(
+      "The golden dataset is synthetic and local-only. A separately reviewed genuine-provider dataset is required for live semantic-quality evaluation; no paid embedding calls were made.",
+    );
+  }
 
   const url =
     process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
@@ -221,7 +233,8 @@ async function main() {
     .from("media_items")
     .select("*", { count: "exact", head: true })
     .in("source", embeddableSources)
-    .is("provider_removed_at", null);
+    .is("provider_removed_at", null)
+    .or(PRODUCTION_CATALOG_FILTER);
   if (catalogError) {
     console.error(
       `[eval:search] Failed to count the catalog: ${catalogError.message}`,

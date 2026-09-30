@@ -110,7 +110,7 @@ jobs:
         run: npm ci
 
       - name: Start local Supabase stack
-        run: npx supabase start
+        run: bash scripts/start-ci-supabase.sh
 
       - name: Run database tests (pgTAP)
         run: npm run db:test
@@ -314,7 +314,7 @@ jobs:
         run: npm ci
 
       - name: Start local Supabase stack
-        run: npx supabase start
+        run: bash scripts/start-ci-supabase.sh
 
       - name: Apply migrations + seed
         # `db reset` re-applies every migration and then runs `seed.sql`
@@ -385,6 +385,7 @@ jobs:
       # successful, the harness's threshold-based NONZERO exit is preserved, and
       # a missing/empty report fails the step clearly.
       - name: Retrieval evaluation (deterministic; NOT semantic-quality evidence)
+        id: retrieval_eval
         run: |
           set -euo pipefail
           mkdir -p eval-reports
@@ -393,7 +394,7 @@ jobs:
             || { echo "::error::Retrieval evaluation produced no JSON report."; exit 1; }
 
       - name: Upload deterministic retrieval evaluation report
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (steps.retrieval_eval.outcome == 'success' || steps.retrieval_eval.outcome == 'failure') }}
         uses: actions/upload-artifact@v4
         with:
           # Honestly labelled: deterministic integration/regression evidence,
@@ -409,16 +410,22 @@ jobs:
       - name: Production build (Supabase-configured)
         run: npm run build
 
+      # This step is reached only after stack startup, seeding, config export,
+      # retrieval evaluation and the configured build succeed. Later independent
+      # suites may still run after a TEST failure, never after a setup failure.
       - name: Install Playwright browsers
+        id: explore_ready
         run: npx playwright install --with-deps chromium
 
       - name: Run strict Explore Playwright tests
+        id: configured_tests
+        if: ${{ !cancelled() && steps.explore_ready.outcome == 'success' }}
         env:
           PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-results/configured.json
         run: E2E_SUITE=configured npx playwright test --project=configured
 
       - name: Assert strict Explore suite executed
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (steps.configured_tests.outcome == 'success' || steps.configured_tests.outcome == 'failure') }}
         run: >-
           node scripts/assert-e2e-results.mjs e2e-results/configured.json --min=5
           --require=explore.spec.ts --require=explore-search.spec.ts
@@ -433,6 +440,8 @@ jobs:
       # the README screenshots. A fresh reset gives it the same clean database
       # as `npm run test:e2e:fixtures`. Reports go to their own directories.
       - name: Run slow, partial failure, empty, and disabled discovery scenarios
+        id: layout_tests
+        if: ${{ !cancelled() && steps.explore_ready.outcome == 'success' }}
         env:
           QUALITY_EVIDENCE_DIR: quality-evidence
         run: |
@@ -451,7 +460,7 @@ jobs:
           exit "$status"
 
       - name: Upload discovery scenario reports
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (steps.layout_tests.outcome == 'success' || steps.layout_tests.outcome == 'failure') }}
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-layout-scenarios
@@ -460,24 +469,28 @@ jobs:
           retention-days: 14
 
       - name: Reset local database for retry-free first-list repetitions
-        if: ${{ !cancelled() }}
+        id: first_list_reset
+        if: ${{ !cancelled() && steps.explore_ready.outcome == 'success' }}
         run: npx supabase db reset
 
       - name: Repeat first-list journey twenty times (no retries)
-        if: ${{ !cancelled() }}
+        id: first_list_tests
+        if: ${{ !cancelled() && steps.first_list_reset.outcome == 'success' }}
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-first-list
           PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-results/first-list.json
-        run: E2E_SUITE=fixtures npx playwright test --grep 'zero lists' --repeat-each=20 --retries=0
+        run: |
+          node scripts/wait-local-supabase-auth.mjs
+          E2E_SUITE=fixtures npx playwright test --grep 'zero lists' --repeat-each=20 --retries=0
 
       - name: Assert all first-list repetitions executed on first attempt
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (steps.first_list_tests.outcome == 'success' || steps.first_list_tests.outcome == 'failure') }}
         run: >-
           node scripts/assert-e2e-results.mjs e2e-results/first-list.json --min=20
           --require=discovery-save-dialog.spec.ts --max-retried=0
 
       - name: Upload first-list failure traces and report
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (steps.first_list_tests.outcome == 'success' || steps.first_list_tests.outcome == 'failure') }}
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-first-list
@@ -488,20 +501,24 @@ jobs:
           retention-days: 14
 
       - name: Reset local database for fixtures suite
-        if: ${{ !cancelled() }}
+        id: fixtures_reset
+        if: ${{ !cancelled() && steps.explore_ready.outcome == 'success' }}
         run: npx supabase db reset
 
       - name: Run fixtures Playwright tests
-        if: ${{ !cancelled() }}
+        id: fixtures_tests
+        if: ${{ !cancelled() && steps.fixtures_reset.outcome == 'success' }}
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-fixtures
           PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-results/fixtures.json
           QUALITY_EVIDENCE_DIR: quality-evidence
           SCREENSHOT_DIR: portfolio-screenshots
-        run: E2E_SUITE=fixtures npx playwright test
+        run: |
+          node scripts/wait-local-supabase-auth.mjs
+          E2E_SUITE=fixtures npx playwright test
 
       - name: Assert fixtures suite executed
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (steps.fixtures_tests.outcome == 'success' || steps.fixtures_tests.outcome == 'failure') }}
         run: >-
           node scripts/assert-e2e-results.mjs e2e-results/fixtures.json --min=15
           --require=discovery-save-dialog.spec.ts
@@ -511,7 +528,7 @@ jobs:
           --require=portfolio-screenshots.spec.ts
 
       - name: Assert required configured quality and screenshot artifacts
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (steps.fixtures_tests.outcome == 'success' || steps.fixtures_tests.outcome == 'failure') }}
         run: node scripts/assert-quality-artifacts.mjs configured
 
       # `@prodreject`: the same build started with a PRODUCTION runtime marker
@@ -519,18 +536,20 @@ jobs:
       # titles into the local catalog, so reset before asserting they are absent;
       # otherwise local search can return them even when the override is refused.
       - name: Reset local database for production-refusal suite
-        if: ${{ !cancelled() }}
+        id: prodreject_reset
+        if: ${{ !cancelled() && steps.explore_ready.outcome == 'success' }}
         run: npx supabase db reset
 
       - name: Run production-refusal Playwright tests
-        if: ${{ !cancelled() }}
+        id: prodreject_tests
+        if: ${{ !cancelled() && steps.prodreject_reset.outcome == 'success' }}
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-prodreject
           PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-results/prodreject.json
         run: E2E_SUITE=fixtures-prod-reject npx playwright test
 
       - name: Assert production-refusal suite executed
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (steps.prodreject_tests.outcome == 'success' || steps.prodreject_tests.outcome == 'failure') }}
         run: >-
           node scripts/assert-e2e-results.mjs e2e-results/prodreject.json --min=1
           --require=explore-materialize-prod-reject.spec.ts
@@ -540,7 +559,7 @@ jobs:
         run: npx supabase stop --no-backup
 
       - name: Upload Playwright report
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (steps.configured_tests.outcome == 'success' || steps.configured_tests.outcome == 'failure') }}
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-explore-integration
@@ -548,7 +567,7 @@ jobs:
           retention-days: 7
 
       - name: Upload fixtures Playwright report
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (steps.fixtures_tests.outcome == 'success' || steps.fixtures_tests.outcome == 'failure') }}
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-fixtures
@@ -556,7 +575,7 @@ jobs:
           retention-days: 7
 
       - name: Upload production-refusal Playwright report
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (steps.prodreject_tests.outcome == 'success' || steps.prodreject_tests.outcome == 'failure') }}
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-prodreject
@@ -564,7 +583,7 @@ jobs:
           retention-days: 7
 
       - name: Upload Playwright JSON results
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (steps.configured_tests.outcome == 'success' || steps.configured_tests.outcome == 'failure' || steps.layout_tests.outcome == 'success' || steps.layout_tests.outcome == 'failure' || steps.first_list_tests.outcome == 'success' || steps.first_list_tests.outcome == 'failure' || steps.fixtures_tests.outcome == 'success' || steps.fixtures_tests.outcome == 'failure' || steps.prodreject_tests.outcome == 'success' || steps.prodreject_tests.outcome == 'failure') }}
         uses: actions/upload-artifact@v4
         with:
           name: e2e-results-explore-integration
@@ -575,7 +594,7 @@ jobs:
       # production build, local Supabase, offline provider fixtures, fixture
       # artwork. Not real-user or live-production data.
       - name: Upload configured-fixture quality evidence
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (steps.layout_tests.outcome == 'success' || steps.layout_tests.outcome == 'failure' || steps.fixtures_tests.outcome == 'success' || steps.fixtures_tests.outcome == 'failure') }}
         uses: actions/upload-artifact@v4
         with:
           name: quality-evidence-configured-fixtures
@@ -584,7 +603,7 @@ jobs:
           retention-days: 30
 
       - name: Upload portfolio screenshots
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (steps.fixtures_tests.outcome == 'success' || steps.fixtures_tests.outcome == 'failure') }}
         uses: actions/upload-artifact@v4
         with:
           name: portfolio-screenshots
@@ -623,7 +642,7 @@ jobs:
         run: npm ci
 
       - name: Start local Supabase stack
-        run: npx supabase start
+        run: bash scripts/start-ci-supabase.sh
 
       - name: Apply migrations + seed
         # `db reset` re-applies every migration, so the curated catalog the feed
@@ -686,16 +705,24 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run following feed Playwright journey
+        id: social_tests
         env:
           PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-results/social.json
         run: E2E_SUITE=social npx playwright test --project=social
 
+      - name: Report following feed setup failure
+        if: ${{ !cancelled() && steps.social_tests.outcome == 'skipped' }}
+        run: |
+          echo '::error::Following feed tests not executed: a prerequisite failed.'
+          echo 'Following feed: **tests not executed** (prerequisite failure).' >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
       - name: Assert following feed journey executed
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.social_tests.outcome != 'skipped' }}
         run: node scripts/assert-e2e-results.mjs e2e-results/social.json --min=1 --require=feed.spec.ts
 
       - name: Upload following feed JSON results
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.social_tests.outcome != 'skipped' }}
         uses: actions/upload-artifact@v4
         with:
           name: e2e-results-social
@@ -708,11 +735,12 @@ jobs:
         run: npx supabase stop --no-backup
 
       - name: Upload Playwright report
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.social_tests.outcome != 'skipped' }}
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-social-integration
           path: playwright-report
+          if-no-files-found: error
           retention-days: 7
 
   # STRICT, secret-free likes integration: the multi-user review/list like
@@ -746,7 +774,7 @@ jobs:
         run: npm ci
 
       - name: Start local Supabase stack
-        run: npx supabase start
+        run: bash scripts/start-ci-supabase.sh
 
       - name: Apply migrations + seed
         # `db reset` re-applies every migration, so the curated catalog the like
@@ -809,16 +837,24 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run likes Playwright journey
+        id: likes_tests
         env:
           PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-results/likes.json
         run: E2E_SUITE=likes npx playwright test --project=likes
 
+      - name: Report likes setup failure
+        if: ${{ !cancelled() && steps.likes_tests.outcome == 'skipped' }}
+        run: |
+          echo '::error::Likes tests not executed: a prerequisite failed. The job remains failed.'
+          echo 'Likes: **tests not executed** (prerequisite failure).' >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
       - name: Assert likes journey executed
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.likes_tests.outcome != 'skipped' }}
         run: node scripts/assert-e2e-results.mjs e2e-results/likes.json --min=1 --require=likes.spec.ts
 
       - name: Upload likes JSON results
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.likes_tests.outcome != 'skipped' }}
         uses: actions/upload-artifact@v4
         with:
           name: e2e-results-likes
@@ -831,9 +867,10 @@ jobs:
         run: npx supabase stop --no-backup
 
       - name: Upload Playwright report
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.likes_tests.outcome != 'skipped' }}
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-likes-integration
           path: playwright-report
+          if-no-files-found: error
           retention-days: 7

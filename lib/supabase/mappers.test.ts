@@ -45,6 +45,20 @@ function makeRow(overrides: Partial<MediaItemRow> = {}): MediaItemRow {
 }
 
 describe("mapMediaRowToDomain", () => {
+  it("preserves saved demo identity, labels it, and omits its synthetic aggregate rating", () => {
+    const row = makeRow({ external_id: "m_duneparttwo" });
+    const item = mapMediaRowToDomain(row);
+    expect(item.id).toBe(row.id);
+    expect(item.slug).toBe(row.slug);
+    expect(item.isDemonstration).toBe(true);
+    expect(item.averageRating).toBeUndefined();
+  });
+
+  it("retains ratings on a legitimate internal record with a similar title", () => {
+    const item = mapMediaRowToDomain(makeRow({ external_id: "curated-dune" }));
+    expect(item.isDemonstration).toBe(false);
+    expect(item.averageRating).toBe(4.7);
+  });
   it("maps a movie row, reading movie-specific fields from details", () => {
     const item = mapMediaRowToDomain(
       makeRow({
@@ -66,6 +80,21 @@ describe("mapMediaRowToDomain", () => {
     expect(item.slug).toBe("dune-part-two");
     expect(item.averageRating).toBe(4.7);
     expect(item.genres).toEqual(["Science Fiction", "Epic"]);
+  });
+
+  it("uses the established genre vocabulary without leaking raw subjects or duplicating genres", () => {
+    const item = mapMediaRowToDomain(
+      makeRow({
+        kind: "book",
+        genres: [
+          "science fiction",
+          "Science Fiction",
+          "Dune (Imaginary place)",
+          "nyt:mass-market-monthly=2021-11-07",
+        ],
+      }),
+    );
+    expect(item.genres).toEqual(["Science Fiction"]);
   });
 
   it("maps a tv row and normalizes an invalid status to 'ongoing'", () => {

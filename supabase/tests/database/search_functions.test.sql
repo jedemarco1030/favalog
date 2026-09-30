@@ -18,6 +18,12 @@
 begin;
 select plan(90);
 
+-- Transaction-local ranking fixtures, not production identities. Dedicated
+-- demonstration_catalog.test.sql covers the unmodified legacy exclusion.
+delete from public.media_items where source = 'favalog' and external_id like 'test-fixture:%';
+update public.media_items set external_id = 'ranking-fixture:' || external_id
+where source = 'favalog';
+
 -- ---------------------------------------------------------------------------
 -- 1. Extension: pgvector installed, and living in the `extensions` schema.
 -- ---------------------------------------------------------------------------

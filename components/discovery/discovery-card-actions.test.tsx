@@ -82,6 +82,40 @@ async function openDialog() {
 }
 
 describe("DiscoveryCardActions save dialog", () => {
+  it("uses bounded JSON by default and announces an already-saved title", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({ ...savedTo("list-1"), alreadyPresent: true }),
+      );
+    vi.stubGlobal("fetch", fetch);
+    try {
+      render(
+        <DiscoveryCardActions
+          identity={identity}
+          title="Dune: Part Two"
+          lists={existingLists}
+          returnTo="/explore"
+          openAction={vi.fn(async () => ({ status: "idle" as const }))}
+        />,
+      );
+      const { user, dialog } = await openDialog();
+      await user.click(
+        within(dialog).getByRole("button", { name: "Save to list" }),
+      );
+      expect(await within(dialog).findByRole("status")).toHaveTextContent(
+        "Dune: Part Two is already in Weekend watch.",
+      );
+      expect(fetch).toHaveBeenCalledOnce();
+      expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({
+        intent: "save",
+        listId: "list-1",
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("offers Create new list alongside existing lists", async () => {
     renderActions({ lists: existingLists });
     const { dialog } = await openDialog();

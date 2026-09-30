@@ -39,6 +39,7 @@ import { setLikeAction } from "@/components/likes/like-actions";
 import { siteConfig } from "@/lib/site-config";
 import { Suspense } from "react";
 import { RelatedTitles } from "@/components/discovery/related-titles";
+import { displayableArtwork } from "@/lib/media/artwork";
 
 interface TitlePageProps {
   params: Promise<{ slug: string }>;
@@ -53,7 +54,9 @@ export async function generateMetadata({
   params,
 }: TitlePageProps): Promise<Metadata> {
   const { slug } = await params;
-  const item = getMediaBySlug(slug) ?? (await getRealMediaBySlug(slug));
+  const item = isAuthAvailable()
+    ? await getRealMediaBySlug(slug)
+    : getMediaBySlug(slug);
   if (!item) {
     return { title: "Title not found" };
   }
@@ -71,7 +74,9 @@ export async function generateMetadata({
       description,
       url: `/title/${item.slug}`,
       siteName: siteConfig.name,
-      images: item.backdropUrl ?? item.posterUrl,
+      images:
+        displayableArtwork(item.backdropUrl) ??
+        displayableArtwork(item.posterUrl),
     },
     twitter: {
       card: "summary_large_image",
@@ -92,21 +97,17 @@ export async function generateMetadata({
  */
 export default async function TitlePage({ params }: TitlePageProps) {
   const { slug } = await params;
-  // Resolve from the mock catalog first; fall back to a real Supabase title so a
-  // freshly MATERIALIZED external title (Catalog Platform v1B) — which exists
-  // only in `media_items` — resolves at its canonical route with the existing
-  // Log / Rate / Review / Favorite / Add-to-list actions working unchanged.
-  const mockItem = getMediaBySlug(slug);
-  const realMedia = mockItem
-    ? null
-    : await getRealMediaWithProviderBySlug(slug);
-  const item = mockItem ?? realMedia?.item;
+  const configured = isAuthAvailable();
+  const realMedia = configured
+    ? await getRealMediaWithProviderBySlug(slug)
+    : null;
+  const item = configured ? realMedia?.item : getMediaBySlug(slug);
   if (!item) notFound();
   const sourceProvider = realMedia?.provider ?? null;
 
-  const distribution = getRatingDistribution(item.id);
-  const titleReviews = getReviewsForMedia(item.id);
-  const related = getRelatedMedia(item.id, 6);
+  const distribution = configured ? undefined : getRatingDistribution(item.id);
+  const titleReviews = configured ? [] : getReviewsForMedia(item.id);
+  const related = configured ? [] : getRelatedMedia(item.id, 6);
 
   // Community reviews: when Supabase is configured this surface reads REAL
   // reviews (with real, persistent like state) and never the mock layer — a
@@ -176,11 +177,25 @@ export default async function TitlePage({ params }: TitlePageProps) {
   return (
     <article>
       <Container>
+        {(!configured || item.isDemonstration) && (
+          <p className="pt-6 text-sm leading-relaxed text-foreground/70">
+            Demonstration title — example catalog data, not a verified provider
+            record.
+            {configured &&
+              " Existing personal entries and saved lists remain available."}
+          </p>
+        )}
         <MediaHero item={item} ratingCount={distribution?.count} />
       </Container>
 
       <Container className="pb-16">
-        <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-12">
+        <div
+          className={
+            distribution
+              ? "grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-12"
+              : "flex flex-col gap-10"
+          }
+        >
           <div className="flex flex-col gap-12">
             <section aria-label="Actions">
               <MediaActions
@@ -273,14 +288,14 @@ export default async function TitlePage({ params }: TitlePageProps) {
             </section>
           </div>
 
-          <aside className="flex flex-col gap-8">
-            {distribution && (
+          {distribution && (
+            <aside className="flex flex-col gap-8">
               <section>
                 <SectionHeader as="h2" title="Community rating" />
                 <RatingBreakdown distribution={distribution} />
               </section>
-            )}
-          </aside>
+            </aside>
+          )}
         </div>
 
         {sourceProvider && realMedia?.externalId && (

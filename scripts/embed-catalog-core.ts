@@ -44,6 +44,7 @@ import {
 } from "../lib/search/embedding-source-policy.ts";
 import type { EmbeddingProvider } from "../lib/search/embedding-provider.ts";
 import type { MediaItem, TVShow } from "../lib/types.ts";
+import { isDemonstrationIdentity } from "../lib/media/demonstration.ts";
 import {
   estimateTokens,
   type EmbeddingRecord,
@@ -470,6 +471,7 @@ export interface MediaRow {
   details: Record<string, unknown> | null;
   /** Set when the provider confirmed removal; removed rows are never embedded. */
   provider_removed_at?: string | null;
+  external_id?: string;
 }
 
 function stringList(value: unknown): string[] {
@@ -685,7 +687,7 @@ export async function runEmbedCatalog(
   const queryBuilder = supabase
     .from("media_items")
     .select(
-      "id, slug, source, kind, title, subtitle, synopsis, year, genres, " +
+      "id, slug, source, external_id, kind, title, subtitle, synopsis, year, genres, " +
         "details, provider_removed_at",
     )
     .order("slug", { ascending: true });
@@ -719,11 +721,15 @@ export async function runEmbedCatalog(
     : readRows;
   // Provider-confirmed removals are never (re)embedded; search already hides
   // them, and their user records are preserved on the row itself.
-  const allRows = sourceRows.filter((row) => !row.provider_removed_at);
+  const allRows = sourceRows.filter(
+    (row) =>
+      !row.provider_removed_at &&
+      !isDemonstrationIdentity(row.source ?? "", row.external_id ?? ""),
+  );
   const removedCount = sourceRows.length - allRows.length;
   if (removedCount > 0) {
     logger.log(
-      `[embed-catalog] Skipped ${removedCount} provider-removed row(s).`,
+      `[embed-catalog] Skipped ${removedCount} provider-removed or demonstration row(s).`,
     );
   }
   const { embeddable, excluded } = partitionEmbeddableRows(allRows, policy);

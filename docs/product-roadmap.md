@@ -1,17 +1,65 @@
 # Favalog product roadmap
 
-> Living document. Last reconciled: 2026-09-29 (Phase 4E closeout), against
-> reviewed `main` at `5d1663b` (PR #20) and closeout PR #21. Release acceptance
+> Living document. Last reconciled: 2026-09-30 (Phase 4E closeout), against
+> post-merge `main` at `1c076a3` (merged PR #21). Engineering closeout is incomplete;
+> the demonstration-separation follow-up still requires final-source CI. Release acceptance
 > is pending; see [the release checklist](mvp1-release-checklist.md). Update this file whenever a phase
 > ships, a capability becomes production-verified, or the agreed sequence
 > changes. When a statement is only true at a point in time, keep it and date it
 > rather than deleting the history.
 
-## Status reconciliation (2026-09-29)
+## Current closeout evidence (2026-09-30)
 
-This section supersedes conflicting status lines further down, which are kept
-as dated history. It uses four separate labels, and a claim gets only the
-labels it has evidence for:
+[Post-merge CI 36749917450](https://github.com/jedemarco1030/favalog/actions/runs/36749917450)
+ran source `1c076a3eb4b94672251ca64e6ab33475a4311fe1`: 20 retry-free first-list
+journeys plus auth setup, 34 first-attempt fixtures, configured Explore 14 passes
+and one paid-semantic skip, following feed one pass. Database/type-drift and
+validation/build jobs passed. Likes failed during local Inbucket binding on
+54324, before Playwright; the overall run failed. A single requested rerun was
+denied by GitHub permissions, so the conflict is not yet classified as transient.
+
+[PR #22](https://github.com/jedemarco1030/favalog/pull/22), application source
+`76bb60866b896d246923932a9bc03e2ba0054814`, separates the exact historical
+demonstration identities without rewriting user references, fixes mock-first
+title rendering and safe artwork fallbacks, and captures scoped CI startup
+diagnostics. [Follow-up CI 36760089274](https://github.com/jedemarco1030/favalog/actions/runs/36760089274)
+passed source validation/builds and database/type drift; likes and following
+feed executed successfully. The historical bind failure did not recur on that
+attempt, but its original listener owner remains unknown. Complete artifacts
+show that this run nevertheless **failed**: configured Explore passed 15 plus
+one paid-semantic skip; first-list passed 20 repetitions plus auth setup without
+retries, while fixtures had five retries, one flaky duplicate-save, one failed
+materialization and seven cascade skips. All eight isolated provider-layout
+scenarios and production fixture-refusal passed. Source `5847189` fixes the
+obsolete materialization slug assertion and duplicate-save result's dependency
+on streamed RSC refresh. Its [CI 36763709617](https://github.com/jedemarco1030/favalog/actions/runs/36763709617)
+completed successfully: 1,574 unit/component tests across 163 files, configured
+15 passes/one paid-semantic skip, 20 first-list repetitions plus auth setup,
+34 fixtures, eight independent provider-layout passes, production fixture-refusal
+one pass, following feed one pass and likes one pass. All executed E2E tests
+passed on their first attempt, with zero retries/flaky outcomes. Default no-env
+has 44 passes/six intentional skips; explicit no-env has five passes/no skips.
+Builds, pgTAP/RLS and generated-type drift passed; generated types are
+byte-identical. Fresh genuine-provider Home/Explore/search/title screenshots and
+ready fixture Save captures were inspected. Final documentation/capture-branch
+and post-merge main CI remain required. Nothing is production-applied here.
+Earlier local verification: 1,562 unit/component passes and 131 focused regressions;
+Docker and native Playwright remain unavailable in this sandbox, not in CI.
+The full [release checklist](mvp1-release-checklist.md) is authoritative.
+
+The five latest inspected refresh schedules skipped; newest
+[36702695138](https://github.com/jedemarco1030/favalog/actions/runs/36702695138).
+No protected hosted rehearsal or live schedule activation is claimed. RAWG
+remains keyword-only; permission and separate live embedding activation are
+still unresolved. The fixture-only golden dataset cannot be used to claim
+live semantic quality; a genuine-provider evaluation dataset is an explicit
+operator-tooling deferral, not a waiver of required beta checks.
+
+## Historical status reconciliation (2026-09-29)
+
+This dated section is superseded by the current closeout evidence above.
+It preserves historical capability labels rather than asserting final-source
+or release acceptance. A claim gets only the labels it has evidence for:
 
 - **Implemented**: the code is on `main`.
 - **CI-verified**: a job in `.github/workflows/ci.yml` exercises it.

@@ -29,6 +29,7 @@ import "server-only";
 import type { ExternalProvider } from "@/lib/catalog/types";
 import type { MediaKind } from "@/lib/types";
 import { externalKeyFor } from "@/lib/catalog/validation";
+import { isDemonstrationIdentity } from "@/lib/media/demonstration";
 import { isSupabaseConfigured } from "./env";
 import { createClient } from "./server";
 
@@ -78,13 +79,22 @@ export async function resolveExternalRefs(
   try {
     const { data, error } = await supabase
       .from("media_external_ids")
-      .select("external_id, media_items!inner(slug)")
+      .select("external_id, media_items!inner(slug, source, external_id)")
       .eq("provider", provider)
       .in("external_id", keys);
     if (!error && data) {
       for (const row of data as AliasRow[]) {
         const slug = row.media_items?.slug;
-        if (row.external_id && slug) resolved.set(row.external_id, slug);
+        if (
+          row.external_id &&
+          slug &&
+          !isDemonstrationIdentity(
+            row.media_items?.source ?? "",
+            row.media_items?.external_id ?? "",
+          )
+        ) {
+          resolved.set(row.external_id, slug);
+        }
       }
     }
   } catch {
@@ -117,7 +127,11 @@ export async function resolveExternalRefs(
 /** Shape of a joined `media_external_ids` row projection. */
 interface AliasRow {
   external_id: string | null;
-  media_items: { slug: string | null } | null;
+  media_items: {
+    slug: string | null;
+    source: string;
+    external_id: string;
+  } | null;
 }
 
 /** Shape of a `media_items` identity projection. */

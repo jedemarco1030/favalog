@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { materializeExternalTitleAction } from "@/app/explore/actions";
-import { saveDiscoveredTitleAction } from "@/app/discovery/actions";
 import { FeaturedBanner } from "@/components/home/featured-banner";
 import {
   mergeByReleaseDate,
@@ -85,7 +84,6 @@ export async function cardContext(
     lists: await getSaveListOptions(),
     returnTo,
     openAction: materializeExternalTitleAction,
-    saveAction: saveDiscoveredTitleAction,
   };
 }
 

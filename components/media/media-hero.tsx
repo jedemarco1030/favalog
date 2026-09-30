@@ -1,4 +1,5 @@
-import Image from "next/image";
+import { ArtworkImage } from "./artwork-image";
+import { displayableArtwork } from "@/lib/media/artwork";
 import type { MediaItem } from "@/lib/types";
 import { MediaPoster } from "@/components/media/media-poster";
 import {
@@ -25,20 +26,20 @@ const countFormatter = new Intl.NumberFormat("en");
  */
 export function MediaHero({ item, ratingCount, className }: MediaHeroProps) {
   const primaryCredit = primaryCreditFor(item);
+  const backdrop = displayableArtwork(item.backdropUrl);
 
   return (
     <section className={cn("relative overflow-hidden", className)}>
-      {item.backdropUrl && (
+      {backdrop && (
         <>
           <div className="pointer-events-none absolute inset-0 -z-10">
-            <Image
-              src={item.backdropUrl}
+            <ArtworkImage
+              src={backdrop}
               alt=""
-              role="presentation"
-              fill
               sizes="100vw"
               priority
               className="object-cover opacity-40"
+              fallback={null}
             />
           </div>
           <div
@@ -120,7 +121,7 @@ export function MediaHero({ item, ratingCount, className }: MediaHeroProps) {
 function primaryCreditFor(item: MediaItem): string | undefined {
   switch (item.kind) {
     case "movie":
-      return `Directed by ${item.director}`;
+      return item.director ? `Directed by ${item.director}` : undefined;
     case "tv":
       return item.creators.length
         ? `Created by ${item.creators.join(", ")}`

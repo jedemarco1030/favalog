@@ -2,10 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getCurrentUser = vi.fn();
 const createAndSave = vi.fn();
+const save = vi.fn();
 vi.mock("@/lib/auth/data", () => ({ getCurrentUser: () => getCurrentUser() }));
 vi.mock("@/app/discovery/actions", () => ({
   createAndSaveDiscoveredTitleAction: (state: unknown, data: FormData) =>
     createAndSave(state, data),
+  saveDiscoveredTitleAction: (state: unknown, data: FormData) =>
+    save(state, data),
 }));
 
 import { POST } from "./route";
@@ -162,6 +165,103 @@ describe("discovery create-save JSON boundary", () => {
     createAndSave.mockResolvedValue(partial);
     expect(await (await POST(request())).json()).toEqual(partial);
     expect(createAndSave).toHaveBeenCalledOnce();
+  });
+
+  it("returns duplicate-save confirmation without creating another list", async () => {
+    const result = {
+      status: "success",
+      listId: "existing-list",
+      alreadyPresent: true,
+    };
+    save.mockResolvedValue(result);
+    const response = await POST(
+      request({
+        ...input,
+        intent: "save",
+        listId: "existing-list",
+        userId: "untrusted-owner",
+        mediaSlug: "untrusted-title",
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.json()).toEqual(result);
+    expect(getCurrentUser).toHaveBeenCalledOnce();
+    expect(save).toHaveBeenCalledOnce();
+    expect(createAndSave).not.toHaveBeenCalled();
+    const data = save.mock.calls[0][1] as FormData;
+    expect([...data.keys()]).toEqual([
+      "listId",
+      "provider",
+      "kind",
+      "externalId",
+      "returnTo",
+    ]);
+    expect(data.get("listId")).toBe("existing-list");
+    expect(data.get("returnTo")).toBe(
+      "/explore?type=movie&save=tmdb%3Amovie%3A999101",
+    );
+  });
+
+  it("authenticates a save-only request before delegation", async () => {
+    getCurrentUser.mockResolvedValue(null);
+    const response = await POST(
+      request({ ...input, intent: "save", listId: "existing-list" }),
+    );
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({
+      status: "unauthenticated",
+      message: "Please sign in to save this title.",
+    });
+    expect(save).not.toHaveBeenCalled();
+    expect(createAndSave).not.toHaveBeenCalled();
+  });
+
+  it.each(["delete", 42, { operation: "save" }])(
+    "rejects an unknown intent %j",
+    async (intent) => {
+      expect((await POST(request({ ...input, intent }))).status).toBe(400);
+      expect(getCurrentUser).not.toHaveBeenCalled();
+      expect(save).not.toHaveBeenCalled();
+      expect(createAndSave).not.toHaveBeenCalled();
+    },
+  );
+
+  it("rejects a non-string list lookup before writes", async () => {
+    expect(
+      (
+        await POST(
+          request({ ...input, intent: "save", listId: ["other-list"] }),
+        )
+      ).status,
+    ).toBe(400);
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("rejects a cross-site save-only request before writes", async () => {
+    const response = await POST(
+      request(
+        { ...input, intent: "save", listId: "existing-list" },
+        { origin: "https://untrusted.example" },
+      ),
+    );
+    expect(response.status).toBe(403);
+    expect(getCurrentUser).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+    expect(createAndSave).not.toHaveBeenCalled();
+  });
+
+  it("redacts save-only failures without attempting list creation", async () => {
+    save.mockRejectedValue(new Error("private database details"));
+    const response = await POST(
+      request({ ...input, intent: "save", listId: "existing-list" }),
+    );
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      status: "error",
+      message: "We couldn't save that just now. Try again.",
+    });
+    expect(createAndSave).not.toHaveBeenCalled();
   });
 
   it("does not leak internal failures", async () => {

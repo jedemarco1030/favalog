@@ -27,6 +27,8 @@ import type {
   TVShow,
 } from "@/lib/types";
 import { deriveDiaryAction } from "./log-input";
+import { isDemonstrationIdentity } from "@/lib/media/demonstration";
+import { canonicalizeBrowseGenre } from "@/lib/browse/genre-vocabulary";
 
 export type MediaItemRow = Database["public"]["Tables"]["media_items"]["Row"];
 export type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
@@ -87,8 +89,18 @@ function mapBaseFields(row: MediaItemRow) {
     year: row.year,
     posterUrl: row.poster_url ?? "",
     backdropUrl: row.backdrop_url ?? undefined,
-    averageRating: row.average_rating ?? undefined,
-    genres: row.genres,
+    averageRating: isDemonstrationIdentity(row.source, row.external_id)
+      ? undefined
+      : (row.average_rating ?? undefined),
+    isDemonstration: isDemonstrationIdentity(row.source, row.external_id),
+    genres: [
+      ...new Set(
+        row.genres.flatMap((genre) => {
+          const canonical = canonicalizeBrowseGenre(row.kind, genre);
+          return canonical ? [canonical] : [];
+        }),
+      ),
+    ],
   };
 }
 

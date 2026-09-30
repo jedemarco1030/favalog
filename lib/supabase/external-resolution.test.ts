@@ -21,7 +21,7 @@ import { resolveExternalRefs } from "./external-resolution";
 function fakeClient(byTable: {
   media_external_ids?: Array<{
     external_id: string;
-    media_items: { slug: string } | null;
+    media_items: { slug: string; source?: string; external_id?: string } | null;
   }>;
   media_items?: Array<{ external_id: string; slug: string }>;
 }) {
@@ -102,6 +102,29 @@ describe("resolveExternalRefs", () => {
     expect(map.get("movie:2")).toBe("row-only");
     // The media_items query must only look up the still-unresolved key.
     expect(inCalls.media_items?.[0]).toEqual(["movie:2"]);
+  });
+
+  it("does not advertise a demonstration alias as the canonical provider title", async () => {
+    const { client } = fakeClient({
+      media_external_ids: [
+        {
+          external_id: "movie:693134",
+          media_items: {
+            slug: "dune-part-two",
+            source: "favalog",
+            external_id: "m_duneparttwo",
+          },
+        },
+      ],
+    });
+    createClient.mockResolvedValue(client);
+    expect(
+      (
+        await resolveExternalRefs("tmdb", [
+          { kind: "movie", externalId: "693134" },
+        ])
+      ).size,
+    ).toBe(0);
   });
 
   it("leaves a never-imported candidate unresolved (importable)", async () => {

@@ -5,7 +5,10 @@ import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useFormStatus } from "react-dom";
 import { Bookmark, Loader2, Plus, X } from "lucide-react";
-import { createAndSaveDiscoveredTitle } from "@/lib/discovery/create-save-client";
+import {
+  createAndSaveDiscoveredTitle,
+  saveDiscoveredTitle,
+} from "@/lib/discovery/create-save-client";
 import {
   initialCreateListFormState,
   type CreateListFormState,
@@ -55,7 +58,7 @@ interface DiscoveryCardActionsProps {
   lists: SaveListOption[] | null;
   returnTo: string;
   openAction: DiscoveryOpenAction;
-  saveAction: DiscoverySaveAction;
+  saveAction?: DiscoverySaveAction;
   /** Creates a list inside the save dialog; injectable for tests. */
   createAction?: DiscoveryCreateListAction;
 }
@@ -149,7 +152,7 @@ export function DiscoveryCardActions({
   lists,
   returnTo,
   openAction,
-  saveAction,
+  saveAction = saveDiscoveredTitle,
   createAction = createAndSaveDiscoveredTitle,
 }: DiscoveryCardActionsProps) {
   const router = useRouter();

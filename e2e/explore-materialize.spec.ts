@@ -14,8 +14,8 @@ import { countMediaByExternalId, countMediaBySlug } from "./fixtures/admin";
  * Supabase.
  *
  * Fixture query tokens (see e2e/fixtures/provider-fixture-server.mjs):
- *   - "dune":    TMDB returns Dune: Part Two (693134, same work as the seeded
- *                curated `dune-part-two`); Open Library FAILS (one provider down).
+ *   - "dune":    TMDB returns Dune: Part Two (693134, same work as the local-only
+ *                `fixture-dune-part-two`); Open Library FAILS (one provider down).
  *   - "voyager": TMDB returns a brand-new importable movie (movie:999001).
  *   - "sandworm": Open Library returns an importable book whose Work record
  *                OMITS first_publish_date; the year is only recoverable via the
@@ -27,7 +27,8 @@ import { countMediaByExternalId, countMediaBySlug } from "./fixtures/admin";
 
 const VOYAGER_TITLE = "Fixture Voyager Chronicles";
 const VOYAGER_EXTERNAL_ID = "movie:999001";
-const DUNE_SLUG = "dune-part-two";
+const DUNE_SLUG = "fixture-dune-part-two";
+const LEGACY_DUNE_SLUG = "dune-part-two";
 
 // The dateless-Work book: its Open Library Work record OMITS first_publish_date,
 // so its year (1965) is only recoverable via the adapter's bounded exact
@@ -48,9 +49,14 @@ test.describe.serial("@fixtures federated Explore + materialization", () => {
     await expect(
       page.getByRole("heading", { name: /Results for/i }),
     ).toBeVisible();
+    const localDune = page.getByRole("link", {
+      name: /Dune: Part Two \(Film, 2024\)/,
+    });
+    await expect(localDune).toBeVisible();
+    await expect(localDune).toHaveAttribute("href", `/title/${DUNE_SLUG}`);
     await expect(
-      page.getByRole("link", { name: /Dune: Part Two \(Film, 2024\)/ }),
-    ).toBeVisible();
+      page.locator(`main a[href="/title/${LEGACY_DUNE_SLUG}"]`),
+    ).toHaveCount(0);
 
     // The failed provider (Open Library) is isolated to a controlled note and
     // never hides the rest of the page. This section STREAMS in after the
@@ -66,14 +72,12 @@ test.describe.serial("@fixtures federated Explore + materialization", () => {
   test("an existing canonical title resolves to its current page without duplication", async ({
     page,
   }) => {
-    const before = await countMediaBySlug(DUNE_SLUG);
-    expect(before).toBe(1);
+    expect(await countMediaBySlug(DUNE_SLUG)).toBe(1);
+    expect(await countMediaBySlug(LEGACY_DUNE_SLUG)).toBe(1);
 
-    // "linkme" is not a local catalog match, so the TMDB Dune candidate is NOT
-    // dropped as a local duplicate. On a clean DB there is no provider link yet,
-    // so it is offered for import; materializing it canonically LINKS to the
-    // existing Dune: Part Two (same title + kind + year) instead of creating a
-    // duplicate, and the browser lands on the current title page.
+    // The independent local fixture is eligible for canonical matching; the
+    // same-name legacy demonstration must neither receive the alias nor change.
+    // "linkme" has no local match, so TMDB offers this unlinked identity to add.
     await page.goto("/explore?q=linkme");
 
     const importDune = page.getByRole("button", {
@@ -86,8 +90,21 @@ test.describe.serial("@fixtures federated Explore + materialization", () => {
       timeout: 30_000,
     });
 
-    // No second row was ever created for the existing canonical title.
+    await expect(
+      page.getByRole("heading", {
+        level: 1,
+        name: "Dune: Part Two",
+        exact: true,
+      }),
+    ).toBeVisible();
     await expect(countMediaBySlug(DUNE_SLUG)).resolves.toBe(1);
+    await expect(countMediaBySlug(LEGACY_DUNE_SLUG)).resolves.toBe(1);
+    await expect(
+      countMediaByExternalId("favalog", "m_duneparttwo"),
+    ).resolves.toBe(1);
+    await expect(
+      countMediaByExternalId("favalog", "test-fixture:m_duneparttwo"),
+    ).resolves.toBe(1);
   });
 
   test("a new fixture title materializes exactly once and lands on its title page", async ({

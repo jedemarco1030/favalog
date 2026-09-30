@@ -5,6 +5,31 @@ personally. This document is only a script and a template. It does **not**
 authorize contacting anyone, sending invitations, or adding analytics or
 behavioral tracking. Each of those needs separate owner approval.
 
+## Release gate (2026-09-30)
+
+**Do not invite participants yet.** Post-merge source `1c076a3` passed the
+retry-free first-list and fixture journeys, but likes did not execute on that
+baseline. [PR #22 CI 36760089274](https://github.com/jedemarco1030/favalog/actions/runs/36760089274)
+now executes likes and following feed successfully on application source
+`76bb608`; the historical startup conflict did not recur on this attempt.
+That run failed configured fixtures (one failure, one flaky test, five retry
+attempts and seven cascade skips). Source `5847189` fixes the incorrect fixture
+slug assertion and streamed duplicate-save result; its
+[CI 36763709617](https://github.com/jedemarco1030/favalog/actions/runs/36763709617)
+completed successfully: 1,574 unit/component tests, 34 retry-free fixtures,
+20 retry-free first-list repetitions, eight provider-layout scenarios, and
+executed likes/feed. Configured Explore has 15 passes/one paid-semantic skip;
+default no-env has 44 passes/six intentional skips; explicit no-env has five
+passes/no skips. No revised-source E2E retries or flaky outcomes were recorded.
+The demonstration-separation follow-up still needs final documentation/capture-branch CI,
+owner migration/deployment approval, new post-merge main CI, and explicit owner
+accessibility/operational acceptance.
+Use the browser-only steps in the
+[release checklist](../mvp1-release-checklist.md). No gate has been silently
+deferred. Games support keyword discovery/search; do not promise RAWG live
+semantic search. Production Home portfolio screenshots are real baseline
+captures, not acceptance evidence for this follow-up.
+
 ## Before the session
 
 - Use the production deployment (<https://favalog.vercel.app>).

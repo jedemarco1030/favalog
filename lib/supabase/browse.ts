@@ -32,6 +32,7 @@ import "server-only";
  */
 
 import type { MediaItem } from "@/lib/types";
+import { PRODUCTION_CATALOG_FILTER } from "@/lib/media/demonstration";
 import type { SearchKindFilter } from "@/lib/search/config";
 import { kindFilterToKind, parseKindFilter } from "@/lib/search/query";
 import {
@@ -122,6 +123,7 @@ interface BrowseQueryBuilder extends PromiseLike<DbResult> {
     options?: { count?: "exact" | "planned" | "estimated"; head?: boolean },
   ): BrowseQueryBuilder;
   eq(column: string, value: string): BrowseQueryBuilder;
+  or(filters: string): BrowseQueryBuilder;
   contains(column: string, value: string[]): BrowseQueryBuilder;
   is(column: string, value: null): BrowseQueryBuilder;
   order(
@@ -150,7 +152,7 @@ async function defaultGetClient(): Promise<BrowseTableClient> {
       // the provider (Section 3 authoritative removal) can never repopulate the
       // Genre facet. Canonical identity and user references are untouched — this
       // is a read-only discovery filter, not a delete.
-      q = q.is("provider_removed_at", null);
+      q = q.is("provider_removed_at", null).or(PRODUCTION_CATALOG_FILTER);
       const res = await q;
       return {
         data: (res.data as Array<{ genres: string[] }> | null) ?? null,
@@ -163,7 +165,7 @@ async function defaultGetClient(): Promise<BrowseTableClient> {
       if (genre) q = q.contains("genres", [genre]);
       // Same discovery filter as the facet read: removed provider rows leave the
       // Explore grid (and the exact count) while their canonical row survives.
-      q = q.is("provider_removed_at", null);
+      q = q.is("provider_removed_at", null).or(PRODUCTION_CATALOG_FILTER);
       for (const oc of orderColumnsForSort(sort)) {
         q = q.order(oc.column, {
           ascending: oc.ascending,

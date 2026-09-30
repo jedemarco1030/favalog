@@ -16,7 +16,7 @@ export interface DiscoveryCardContext {
   lists: SaveListOption[] | null;
   returnTo: string;
   openAction: DiscoveryOpenAction;
-  saveAction: DiscoverySaveAction;
+  saveAction?: DiscoverySaveAction;
 }
 
 interface DiscoveryCardProps extends DiscoveryCardContext {
