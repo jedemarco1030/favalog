@@ -225,6 +225,34 @@ describe("chunk", () => {
 });
 
 describe("runEmbeddingPipeline", () => {
+  it("caps embeds at maxEmbed and reports the rest as deferred", async () => {
+    const records = ["a", "b", "c"].map((slug, i) =>
+      makeRecord({ mediaId: `m${i}`, slug, contentHash: `h${i}` }),
+    );
+    const { store, upserts } = makeStore();
+    const report = await runEmbeddingPipeline(
+      records,
+      store,
+      new FakeEmbeddingProvider(),
+      { ...baseOptions, maxEmbed: 2 },
+    );
+    expect(upserts).toHaveLength(2);
+    expect(report.updated).toBe(2);
+    expect(report.deferred).toBe(1);
+  });
+
+  it("estimates tokens on a dry run without embedding", async () => {
+    const { store, upserts } = makeStore();
+    const { provider, calls } = makeRecordingProvider();
+    const report = await runEmbeddingPipeline([makeRecord()], store, provider, {
+      ...baseOptions,
+      dryRun: true,
+    });
+    expect(calls).toHaveLength(0);
+    expect(upserts).toHaveLength(0);
+    expect(report.estimatedTokens).toBeGreaterThan(0);
+  });
+
   it("embeds all missing records and records provenance", async () => {
     const records = [
       makeRecord({ mediaId: "m1", slug: "a", contentHash: "h1" }),

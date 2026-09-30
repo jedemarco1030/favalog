@@ -49,16 +49,70 @@ export const EMBEDDABLE_SOURCES = ["favalog", "openlibrary"] as const;
  */
 export const PROVIDER_GATED_EMBEDDABLE_SOURCES = ["tmdb", "rawg"] as const;
 
+/** Status of the documented permission to send RAWG content to a live embedder. */
+export type RawgEmbeddingPermissionStatus = "unresolved" | "documented";
+
+/** A cited, reviewable record of the evidence behind the RAWG embedding gate. */
+export interface RawgEmbeddingPermissionRecord {
+  status: RawgEmbeddingPermissionStatus;
+  reviewedOn: string;
+  sources: readonly { url: string; relevantText: string }[];
+  /** Why the evidence does not (yet) permit live embedding. */
+  assessment: string;
+  /** The exact question that, if answered yes in writing, resolves the gate. */
+  outstandingQuestion: string;
+}
+
 /**
- * Whether the owner has documented permission to submit RAWG-derived content to
- * a LIVE (third-party) embedding provider. RAWG's terms permit personal use with
- * attribution, but embedding/caching clarification is unresolved, and TMDB's
- * staff clarification does NOT extend to RAWG. Until this is flipped in a
- * reviewed change that cites the documented permission, RAWG rows may only be
- * embedded with synthetic (fake) vectors, even when `RAWG_EMBEDDING_ENABLED` is
- * on. This is a code-level lock on purpose: an env var alone cannot enable it.
+ * The evidence behind the RAWG live-embedding gate. Owner authorization to show
+ * games in hybrid search is a product decision, NOT RAWG permission, and TMDB's
+ * staff clarification does not extend to RAWG. Flipping `status` to
+ * `documented` requires a reviewed change that adds RAWG's written answer (or a
+ * terms revision) to `sources`.
  */
-export const RAWG_LIVE_EMBEDDING_PERMISSION_DOCUMENTED = false;
+export const RAWG_EMBEDDING_PERMISSION: RawgEmbeddingPermissionRecord = {
+  status: "unresolved",
+  reviewedOn: "2026-09-29",
+  sources: [
+    {
+      url: "https://rawg.io/apidocs",
+      relevantText:
+        "Free for personal use as long as you attribute RAWG ... No data " +
+        "redistribution ... you may use the data with your API access only " +
+        "for your projects.",
+    },
+    {
+      url: "https://rawg.io/tos_api",
+      relevantText:
+        "§6.2: no parts of the Services or the Content may be copied, " +
+        "reproduced, ... transmitted or otherwise sent (including copied) to " +
+        "another computer, server, website or any other data medium for " +
+        "publication, distribution or any other commercial purpose ... " +
+        "without our prior express written consent. §4.3(5): not to use " +
+        "Services for the purposes of further distribution in any way.",
+    },
+  ],
+  assessment:
+    "The terms are silent on caching, derived vectors, and third-party " +
+    "processors. Sending game metadata to OpenAI's embedding API transmits " +
+    "RAWG Content to another server, which §6.2 restricts for commercial " +
+    "purposes without written consent; whether Favalog's use qualifies is " +
+    "not established by the published terms.",
+  outstandingQuestion:
+    "May Favalog send RAWG game metadata (title, year, genres, developers, " +
+    "publishers, platforms, and the RAWG description) to a third-party " +
+    "embedding API (OpenAI) and store the resulting vectors in Favalog's own " +
+    "database, used only to rank search results inside Favalog and never " +
+    "redistributed or exposed?",
+};
+
+/**
+ * Whether live RAWG embedding is permitted. Derived from the evidence record so
+ * an env var alone can never enable it; RAWG rows may only be embedded with
+ * synthetic (fake) vectors while the record is `unresolved`.
+ */
+export const RAWG_LIVE_EMBEDDING_PERMISSION_DOCUMENTED: boolean =
+  RAWG_EMBEDDING_PERMISSION.status === "documented";
 
 export type EmbeddableSource = (typeof EMBEDDABLE_SOURCES)[number];
 
@@ -161,6 +215,19 @@ export function classifyEmbeddingSource(
     return "permitted";
   }
   return "excluded_unknown";
+}
+
+/**
+ * Every known source that is embeddable under `policy` (always-on plus enabled
+ * gated sources). Used by the eval harness so its completeness gate counts the
+ * same corpus the pipeline would embed.
+ */
+export function embeddableSourcesFor(
+  policy: EmbeddingSourcePolicy = DEFAULT_EMBEDDING_SOURCE_POLICY,
+): string[] {
+  return [...EMBEDDABLE_SOURCES, ...PROVIDER_GATED_EMBEDDABLE_SOURCES].filter(
+    (source) => isSourceEmbeddable(source, policy),
+  );
 }
 
 /**

@@ -28,7 +28,7 @@ activation, or database state.
 | Hybrid search (full-text + pgvector) with Open Library federation                 | Yes                            | Unit, pgTAP, `eval:search` fixtures                                | Yes (2026-09-01)                                                                              |
 | TMDB movie/TV discovery, search, import, title pages                              | Yes                            | Unit, `@fixtures` Playwright (offline fixture server)              | Yes (2026-09-21)                                                                              |
 | Games via RAWG: discovery, import, keyword search, attribution                    | Yes (PR #11, #13)              | Unit, pgTAP (`game_media_and_status.test.sql`)                     | Preview-verified 2026-09-25; production discovery included in the 2026-09-29 confirmation     |
-| RAWG **live semantic embedding**                                                  | Gated off in code              | Only `--fake` vectors in tests                                     | **Deferred**: needs documented RAWG permission                                                |
+| RAWG **live semantic embedding**                                                  | Implemented; gated off in code | Fixture tests (Vitest and pgTAP) with `--fake` vectors only        | **Deferred**: RAWG permission unresolved. Not enabled, backfilled, or production-verified     |
 | Phase 4D discovery shelves, artwork fallback, related titles, save from discovery | Yes (PR #13, #14)              | Unit, component                                                    | Yes (2026-09-29)                                                                              |
 | Create a new list inside the Save dialog (new and existing-list users)            | Yes (PR #15)                   | Component tests; the `@fixtures` spec is **not in CI** (see below) | Yes (2026-09-29)                                                                              |
 | `catalog-refresh.yml` workflow                                                    | Yes, on `main` since `7486441` | Worker logic unit-tested; workflow runs not observed               | **Unverified**: no run evidence recorded; whether `CATALOG_REFRESH_ENABLED` is set is unknown |
@@ -351,14 +351,71 @@ Favalog therefore keeps two independent RAWG controls:
 - `RAWG_EMBEDDING_ENABLED` allows RAWG rows into the embedding pipeline. It is
   **off by default**, and is currently unset.
 
-Even with `RAWG_EMBEDDING_ENABLED` on, the source policy constant
-`RAWG_LIVE_EMBEDDING_PERMISSION_DOCUMENTED = false` refuses to send RAWG
+Even with `RAWG_EMBEDDING_ENABLED` on, the source policy refuses to send RAWG
 content to a live embedding provider. Only synthetic (`--fake`) vectors are
-allowed, which is how CI tests the pipeline. **Remaining activation
-dependency:** before any live RAWG embedding, the owner must document the
-applicable RAWG permission, and a reviewed change must flip that constant and
-cite the permission. Until then, games take part in keyword search but not
-semantic search.
+allowed, which is how CI tests the pipeline. Until the permission is documented,
+games take part in keyword search but not semantic search.
+
+### RAWG semantic search status (2026-09-29)
+
+| Stage               | Status                                                                                  |
+| ------------------- | --------------------------------------------------------------------------------------- |
+| Implemented         | **Yes.** Game documents, backfill, and shared hybrid retrieval are covered by tests.    |
+| Permission          | **Unresolved.** `RAWG_EMBEDDING_PERMISSION.status = "unresolved"` (cited record below). |
+| Enabled (hosted)    | **No.** `RAWG_EMBEDDING_ENABLED` is unset, and live embedding is refused in code.       |
+| Backfilled          | **No.** No live RAWG vectors exist.                                                     |
+| Production-verified | **No.**                                                                                 |
+
+The evidence is in `lib/search/embedding-source-policy.ts`
+(`RAWG_EMBEDDING_PERMISSION`). It cites `rawg.io/apidocs` and
+`rawg.io/tos_api` §6.2 and §4.3(5). The published terms do not mention caching,
+derived vectors, or third-party processors, and §6.2 restricts sending RAWG
+Content to another server for commercial purposes without written consent. The
+owner's authorization is a product decision, and TMDB's clarification covers
+TMDB only. Neither one is RAWG permission.
+
+**Outstanding question for RAWG:** may Favalog send RAWG game metadata (title,
+year, genres, developers, publishers, platforms, and the RAWG description) to a
+third-party embedding API (OpenAI) and store the resulting vectors in Favalog's
+own database, used only to rank search results inside Favalog and never
+redistributed or exposed?
+
+What is implemented, and how the pieces work together:
+
+- `rowToMediaItem` builds game rows as games. Before this, game rows fell
+  through to the book branch. Each document includes platforms, developers, and
+  publishers, and never includes lists, reviews, diary entries, or social data.
+- Provider-removed rows are never embedded.
+- The backfill (`npm run embed:catalog`) adds `--source=<source>` and
+  `--max-embed=<n>`, which is resumable: unchanged rows are skipped, so a rerun
+  continues from where the last one stopped. A dry run reports the eligible
+  count, the rows that would be embedded, and an estimated token count. A live
+  dry run also reports the RAWG rows blocked pending permission, with their cost.
+  A live `--source=rawg` run exits nonzero and prints the outstanding question.
+  The remote-write safeguards are unchanged (`--allow-remote` plus
+  `--confirm-project-ref`).
+- Retrieval needed no SQL change. `hybrid_search` and `semantic_search` are
+  kind-agnostic, so embedded games share the corpus with films and books,
+  `p_kind=game` gives games-only results, and cross-media balance already
+  includes games.
+- Evaluation is fixture-based (Vitest and pgTAP), not measured live relevance.
+  It covers exact titles and the ambiguous "odyssey" query, conceptual queries
+  across all four kinds, games-only filtering, missing, removed, and ineligible
+  (flag-off or live-blocked) embeddings, provider disablement (keyword
+  fallback), and partial embedding failures.
+
+**Activation after RAWG answers yes in writing (owner steps):**
+
+1. Add RAWG's written answer to `RAWG_EMBEDDING_PERMISSION.sources` and set
+   `status: "documented"` in a reviewed PR.
+2. Run a hosted dry run: `RAWG_EMBEDDING_ENABLED=true npm run embed:catalog --
+--dry-run --source=rawg --allow-remote --confirm-project-ref=<ref>`. Record
+   the eligible count and the token estimate.
+3. Set `RAWG_EMBEDDING_ENABLED=true` in the hosted environment.
+4. Run the bounded live backfill with the same flags, minus `--dry-run`, plus
+   `--max-embed=<n>`. Repeat until nothing is deferred.
+5. Run the live search eval (`npm run eval:search`, live mode) and a games-only
+   production smoke check, then record the measured results here.
 
 ## Phase 4D — Provider discovery and direct saving (increment 1, merged and owner-confirmed)
 

@@ -35,17 +35,40 @@ import {
 } from "../lib/catalog/feature-flag.ts";
 import {
   classifyEmbeddingSource,
+  EMBEDDABLE_SOURCES,
   type EmbeddingSourcePolicy,
   partitionEmbeddableRows,
+  PROVIDER_GATED_EMBEDDABLE_SOURCES,
+  RAWG_EMBEDDING_PERMISSION,
+  RAWG_LIVE_EMBEDDING_PERMISSION_DOCUMENTED,
 } from "../lib/search/embedding-source-policy.ts";
 import type { EmbeddingProvider } from "../lib/search/embedding-provider.ts";
 import type { MediaItem, TVShow } from "../lib/types.ts";
-import type {
-  EmbeddingRecord,
-  EmbeddingStore,
-  PipelineOptions,
-  PipelineReport,
+import {
+  estimateTokens,
+  type EmbeddingRecord,
+  type EmbeddingStore,
+  type PipelineOptions,
+  type PipelineReport,
 } from "../lib/search/pipeline.ts";
+
+/**
+ * List price used for dry-run cost estimates (OpenAI text-embedding-3-small,
+ * USD per 1M input tokens). An estimate only; confirm current pricing before a
+ * large hosted backfill.
+ */
+export const EMBEDDING_PRICE_USD_PER_MILLION_TOKENS = 0.02;
+
+/** Cost estimate in USD for a token count, at the list price above. */
+export function estimateCostUsd(tokens: number): number {
+  return (tokens / 1_000_000) * EMBEDDING_PRICE_USD_PER_MILLION_TOKENS;
+}
+
+/** Sources the `--source` flag accepts. */
+const KNOWN_SOURCES: readonly string[] = [
+  ...EMBEDDABLE_SOURCES,
+  ...PROVIDER_GATED_EMBEDDABLE_SOURCES,
+];
 
 /** Parsed CLI arguments for the embedding pipeline. */
 export interface EmbedArgs {
@@ -55,6 +78,10 @@ export interface EmbedArgs {
   limit: number | undefined;
   allowRemote: boolean;
   confirmProjectRef: string | undefined;
+  /** Restrict the run to one catalog source (e.g. `rawg`). */
+  source: string | undefined;
+  /** Cap on stale rows embedded this run (resumable bounded backfill). */
+  maxEmbed: number | undefined;
 }
 
 /**
@@ -76,6 +103,8 @@ export const USAGE = [
   "  --fake                           Use deterministic FAKE local vectors (dev only).",
   "  --force                          Re-embed every row (recovery only).",
   "  --limit <n> | --limit=<n>        Cap catalog rows processed (positive integer).",
+  "  --max-embed <n> | --max-embed=<n>  Cap stale rows embedded this run (resumable).",
+  "  --source <s> | --source=<s>      Only this source: favalog, openlibrary, tmdb, rawg.",
   "  --allow-remote                   Permit a guarded remote (hosted) live write.",
   "  --confirm-project-ref <ref>      Confirm the exact hosted project reference.",
   "  --confirm-project-ref=<ref>      (same, `=` form)",
@@ -111,6 +140,8 @@ export function parseArgs(argv: readonly string[]): ParseResult {
     limit: undefined,
     allowRemote: false,
     confirmProjectRef: undefined,
+    source: undefined,
+    maxEmbed: undefined,
   };
   const seen = new Set<string>();
   const markSeen = (name: string): string | undefined =>
@@ -188,6 +219,47 @@ export function parseArgs(argv: readonly string[]): ParseResult {
         return { ok: false, error: "Empty value for '--confirm-project-ref'." };
       }
       args.confirmProjectRef = value;
+    } else if (arg === "--max-embed" || arg.startsWith("--max-embed=")) {
+      const dup = markSeen("--max-embed");
+      if (dup) return { ok: false, error: dup };
+      let value: string | undefined;
+      if (arg === "--max-embed") {
+        value = argv[i + 1];
+        if (value === undefined || value.startsWith("--")) {
+          return { ok: false, error: "Missing value for '--max-embed'." };
+        }
+        i++;
+      } else {
+        value = arg.slice("--max-embed=".length);
+      }
+      const parsed = parseLimit(value);
+      if (parsed === null) {
+        return {
+          ok: false,
+          error: `Invalid --max-embed value '${value}'; expected a positive integer.`,
+        };
+      }
+      args.maxEmbed = parsed;
+    } else if (arg === "--source" || arg.startsWith("--source=")) {
+      const dup = markSeen("--source");
+      if (dup) return { ok: false, error: dup };
+      let value: string | undefined;
+      if (arg === "--source") {
+        value = argv[i + 1];
+        if (value === undefined || value.startsWith("--")) {
+          return { ok: false, error: "Missing value for '--source'." };
+        }
+        i++;
+      } else {
+        value = arg.slice("--source=".length);
+      }
+      if (!KNOWN_SOURCES.includes(value)) {
+        return {
+          ok: false,
+          error: `Invalid --source value '${value}'; expected one of ${KNOWN_SOURCES.join(", ")}.`,
+        };
+      }
+      args.source = value;
     } else {
       return { ok: false, error: `Unknown option '${arg}'.` };
     }
@@ -396,6 +468,14 @@ export interface MediaRow {
   poster_url?: string | null;
   genres: string[] | null;
   details: Record<string, unknown> | null;
+  /** Set when the provider confirmed removal; removed rows are never embedded. */
+  provider_removed_at?: string | null;
+}
+
+function stringList(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string")
+    : [];
 }
 
 /** Build a MediaItem-shaped object from a media_items row for the doc builder. */
@@ -431,6 +511,15 @@ export function rowToMediaItem(row: MediaRow): MediaItem {
       episodes: (d.episodes as number) ?? 0,
       creators: Array.isArray(d.creators) ? (d.creators as string[]) : [],
       status: (d.status as TVShow["status"]) ?? "ongoing",
+    };
+  }
+  if (row.kind === "game") {
+    return {
+      ...base,
+      kind: "game" as const,
+      platforms: stringList(d.platforms),
+      developers: stringList(d.developers),
+      publishers: stringList(d.publishers),
     };
   }
   return {
@@ -545,6 +634,23 @@ export async function runEmbedCatalog(
   }
   logger.log(`[embed-catalog] ${decision.message}`);
 
+  // A live RAWG write is refused outright (rather than silently embedding zero
+  // rows) while the permission evidence is unresolved.
+  if (
+    args.source === "rawg" &&
+    !args.fake &&
+    !args.dryRun &&
+    !RAWG_LIVE_EMBEDDING_PERMISSION_DOCUMENTED
+  ) {
+    logger.error(
+      "[embed-catalog] Refusing a live RAWG embedding run: RAWG permission is " +
+        `${RAWG_EMBEDDING_PERMISSION.status} (reviewed ` +
+        `${RAWG_EMBEDDING_PERMISSION.reviewedOn}). Outstanding question for ` +
+        `RAWG: ${RAWG_EMBEDDING_PERMISSION.outstandingQuestion}`,
+    );
+    return 1;
+  }
+
   // Resolve the embedding provider (or exit cleanly when no key + not dry/fake).
   let provider: EmbeddingProvider;
   if (args.fake) {
@@ -579,7 +685,8 @@ export async function runEmbedCatalog(
   const queryBuilder = supabase
     .from("media_items")
     .select(
-      "id, slug, source, kind, title, subtitle, synopsis, year, genres, details",
+      "id, slug, source, kind, title, subtitle, synopsis, year, genres, " +
+        "details, provider_removed_at",
     )
     .order("slug", { ascending: true });
   const query = Number.isFinite(args.limit as number)
@@ -606,8 +713,39 @@ export async function runEmbedCatalog(
     rawgEmbeddingEnabled: isRawgEmbeddingEnabled(env),
     liveSubmission: !args.fake,
   };
-  const allRows = (rows as MediaRow[]) ?? [];
+  const readRows = (rows as MediaRow[]) ?? [];
+  const sourceRows = args.source
+    ? readRows.filter((row) => row.source === args.source)
+    : readRows;
+  // Provider-confirmed removals are never (re)embedded; search already hides
+  // them, and their user records are preserved on the row itself.
+  const allRows = sourceRows.filter((row) => !row.provider_removed_at);
+  const removedCount = sourceRows.length - allRows.length;
+  if (removedCount > 0) {
+    logger.log(
+      `[embed-catalog] Skipped ${removedCount} provider-removed row(s).`,
+    );
+  }
   const { embeddable, excluded } = partitionEmbeddableRows(allRows, policy);
+
+  // Planning aid: in a live dry run, report what a RAWG backfill WOULD cost
+  // once permission is documented, without admitting those rows to the run.
+  if (args.dryRun && !args.fake && !RAWG_LIVE_EMBEDDING_PERMISSION_DOCUMENTED) {
+    const blockedRawg = allRows.filter((row) => row.source === "rawg");
+    if (blockedRawg.length > 0) {
+      const tokens = blockedRawg.reduce(
+        (sum, row) =>
+          sum +
+          estimateTokens(canonicalDocumentFor(rowToMediaItem(row)).document),
+        0,
+      );
+      logger.log(
+        `[embed-catalog] RAWG blocked pending permission: ${blockedRawg.length} ` +
+          `eligible game(s), ~${tokens} tokens, ~$${estimateCostUsd(tokens).toFixed(4)} ` +
+          `(upper bound; includes rows that may already be fresh).`,
+      );
+    }
+  }
   if (excluded.length > 0) {
     const byReason = new Map<string, number>();
     for (const row of excluded) {
@@ -682,6 +820,7 @@ export async function runEmbedCatalog(
     const report = await deps.runPipeline(records, store, provider, {
       dryRun: args.dryRun,
       force: args.force,
+      maxEmbed: args.maxEmbed,
       documentVersion: CANONICAL_DOCUMENT_VERSION,
       onProgress: ({ batch, batches, updated, failed }) => {
         logger.log(
@@ -694,9 +833,36 @@ export async function runEmbedCatalog(
       `[embed-catalog] ${args.dryRun ? "DRY RUN — " : ""}done: ` +
         `attempted ${report.attempted}, updated ${report.updated}, ` +
         `unchanged ${report.unchanged}, failed ${report.failed}, ` +
-        `tokens ${report.tokens}, duration ${Math.round(report.durationMs)}ms`,
+        `tokens ${report.tokens}, duration ${Math.round(report.durationMs)}ms` +
+        (report.deferred
+          ? `, deferred ${report.deferred} (re-run to resume)`
+          : ""),
     );
-    logger.log(JSON.stringify({ event: "embed_catalog_report", ...report }));
+    const eligibleBySource: Record<string, number> = {};
+    for (const row of embeddable) {
+      const key = `${row.source}/${row.kind}`;
+      eligibleBySource[key] = (eligibleBySource[key] ?? 0) + 1;
+    }
+    const estimatedCostUsd =
+      report.estimatedTokens !== undefined
+        ? Number(estimateCostUsd(report.estimatedTokens).toFixed(6))
+        : undefined;
+    if (estimatedCostUsd !== undefined) {
+      logger.log(
+        `[embed-catalog] eligible ${embeddable.length} title(s); estimated ` +
+          `~${report.estimatedTokens} tokens, ~$${estimatedCostUsd.toFixed(4)} ` +
+          `at $${EMBEDDING_PRICE_USD_PER_MILLION_TOKENS}/1M tokens.`,
+      );
+    }
+    logger.log(
+      JSON.stringify({
+        event: "embed_catalog_report",
+        ...report,
+        eligible: embeddable.length,
+        eligibleBySource,
+        ...(estimatedCostUsd !== undefined && { estimatedCostUsd }),
+      }),
+    );
     return report.failed > 0 ? 2 : 0;
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown error";

@@ -1178,7 +1178,9 @@ title resolves and reuses all existing per-user features.
 > history. TMDB discovery, search, import, and title pages have been
 > owner-confirmed in production since 2026-09-21 (see
 > [`tmdb-activation-rollout.md`](tmdb-activation-rollout.md)). RAWG games are
-> enabled for discovery and import. RAWG live embedding stays blocked in code
+> enabled for discovery and import. Game embedding and hybrid retrieval are
+> implemented, but RAWG live embedding stays blocked in code
+> (`RAWG_EMBEDDING_PERMISSION` in `lib/search/embedding-source-policy.ts`)
 > until RAWG permission is documented. Current status by capability is in the
 > roadmap's "Status reconciliation (2026-09-29)" table.
 

@@ -166,6 +166,8 @@ describe("parseArgs — supported forms", () => {
       limit: undefined,
       allowRemote: false,
       confirmProjectRef: undefined,
+      source: undefined,
+      maxEmbed: undefined,
     });
   });
 
@@ -179,6 +181,8 @@ describe("parseArgs — supported forms", () => {
       limit: undefined,
       allowRemote: true,
       confirmProjectRef: undefined,
+      source: undefined,
+      maxEmbed: undefined,
     });
   });
 
@@ -789,5 +793,96 @@ describe("runEmbedCatalog — RAWG embedding control", () => {
     await runEmbedCatalog(["--dry-run"], h.deps);
     const slugs = (h.captured.records ?? []).map((r) => r.slug);
     expect(slugs).not.toContain("rawg-title");
+  });
+});
+
+const RAWG_GAME_ROW: MediaRow = {
+  id: "00000000-0000-0000-0000-0000000000a7",
+  slug: "hollow-lantern",
+  source: "rawg",
+  kind: "game",
+  title: "Hollow Lantern",
+  subtitle: null,
+  synopsis: "A lantern-lit exploration game.",
+  year: 2024,
+  poster_url: null,
+  genres: ["Adventure"],
+  details: {
+    platforms: ["PC", "Switch"],
+    developers: ["Ember Works"],
+    publishers: ["Northlight"],
+  },
+};
+
+const RAWG_ON_ENV = {
+  SUPABASE_URL: LOCAL_URL,
+  SUPABASE_SECRET_KEY: SERVICE_KEY,
+  RAWG_EMBEDDING_ENABLED: "true",
+};
+
+describe("runEmbedCatalog — RAWG game backfill", () => {
+  it("builds game documents (not book documents) for game rows", async () => {
+    const h = createHarness({ env: RAWG_ON_ENV, mediaRows: [RAWG_GAME_ROW] });
+    expect(await runEmbedCatalog(["--fake"], h.deps)).toBe(0);
+    const [record] = h.captured.records ?? [];
+    expect(record?.slug).toBe("hollow-lantern");
+    expect(record?.document).toContain("PC");
+    expect(record?.document).toContain("Ember Works");
+  });
+
+  it("never embeds provider-removed rows", async () => {
+    const removed = {
+      ...RAWG_GAME_ROW,
+      id: "00000000-0000-0000-0000-0000000000a8",
+      slug: "removed-game",
+      provider_removed_at: "2026-09-01T00:00:00Z",
+    };
+    const h = createHarness({
+      env: RAWG_ON_ENV,
+      mediaRows: [RAWG_GAME_ROW, removed],
+    });
+    expect(await runEmbedCatalog(["--fake"], h.deps)).toBe(0);
+    const slugs = (h.captured.records ?? []).map((r) => r.slug);
+    expect(slugs).toEqual(["hollow-lantern"]);
+  });
+
+  it("--source restricts the run to one source", async () => {
+    const h = createHarness({
+      env: RAWG_ON_ENV,
+      mediaRows: [FAVALOG_ROW, RAWG_GAME_ROW],
+    });
+    expect(await runEmbedCatalog(["--fake", "--source=rawg"], h.deps)).toBe(0);
+    const slugs = (h.captured.records ?? []).map((r) => r.slug);
+    expect(slugs).toEqual(["hollow-lantern"]);
+  });
+
+  it("refuses a live RAWG run and names the outstanding permission question", async () => {
+    const h = createHarness({ env: RAWG_ON_ENV, mediaRows: [RAWG_GAME_ROW] });
+    expect(await runEmbedCatalog(["--source=rawg"], h.deps)).toBe(1);
+    expect(h.runPipeline).not.toHaveBeenCalled();
+    expect(h.errors.join("\n")).toMatch(/Outstanding question for RAWG/);
+  });
+
+  it("a live dry run reports the blocked RAWG count and cost without admitting rows", async () => {
+    const h = createHarness({ env: RAWG_ON_ENV, mediaRows: [RAWG_GAME_ROW] });
+    await runEmbedCatalog(["--dry-run"], h.deps);
+    expect(h.logs.join("\n")).toMatch(
+      /RAWG blocked pending permission: 1 eligible game/,
+    );
+    expect((h.captured.records ?? []).map((r) => r.slug)).toEqual([]);
+  });
+
+  it("passes --max-embed through to the pipeline", async () => {
+    const h = createHarness({ env: RAWG_ON_ENV, mediaRows: [RAWG_GAME_ROW] });
+    expect(await runEmbedCatalog(["--fake", "--max-embed", "25"], h.deps)).toBe(
+      0,
+    );
+    expect(h.captured.options).toMatchObject({ maxEmbed: 25 });
+  });
+
+  it("rejects an unknown --source and an invalid --max-embed", () => {
+    expect(parseArgs(["--source=steam"]).ok).toBe(false);
+    expect(parseArgs(["--max-embed=0"]).ok).toBe(false);
+    expect(okArgs(["--source", "rawg"]).source).toBe("rawg");
   });
 });
