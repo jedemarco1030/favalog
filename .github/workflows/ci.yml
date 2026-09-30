@@ -110,7 +110,7 @@ jobs:
         run: npm ci
 
       - name: Start local Supabase stack
-        run: npx supabase start
+        run: bash scripts/start-ci-supabase.sh
 
       - name: Run database tests (pgTAP)
         run: npm run db:test
@@ -314,7 +314,7 @@ jobs:
         run: npm ci
 
       - name: Start local Supabase stack
-        run: npx supabase start
+        run: bash scripts/start-ci-supabase.sh
 
       - name: Apply migrations + seed
         # `db reset` re-applies every migration and then runs `seed.sql`
@@ -623,7 +623,7 @@ jobs:
         run: npm ci
 
       - name: Start local Supabase stack
-        run: npx supabase start
+        run: bash scripts/start-ci-supabase.sh
 
       - name: Apply migrations + seed
         # `db reset` re-applies every migration, so the curated catalog the feed
@@ -686,16 +686,24 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run following feed Playwright journey
+        id: social_tests
         env:
           PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-results/social.json
         run: E2E_SUITE=social npx playwright test --project=social
 
+      - name: Report following feed setup failure
+        if: ${{ !cancelled() && steps.social_tests.outcome == 'skipped' }}
+        run: |
+          echo '::error::Following feed tests not executed: a prerequisite failed.'
+          echo 'Following feed: **tests not executed** (prerequisite failure).' >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
       - name: Assert following feed journey executed
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.social_tests.outcome != 'skipped' }}
         run: node scripts/assert-e2e-results.mjs e2e-results/social.json --min=1 --require=feed.spec.ts
 
       - name: Upload following feed JSON results
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.social_tests.outcome != 'skipped' }}
         uses: actions/upload-artifact@v4
         with:
           name: e2e-results-social
@@ -708,11 +716,12 @@ jobs:
         run: npx supabase stop --no-backup
 
       - name: Upload Playwright report
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.social_tests.outcome != 'skipped' }}
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-social-integration
           path: playwright-report
+          if-no-files-found: error
           retention-days: 7
 
   # STRICT, secret-free likes integration: the multi-user review/list like
@@ -746,7 +755,7 @@ jobs:
         run: npm ci
 
       - name: Start local Supabase stack
-        run: npx supabase start
+        run: bash scripts/start-ci-supabase.sh
 
       - name: Apply migrations + seed
         # `db reset` re-applies every migration, so the curated catalog the like
@@ -809,16 +818,24 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run likes Playwright journey
+        id: likes_tests
         env:
           PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-results/likes.json
         run: E2E_SUITE=likes npx playwright test --project=likes
 
+      - name: Report likes setup failure
+        if: ${{ !cancelled() && steps.likes_tests.outcome == 'skipped' }}
+        run: |
+          echo '::error::Likes tests not executed: a prerequisite failed. The job remains failed.'
+          echo 'Likes: **tests not executed** (prerequisite failure).' >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
       - name: Assert likes journey executed
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.likes_tests.outcome != 'skipped' }}
         run: node scripts/assert-e2e-results.mjs e2e-results/likes.json --min=1 --require=likes.spec.ts
 
       - name: Upload likes JSON results
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.likes_tests.outcome != 'skipped' }}
         uses: actions/upload-artifact@v4
         with:
           name: e2e-results-likes
@@ -831,9 +848,10 @@ jobs:
         run: npx supabase stop --no-backup
 
       - name: Upload Playwright report
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.likes_tests.outcome != 'skipped' }}
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-likes-integration
           path: playwright-report
+          if-no-files-found: error
           retention-days: 7

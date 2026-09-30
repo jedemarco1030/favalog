@@ -364,6 +364,7 @@ describe("browseCatalog", () => {
 
     it("filters `provider_removed_at is null` on both the facet and the page read", async () => {
       const isCalls: Array<[string, unknown]> = [];
+      const orCalls: string[] = [];
 
       function makeChain() {
         let isGenreRead = false;
@@ -376,6 +377,10 @@ describe("browseCatalog", () => {
             return chain;
           },
           contains() {
+            return chain;
+          },
+          or(filters: string) {
+            orCalls.push(filters);
             return chain;
           },
           is(column: string, value: unknown) {
@@ -418,6 +423,10 @@ describe("browseCatalog", () => {
       );
       // One for the genre facet read, one for the paginated grid read.
       expect(removalClauses).toHaveLength(2);
+      expect(orCalls).toHaveLength(2);
+      expect(orCalls[0]).toBe(orCalls[1]);
+      expect(orCalls[0]).toContain("source.neq.favalog,external_id.not.in.(");
+      expect(orCalls[0]).toContain("t_undertheeaves");
     });
   });
 });

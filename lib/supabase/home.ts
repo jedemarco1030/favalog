@@ -4,6 +4,7 @@ import { cache } from "react";
 import type { ExternalProvider } from "@/lib/catalog/types";
 import { providerFromSource } from "@/lib/catalog/source-provider";
 import type { MediaItem, MediaKind } from "@/lib/types";
+import { PRODUCTION_CATALOG_FILTER } from "@/lib/media/demonstration";
 import { isSupabaseConfigured } from "./env";
 import { createClient } from "./server";
 import { mapMediaRowToDomain, type MediaItemRow } from "./mappers";
@@ -22,9 +23,6 @@ export type HomeRead =
   | { status: "unavailable" }
   | { status: "error" };
 
-/** `media_items.source` of the curated demo seed catalog. */
-export const DEMO_SEED_SOURCE = "favalog";
-
 /** Hard upper bound on any Home read. */
 export const HOME_READ_MAX = 24;
 
@@ -41,9 +39,7 @@ async function readHome(query: HomeQuery): Promise<HomeRead> {
       .from("media_items")
       .select("*")
       .is("provider_removed_at", null)
-      // Demo seed rows carry bundled placeholder graphics, not real artwork;
-      // they stay browsable elsewhere but are never promoted on Home.
-      .neq("source", DEMO_SEED_SOURCE);
+      .or(PRODUCTION_CATALOG_FILTER);
 
     if (query.by === "slugs") {
       if (query.slugs.length === 0) {

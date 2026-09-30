@@ -29,6 +29,13 @@ export const BookCover: Story = {
   args: { item: book, sizes: "180px" },
 };
 
+export const MissingArtwork: Story = {
+  args: {
+    item: { title: "A title without supplied artwork", posterUrl: "" },
+    sizes: "180px",
+  },
+};
+
 export const WideRatio: Story = {
   args: { item: movie, sizes: "320px", ratio: "16/9" },
   decorators: [

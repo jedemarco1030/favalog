@@ -14,6 +14,7 @@ export type MediaKind = "movie" | "tv" | "book" | "game";
  */
 export interface MediaItemBase {
   id: string;
+  isDemonstration?: boolean;
   /**
    * Stable, URL-safe identifier used for `/title/[slug]` routes.
    * Distinct from `id` so that a display title change never breaks a URL.

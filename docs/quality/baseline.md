@@ -8,7 +8,49 @@ violations does **not** establish accessibility compliance. It catches only a
 subset of issues. Keyboard, focus, and screen-reader behavior are checked
 explicitly, and the parts that need a human are listed under "Manual checks".
 
-## Status
+## Current inspected closeout evidence (2026-09-30)
+
+Source `1c076a3eb4b94672251ca64e6ab33475a4311fe1`,
+[post-merge CI 36749917450](https://github.com/jedemarco1030/favalog/actions/runs/36749917450):
+34 offline fixture passes and 20 retry-free first-list passes (plus auth setup),
+with no fixture skips/retries/flaky outcomes. This supersedes older pending
+first-list claims, but not the unresolved likes startup or final-source gates.
+
+Downloaded `quality-evidence-configured-fixtures` was inspected: configured
+Explore-mobile measurements contain three samples and explicitly identify a
+production build served locally with offline providers and synthetic artwork.
+They are not production performance. The dialog report records initial Close
+focus, create-form input focus, no escaped application focus stops, focus
+restoration, and zero dialog/create-form axe violations or incomplete findings.
+`configured-zoom-200.json` records 640 px viewport/scrollWidth without offenders
+on all four surfaces: **viewport equivalence only, not actual browser zoom**.
+
+`configured-contrast.json` still contains incomplete `aria-prohibited-attr`,
+`aria-valid-attr-value` and `color-contrast` findings, including Home `.pt-6`,
+menu `aria-controls` targets and mobile navigation links. They are retained
+for review, not counted as passes. Manual VoiceOver/NVDA announcements, actual
+browser zoom and artwork contrast acceptance remain required.
+
+Representative main fixture title/Explore/Save screenshots were visually
+inspected. The title still included legacy demonstration recommendations and
+Explore still exposed legacy catalog examples; these captures are rejected as
+current portfolio evidence. Fresh genuine production Home captures at 1280×900
+and 390×844 are committed separately, dated 2026-09-30 and labelled as the
+**deployed baseline**, not the unapplied follow-up. Development preview captures
+covered Home, Explore, search and a genuine Open Library title at 942×664 and
+390×844 with visible images decoded; search exclusion is not established before
+the owner applies the new migration. Authenticated Save capture requires CI or
+an owner-controlled session, not a hosted mutation during read-only inspection.
+
+Follow-up local coverage: 1,562 passes across 163 files, 93.66% statements,
+86.31% branches, 96.20% functions, 94.57% lines. Native no-env Playwright reported
+five browser-launch failures and no behavior passes (`libnspr4.so` absent).
+One dependency-recovery attempt failed because `apt-get` is unavailable. Docker
+is also absent: final-source pgTAP/type-drift and configured fixtures/social/likes
+are not verified locally. See the [release checklist](../mvp1-release-checklist.md)
+for per-invocation counts, owner steps and the incomplete release decision.
+
+## Historical status
 
 | Item                                                               | State                                                        |
 | ------------------------------------------------------------------ | ------------------------------------------------------------ |

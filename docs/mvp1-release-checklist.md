@@ -1,204 +1,167 @@
 # MVP 1 release checklist — Phase 4E
 
-**Decision: NOT ACCEPTED yet.** PR [#21](https://github.com/jedemarco1030/favalog/pull/21)
-is a closeout candidate, not permission to merge, deploy, mutate hosted data,
-enable scheduled writes, or invite beta participants. Owner checks and
-final-commit artifact review remain release gates.
+**Decision, 2026-09-30: engineering closeout INCOMPLETE; MVP 1 NOT ACCEPTED.**
+Invited beta cannot begin yet. This follow-up starts from merged PR
+[#21](https://github.com/jedemarco1030/favalog/pull/21), `main` at
+`1c076a3eb4b94672251ca64e6ab33475a4311fe1`. No merge, deployment, hosted
+migration/write, user-record deletion, secret change, schedule activation, or
+paid embedding invocation is authorized by this checklist.
 
-## Evidence ledger
+## Inspected post-merge baseline
 
-- Reviewed baseline: `main` at `5d1663b`, PR #20,
-  [CI 36661125887](https://github.com/jedemarco1030/favalog/actions/runs/36661125887).
-  Fixtures: 28 first-attempt passes, one first-list create/save flaky pass on
-  retry. The failed attempt's error context remained in “Saving”; only the
-  successful retry trace was retained. That does **not** identify a cause.
-- Candidate application/test/workflow source: `629fa3a`,
-  [CI 36664561980](https://github.com/jedemarco1030/favalog/actions/runs/36664561980).
-  Twenty retry-free first-list repetitions all failed: some reproduced the
-  original pending-save stall; the others reached success and failed a newly
-  added title-link assertion that expected the wrong accessible name. The
-  assertion now targets the exact title link within List contents. Failed
-  first-attempt traces are retained. The candidate fix performs create/save in
-  one authenticated Server Action response, keeping a created list available
-  for save-only retry on partial failure; verification is still pending.
-  Final execution counts, retries, decoded screenshots, and raw measurements
-  must be inspected before this ledger can be marked complete.
-- Source `3bc4561`, [CI 36666650203](https://github.com/jedemarco1030/favalog/actions/runs/36666650203):
-  twenty retry-free first-list attempts executed, **all failed**. Seven retained
-  the pending “Saving” stall even with a single Server Action; thirteen reached
-  server-confirmed success, persisted one title after refresh, then failed a
-  page-wide uniqueness assertion because the same public list appears in both
-  Your lists and Community lists. The assertion now scopes to Your lists.
-  The next candidate returns create/save through an authenticated, same-origin,
-  bounded JSON endpoint, independently of streamed RSC refresh completion.
-  Existing write authorization/RLS and save-only partial-failure retry remain.
-  This candidate is **not yet browser-verified**; combining Server Actions alone
-  did not fix the stall and must not be reported as the final root cause/fix.
-- Source `3bc4561` passed format, lint, typecheck, all 1,503 unit/component tests
-  with coverage (93.66% statements, 86.28% branches, 96.19% functions, 94.57%
-  lines), production build, Storybook, pgTAP and generated-type drift checks.
-  The JSON-boundary candidate additionally passes 43 focused route/client/action/
-  component tests, format, lint and typecheck; its full CI remains required.
-  Docker is unavailable in the v0 sandbox; isolated E2E, pgTAP, production and
-  Storybook builds are delegated to GitHub CI.
-- Default no-env candidate run: 44 first-attempt passes, six intentional skips;
-  no-env-specific run: five passes. The default execution gate initially failed
-  because four pre-existing `test.fixme` list placeholders were not allow-listed.
-  The correction names all six exact exceptions; it does not permit new skips.
-  Four are real-list placeholders; two need authenticated deletion/favorites.
-  Isolated fixtures exercise list creation/visibility; authenticated production
-  deletion/favorites still require owner confirmation, not a claimed no-env pass.
-- Read-only v0 development preview: 942×664 dark desktop and 390×844 dark
-  mobile screenshots inspected; four provider shelves precede the local catalog,
-  mobile document width equals viewport (390 px). One unthrottled development
-  navigation at 390×844 observed CLS 0, TTFB 701 ms, LCP 1,364 ms. This uses live
-  provider reads and warm/unspecified caches, **not** production or fixture
-  performance evidence, and establishes no improvement.
-- Continued closeout: the JSON endpoint initially rejected a valid anonymous
-  v0 preview request (403) because `Request.url` retained localhost while Origin
-  and the trusted proxy host were the external preview host. Its origin boundary
-  now follows the forwarded-host/Host convention used by Next Server Actions.
-  A fresh read-only browser request returns 401 with `Cache-Control: no-store`
-  and a safe same-card sign-in continuation; no database mutation occurred.
-  Two new proxy-origin regressions and the prior route/client/action/component
-  suite pass: **45 tests across four files**, without suppressed errors.
-- Inspected source `3bc4561` screenshots: Home desktop/mobile have decoded hero
-  and discovery shelves and are committed under `docs/screenshots/`, embedded
-  in README/case study. Explore/title captures were rejected for unrelated
-  local demo placeholders. Fixture-only artwork routing now also fulfills those
-  local SVG URLs with synthetic photographs; production/domain data is unchanged.
-  The zoom-equivalent failure was a readiness-harness defect: at 640×400,
-  Explore's first image is below the viewport. Reflow, zoom and contrast scans now
-  require **all** main artwork to load/decode; measured navigation profiles retain
-  initial-viewport readiness and navigation-start timing. Fresh captures and
-  configured accessibility/performance artifacts are still required.
-- JSON-boundary source `04e957a`, [CI 36668638263](https://github.com/jedemarco1030/favalog/actions/runs/36668638263):
-  source validation/build, database/RLS and default/no-env jobs passed at the
-  last inspection; isolated first-list/full-fixture evidence was still running.
-  This run predates the proxy-origin and full-capture corrections above, so it
-  cannot be presented as final-commit verification.
-- No final release/production performance or screen-reader pass is asserted.
+[CI 36749917450](https://github.com/jedemarco1030/favalog/actions/runs/36749917450)
+ran against the exact main source above. Its overall conclusion is **failure**,
+not green: likes failed during Supabase startup, before Playwright executed.
+Downloaded JSON artifacts were inspected separately from job conclusions.
 
-## Functional acceptance
+| Invocation                            |                       First-attempt passes |         Intentional skips | Retries / flaky  | Result                                                                                  |
+| ------------------------------------- | -----------------------------------------: | ------------------------: | ---------------- | --------------------------------------------------------------------------------------- |
+| Unit/component coverage               |                                      1,522 |                         0 | Not Playwright   | Passed                                                                                  |
+| Strict configured Explore             |                                         14 |                         1 | 0 / 0            | Passed; paid live semantic test requires real credentials/corpus and was not run        |
+| First-list repetitions                |                          20 + 1 auth setup |                         0 | 0 / 0            | All 20 journey repetitions passed                                                       |
+| Offline provider fixtures             |                 34, including 1 auth setup |                         0 | 0 / 0            | Passed                                                                                  |
+| Slow/partial/empty/disabled discovery | 1 per scenario per viewport; 8 invocations |                         0 | 0 / 0            | Passed                                                                                  |
+| Production fixture-refusal            |                                          1 |                         0 | 0 / 0            | Passed                                                                                  |
+| Following feed                        |                                          1 |                         0 | 0 / 0            | Passed                                                                                  |
+| Likes                                 |                                          0 | Setup prevented execution | No test attempts | Failed setup                                                                            |
+| Default no-env                        |                                         44 |                         6 | 0 / 0            | Passed; four existing list placeholders and two auth-dependent deletion/favorites cases |
+| Explicit no-env                       |                                          5 |                         0 | 0 / 0            | Passed                                                                                  |
 
-Mark a row complete only after its cited CI evidence and required owner smoke
-check exist. Fixtures validate behavior, not hosted provider state.
+Formatting, lint, typecheck, production/Storybook builds, pgTAP and generated-type
+drift passed on that baseline. These are **not** final-source verification for
+this follow-up.
 
-- [ ] Empty-query Home/Explore discovery across films, TV, books, games;
-      provider-ranked labels, media filters, discover sort/page URLs, and
-      clearly identified local catalog below discovery.
-- [ ] Known-title search across TMDB, Open Library, and RAWG; local exact-title
-      protection and keyword fallback. RAWG live embeddings remain blocked.
-- [ ] Open/materialize/save a canonical title; existing-list save and first-list
-      create/save; exactly one list/item, server-confirmed success, refresh
-      persistence, and duplicate prevention.
-- [ ] Retry failed add without creating another list; safe sign-in continuation
-      and account isolation. Component/action failure injection is separate
-      from the browser journey and must not be described as browser proof.
-- [ ] Auth/onboarding, diary/reviews/favorites, account switching; follows,
-      following feed, review/list likes, visibility revocation and RLS.
-- [ ] Slow provider, partial failure, empty results, and providers disabled:
-      no demo records presented as live, no excessive reserved holes; mandatory
-      TMDB/RAWG attribution and safe artwork fallbacks remain visible.
-- [ ] Fully rendered screenshot and configured quality artifacts: discovery
-      present, required images decoded, intended materialized title, ready dialog.
-      Mobile and desktop captures inspected and useful examples committed.
-- [ ] Each Playwright invocation reports nonzero required execution; unexpected
-      skips, unusable reports and failures fail the gate. Retries/flaky results
-      are exposed; retry-free first-list repetitions precede the full suite.
+Inspected artifacts: `e2e-results-explore-integration`, `e2e-results-social`,
+`e2e-results-no-env`, `quality-evidence-configured-fixtures`, and
+`portfolio-screenshots`. Representative fixture Explore/title/Save captures were
+reviewed visually. The title capture still showed demonstration recommendations;
+the catalog capture still included legacy examples. Those are defects, not
+acceptable portfolio representations. Fixture images are synthetic, never
+credible evidence of authentic covers. Historical failed candidates
+`629fa3a`, `3bc4561`, and `04e957a` predate this inspected main run; their pending
+first-list claims are superseded by the baseline above, not by a final-source pass.
 
-## Accessibility acceptance
+## Follow-up fixes and current limits
 
-CI covers keyboard trapping, Escape/focus restoration, create/save live
-regions, 320 px reflow, a 640 px/2x **zoom-equivalent viewport**, reduced motion,
-and dark/light axe violations plus incomplete/manual-review findings. This
-is not a screen-reader, real-browser-zoom, or compliance certification.
+- Exact `source=favalog` plus the 28 immutable legacy identifiers distinguishes
+  demonstrations from genuine internal curation. Home and browse apply the
+  exclusion before genre facets, pagination and exact counts.
+- Forward migration `20260930180000_separate_demonstration_catalog.sql` excludes
+  those identities from keyword, semantic, hybrid and compatible-corpus reads.
+  It preserves return signatures, rank/cutoff logic, grants and removal filters.
+  No stored media, user references, slugs, IDs, ratings or aliases are rewritten.
+- Deterministic title matching cannot link a real provider title to a demo. Exact
+  alias conflicts fail safely rather than silently detaching or merging them.
+  The hosted read-only check found **zero** aliases on these identities; the
+  migration independently refuses unexpected conflicts at application time.
+- Configured title pages and metadata resolve the database first, never the mock
+  catalog. Saved demonstration routes remain available and labelled. Synthetic
+  rating distributions and mock related-title recommendations render only in the
+  labelled no-env experience. Provider attribution remains intact.
+- Real artwork is preserved; missing covers get a compact typographic fallback.
+  Title backdrops use the approved artwork boundary and failure fallback;
+  synthetic bundled images cannot become title backdrops or Open Graph covers.
+  Unused title sidebar space and raw provider-subject genre clutter are removed.
+- Embedding selection skips legacy demos. The existing synthetic evaluation
+  dataset now targets distinct **local-only** search fixtures. `eval:search --live`
+  fails before paid calls until a genuine-provider judgment dataset is reviewed.
+  This is an explicit tooling deferral; normal genuine-provider search is not
+  disabled. No live semantic-quality or corpus-completeness claim is made.
+- Every database-backed CI job now logs scoped port-owner diagnostics around
+  startup. Likes/feed report prerequisite failure as **tests not executed**;
+  reports remain mandatory when their test step runs. Cleanup remains limited to
+  this local Supabase project. No listener/container is indiscriminately killed.
 
-Owner: use VoiceOver + Safari or NVDA + Firefox/Chrome. Record date, OS,
-browser, assistive-technology version, each result, and any actual announcement
-(text or a paraphrase). Do not include account names or email addresses.
+**Likes infrastructure is NOT yet resolved.** The historical failure is an
+Inbucket bind conflict on host port `54324`; the owner of that listener was not
+captured. One requested rerun was denied by GitHub (`Resource not accessible by
+integration`). A transient or recurrent cause therefore cannot be asserted.
+Do not change ports, suppress failures, disable likes, or repeatedly rerun until
+green. The next runner attempt must retain the new listener/container diagnostics.
 
-- [ ] Navigate Home → Explore by keyboard; skip link enters main, every visible
-      focus is discernible. Find provider shelves, search, filters, and title
-      links by headings/landmarks; no disappearing discovery sections.
-- [ ] Activate Save on a provider card. Expect “Save [title]” dialog, then Close
-      or List name focus (zero-list user); Tab/Shift+Tab stays within it.
-      Escape restores the invoking Save control.
-- [ ] Create an empty/invalid list: expect native required-field validation or
-      associated list-name error and error announcement, not silent failure.
-- [ ] Create/save a valid list: expect “Created [list] and saved [title]” status
-      announcement. Activate View list; refresh retains one title. Repeat save:
-      expect “[title] is already in [list]”, with no duplicate item.
-- [ ] In a controlled nonproduction failure rehearsal, create list then fail
-      add: expect “Created [list], but [title] wasn't saved yet” plus the safe
-      error. Retry Save without another list. Do not disrupt production just
-      to induce this state; report unavailable if no safe setup exists.
-- [ ] At **actual 200% browser zoom**, content and dialog submit stay reachable;
-      separately review 320 px viewport, reduced motion, and light/dark text
-      contrast including text over artwork. Review every axe incomplete target.
+Local follow-up checks: 1,562 unit/component tests across 163 files passed with
+coverage (93.66% statements, 86.31% branches, 96.20% functions, 94.57% lines);
+131 focused catalog/artwork regressions passed, and typecheck passed. Format,
+lint and production/Storybook builds passed. The first full-coverage invocation
+did not yield a completed result; the bounded-worker invocation above did.
+Docker is absent, so local pgTAP, type generation and configured/social/likes/
+fixture E2E could not execute. Native no-env Playwright had five browser-launch
+errors and **zero behavior passes**, caused by missing `libnspr4.so`; one
+`install-deps` recovery failed because this OS has no `apt-get`. No assertions,
+timeouts or skip allowlists were relaxed. Final-source CI remains mandatory.
 
-Send the results to the PR before final acceptance; none are automatically
-checked by this document.
+Fresh read-only dark desktop/mobile Home, Explore, search and title checks used
+real provider content in the development preview. Search still exposed legacy
+rows because the hosted migration is intentionally unapplied: these checks do
+not prove migrated retrieval. Authentic production Home captures are committed
+under `docs/screenshots/home-*-production.png`; production search still showed
+legacy titles. A fresh authenticated Save capture requires isolated CI or an
+owner-controlled session, not an unauthorized hosted save.
 
-## Operational acceptance
+## Remaining engineering and deployment gates
 
-Latest observed scheduled refresh:
-[36557022714](https://github.com/jedemarco1030/favalog/actions/runs/36557022714),
-**skipped**. Five latest observed scheduled runs skipped. This establishes no
-metadata processing. Actions configuration listing returned HTTP 403; required
-configuration could not be verified. No hosted dry-run or activation was done.
+- [ ] Open/update the follow-up review PR and inspect the exact source SHA.
+- [ ] Resolve or demonstrate the transient likes startup cause with one retained
+      runner attempt; verify likes actually execute and pass.
+- [ ] Review complete final-source CI, including all mandatory invocation counts,
+      first-list repetitions without retries, provider failure scenarios, feed,
+      likes, pgTAP and generated types. Signatures/types are unchanged by the
+      migration, but drift must still be checked rather than assumed.
+- [ ] Fresh final-source desktop/mobile captures for Home, Explore, search,
+      genuine-provider title detail and ready Save dialog; required images decode.
+      Inspect them visually; synthetic fixtures remain test evidence only.
+- [ ] Owner reviews and merges only after engineering gates pass. Verify the
+      **new post-merge main CI**, not merely PR CI, before the release decision.
+- [ ] Owner separately approves/applies the forward migration after a fresh
+      alias-conflict check, then deploys the reviewed application. Never apply
+      `seed.sql` to hosted production. Verify exclusion and saved-record access
+      before inviting participants. No backfill or identity reconciliation is
+      implicitly authorized.
 
-Owner dashboard steps:
+## Browser-only owner acceptance
 
-1. GitHub repository **Settings → Environments → catalog-refresh**: confirm
-   branch/reviewer protections and secret **names** `SUPABASE_URL`,
-   `SUPABASE_SECRET_KEY`, `SUPABASE_PROJECT_REF`, `TMDB_API_READ_TOKEN`.
-   Never paste values into the PR. Confirm URL project ref exactly matches
-   `SUPABASE_PROJECT_REF` and is the intended production project.
-2. **Settings → Secrets and variables → Actions → Variables** (and environment
-   variables): inspect `CATALOG_REFRESH_ENABLED`. Keep unset/`false` while
-   rehearsing. Vercel Vars do not configure GitHub Actions.
-3. **Actions → Catalog metadata refresh → Run workflow**, select the reviewed
-   branch, leave **dry_run checked (`true`)**, set **limit `1`**. Approve its
-   protected environment if requested. Verify `Report run mode` says
-   `event=workflow_dispatch dry_run=true limit=1`, provider refresh succeeded,
-   and **Bounded stale-embedding backfill is skipped**. Record run URL and
-   redacted counts. `checked=0` proves only a write-free invocation, not refresh.
-4. [ ] Confirm bounded provider reads and no database/embedding writes from
-       that run. If no due rows exist, document that limitation rather than claim
-       metadata changed. Review the rollout runbook before any separate live test.
-5. Scheduled writes require **separate explicit owner approval**. Review the
-   workflow first: daily 04:17 UTC, up to 200 metadata rows and a separate
-   embedding backfill of up to 200 rows with TMDB eligibility enabled inline.
-   A manual live metadata limit of `1` does **not** narrow the embedding batch.
-   Do not run `dry_run=false` as part of this acceptance rehearsal.
-6. Only after approval and budget/target verification, set the GitHub variable
-   to literal `true`; observe an actual completed scheduled job and redacted
-   checked/changed/unchanged/unavailable/failed/remaining-due summary. A skipped
-   or zero-work run is not evidence of successful metadata refresh.
-7. Rollback: set/delete `CATALOG_REFRESH_ENABLED` to disable future schedules;
-   use **Actions → run → Cancel workflow** for queued/running work if required.
-   The concurrency group does not automatically cancel an in-flight run.
-   Preserve existing records; no destructive cleanup or credential changes.
+1. In GitHub Actions, open the failed baseline likes job and **Re-run failed
+   jobs once** if still appropriate. On the review PR, inspect all final-source
+   jobs and artifacts; if binding recurs, retain the port-owner diagnostics and
+   request a cause-specific fix. After merge, verify the new main CI run.
+2. Following separate migration/deployment approval: signed out, check Home and
+   Explore discovery first across all media types; search real TMDB/Open Library/
+   RAWG titles, inspect attribution, counts/filters/page URLs and artwork. Paper
+   Watch/Under the Eaves must not appear as ordinary production results. A saved
+   legacy title route must still resolve with its demonstration indication.
+3. With owner-controlled accounts, check Save sign-in continuation, first/new/
+   existing-list save, refresh and duplicate prevention; check diary/reviews/
+   favorites, account isolation, follow/unfollow/feed, review/list likes and
+   follower-only visibility revocation. Record URLs/results without personal data.
+4. Keyboard and assistive technology: check skip link, headings/landmarks, visible
+   focus, Save dialog Tab/Shift+Tab trap, Escape restoration, invalid-list error,
+   success/already-saved announcements and save-only retry in a safe nonproduction
+   failure rehearsal. Record VoiceOver/Safari or NVDA/browser versions and actual
+   announcements. Check **actual 200% browser zoom**, 320 px reflow, reduced
+   motion and light/dark artwork contrast. Review axe incomplete targets.
+5. GitHub **Settings → Environments → catalog-refresh**: inspect protections and
+   secret names `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_PROJECT_REF`,
+   `TMDB_API_READ_TOKEN`; do not share their values. Ensure the URL's project ref
+   matches the intended project. Keep `CATALOG_REFRESH_ENABLED` unset/`false`.
+   **Actions → Catalog metadata refresh → Run workflow → branch `main` after
+   the approved merge → dry_run=true (checked) → limit=1**. Approve the protected
+   environment if asked. Expect `event=workflow_dispatch dry_run=true limit=1`,
+   successful provider reads, zero database/embedding writes and **Bounded
+   stale-embedding backfill skipped**. Record redacted checked/changed/unchanged/
+   failed/unavailable counts (at most one checked row). `checked=0` proves only a
+   no-work rehearsal, not metadata processing. Do not run `dry_run=false`.
+6. Record explicit owner acceptance in the PR. Only after all required evidence
+   exists use the [invited-beta checklist](beta/invited-beta-checklist.md).
 
-[Rollout runbook](tmdb-activation-rollout.md) ·
-[Scheduler handoff](ci/catalog-refresh-scheduler-handoff.md).
-RAWG permission and live embedding activation remain independently unresolved;
-this closeout does not change their gates or run a paid backfill.
+Latest five observed scheduled refresh runs were **skipped**; newest
+[36702695138](https://github.com/jedemarco1030/favalog/actions/runs/36702695138).
+Scheduling is not operationally verified, and no protected hosted dry run was
+performed here. GitHub Actions configuration is separate from Vercel Vars.
+Live scheduling and paid embedding work require separate approval. RAWG remains
+keyword discovery/search only until permission **and** independent activation
+are verified. Optional deferral must be owner-recorded with user impact, never
+silently converted into a passed release gate.
 
-## Final production smoke test (owner, after approved deployment)
-
-1. Signed out: Home/Explore shows provider discovery first; filter all four
-   media types, search a known title, check attribution and a title page.
-2. Sign in from Save and verify same-card continuation. Save into an existing
-   list, create a first/new list, refresh, repeat save, check one item/list.
-3. Switch accounts; prior private lists and ownership controls do not leak.
-   Follow/unfollow, feed, review/list likes, and revoke follower-only visibility.
-4. Check narrow/mobile plus desktop light/dark, keyboard/Escape, actual zoom,
-   announcements, and a provider-unavailable fallback without demo leakage.
-5. Confirm operational run URL/target/mode and RAWG gate unchanged. Record
-   owner acceptance only once every required release row is satisfied.
-
-Then use the existing [invited-beta task script and anonymous feedback template](beta/invited-beta-checklist.md).
-It does not authorize invitations or analytics; keep participant notes private.
-No invented user counts, revenue, relevance, or production-performance claims.
+When engineering gates actually pass but owner acceptance remains, use exactly:
+**“MVP 1 engineering closeout complete; beta acceptance pending these owner checks.”**
+That decision is **not yet supported** by the current evidence.

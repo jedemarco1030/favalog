@@ -29,6 +29,31 @@ function exploreSearchbox(page: Page) {
 }
 
 test.describe("Explore discovery @configured", () => {
+  test("does not discover legacy demonstrations but preserves their saved-record route", async ({
+    page,
+  }) => {
+    await page.goto("/explore?q=Paper%20Watch");
+    await expect(
+      page.getByRole("heading", { name: /Results for/ }),
+    ).toBeVisible();
+    await expect(page.locator('main a[href="/title/paper-watch"]')).toHaveCount(
+      0,
+    );
+    await expect(
+      page.locator('main a[href="/title/fixture-paper-watch"]'),
+    ).toBeVisible();
+    await page.goto("/title/paper-watch");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Paper Watch" }),
+    ).toBeVisible();
+    await expect(page.getByText(/Demonstration title/)).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Community rating" }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { name: "More like this" }),
+    ).toHaveCount(0);
+  });
   test("submitting a search surfaces the matching catalog title", async ({
     page,
   }) => {
@@ -106,7 +131,7 @@ test.describe("Explore discovery @configured", () => {
 
     await page.getByRole("link", { name: AFTERGLOW_LINK }).click();
 
-    await expect(page).toHaveURL(/\/title\/afterglow$/);
+    await expect(page).toHaveURL(/\/title\/fixture-afterglow$/);
     await expect(
       page.getByRole("heading", { level: 1, name: "Afterglow" }),
     ).toBeVisible();

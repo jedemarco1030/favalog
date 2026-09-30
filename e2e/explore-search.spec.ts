@@ -21,7 +21,7 @@ import { expect, test, type Page } from "@playwright/test";
  * a real `OPENAI_API_KEY` is present.
  */
 
-/** Seeded titles surfaced by the queries below. */
+/** Local-only search fixtures; legacy demonstration rows stay excluded. */
 const DUNE_LINK = /Dune: Part Two \(Film, 2024\)/;
 const AFTERGLOW_LINK = /Afterglow \(Film, 2023\)/;
 

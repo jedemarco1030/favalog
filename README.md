@@ -5,8 +5,10 @@ organizing, and discovering **movies, TV series, books, and video games** in one
 cross-media record. Discovery is led by external providers. The canonical
 catalog stores only the titles people actually engage with.
 
-> Status is reconciled as of **2026-09-30** against reviewed `main` at
-> `5d1663b` and closeout PR #21. **MVP 1 acceptance is still pending**; see the
+> Status is reconciled as of **2026-09-30** against post-merge `main` at
+> `1c076a3` (merged PR #21). **Engineering closeout remains incomplete**: likes
+> did not execute, and the demonstration-separation follow-up still needs
+> final-source and post-merge CI. **MVP 1 acceptance is still pending**; see the
 > [release checklist](docs/mvp1-release-checklist.md). Each capability
 > below is labelled by its evidence: implemented in code, CI-verified,
 > owner-confirmed in production, or unverified/deferred. The authoritative
@@ -18,16 +20,15 @@ catalog stores only the titles people actually engage with.
 ## Live demo and screenshots
 
 - **Live deployment:** <https://favalog.vercel.app>
-- **Screenshots:** inspected, artwork-backed Home captures from the local/offline
-  fixture application in [CI 36666650203](https://github.com/jedemarco1030/favalog/actions/runs/36666650203)
-  (source `3bc4561`). These are synthetic fixture artwork, not authentic covers
-  or production captures; the overall run failed save/zoom checks and is not
-  release acceptance. Other captures remain under review.
+- **Screenshots:** fresh read-only production Home captures on **2026-09-30**,
+  with decoded genuine RAWG artwork, at 1280×900 and 390×844. They show the
+  deployed baseline, not this unapplied follow-up or release acceptance.
+  Offline fixture captures are separate test evidence, never authentic covers.
 - **Engineering case study:** [`docs/case-study.md`](docs/case-study.md).
 
-![Desktop Home: offline fixtures with decoded hero and discovery artwork](docs/screenshots/home-desktop-fixture.png)
+![Production Home with genuine RAWG artwork, captured read-only](docs/screenshots/home-desktop-production.png)
 
-[Mobile Home fixture capture](docs/screenshots/home-mobile-fixture.png).
+[Production mobile Home](docs/screenshots/home-mobile-production.png).
 Both screenshots show the actual application, never mock-ups.
 
 ## What Favalog does
@@ -146,10 +147,21 @@ production behavior.
 
 ## Known limitations
 
+- The demonstration-separation follow-up requires owner application of
+  `20260930180000_separate_demonstration_catalog.sql` before deployment acceptance.
+  Saved IDs/routes/references are preserved; ordinary discovery excludes only
+  the known demonstration identities, not every internal catalog title.
+- The synthetic golden dataset is now local-fixture-only. Live semantic-quality
+  evaluation is explicitly deferred until genuine-provider judgments are reviewed;
+  the evaluator refuses paid calls against that fixture dataset.
+- Inspected post-merge CI `36749917450` passed 20 retry-free first-list journeys
+  and 34 fixtures, but failed likes startup on port 54324 before tests executed.
+  Its results do not verify this follow-up or authorize an invited beta.
+
 - RAWG content is not semantically searchable (see above).
 - Community reviews on some surfaces still come from the labelled mock layer.
 - Catalog-refresh scheduling exists, but the five latest observed scheduled
-  runs skipped the refresh job (latest: `36557022714`). This is not evidence
+  runs skipped the refresh job (latest: `36702695138`, inspected 2026-09-30). This is not evidence
   of processing. Activation is a **GitHub Actions** variable, not a Vercel
   environment variable; owner operational acceptance is still required.
 - MVP 1 is **not yet accepted**. See the

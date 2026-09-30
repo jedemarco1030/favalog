@@ -1,10 +1,11 @@
 # TMDB activation & scheduled metadata refresh — owner-controlled rollout runbook
 
-- **Status (updated 2026-09-21):** TMDB discovery/import is **owner-confirmed in
-  hosted production**; the scheduled metadata-refresh workflow is **not yet
-  installed on `main`** and its runs remain **unverified/pending**
-  (owner- and maintainer-controlled). See
-  [Rollout progress observed on 2026-09-21](#rollout-progress-observed-on-2026-09-21).
+- **Current status (2026-09-30):** TMDB discovery/import is owner-confirmed;
+  `catalog-refresh.yml` **is installed on main**. The five latest scheduled
+  runs skipped, newest [36702695138](https://github.com/jedemarco1030/favalog/actions/runs/36702695138).
+  Processing is not operationally verified. No protected hosted dry run or live
+  activation occurred during this closeout. The 2026-09-21 observations below
+  are retained strictly as history, not the current installation state.
 - **Scope:** The exact, ordered procedure to activate TMDB movie/TV discovery
   and import in production, keep imported metadata fresh with the bounded
   periodic refresh worker, and regenerate affected embeddings — without deleting
@@ -19,7 +20,20 @@ is an explicit, owner-authorized action against hosted infrastructure. Read-only
 production checks are kept separate from owner-authorized imports, refreshes, and
 embedding writes.
 
-## What is true right now — do not conflate these
+## Current browser-only acceptance rehearsal
+
+After separate review/merge approval, open GitHub **Actions → Catalog metadata
+refresh → Run workflow**, select branch **main**, keep **dry_run=true** checked
+and set **limit=1**. Confirm the protected `catalog-refresh` environment and
+intended Supabase project via secret names, never shared values. Keep the GitHub
+Actions variable `CATALOG_REFRESH_ENABLED` unset/false; Vercel Vars do not set it.
+Expect `event=workflow_dispatch dry_run=true limit=1`, at most one checked due
+record, zero writes, and **Bounded stale-embedding backfill skipped**. A zero-work
+run is not proof of refresh. Attach the run URL and redacted counters to the PR.
+Do not select `dry_run=false`, enable schedules, or trigger paid embeddings here.
+The full [release checklist](mvp1-release-checklist.md) controls acceptance.
+
+## Historical activation observations — do not conflate these
 
 1. **Owner-provided TMDB clarification (context, not blanket approval).** The
    owner supplied evidence (a screenshot of TMDB staff member Travis Bell) that

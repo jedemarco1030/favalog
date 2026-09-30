@@ -1,17 +1,44 @@
 # Favalog product roadmap
 
-> Living document. Last reconciled: 2026-09-29 (Phase 4E closeout), against
-> reviewed `main` at `5d1663b` (PR #20) and closeout PR #21. Release acceptance
+> Living document. Last reconciled: 2026-09-30 (Phase 4E closeout), against
+> post-merge `main` at `1c076a3` (merged PR #21). Engineering closeout is incomplete;
+> the demonstration-separation follow-up still requires final-source CI. Release acceptance
 > is pending; see [the release checklist](mvp1-release-checklist.md). Update this file whenever a phase
 > ships, a capability becomes production-verified, or the agreed sequence
 > changes. When a statement is only true at a point in time, keep it and date it
 > rather than deleting the history.
 
-## Status reconciliation (2026-09-29)
+## Current closeout evidence (2026-09-30)
 
-This section supersedes conflicting status lines further down, which are kept
-as dated history. It uses four separate labels, and a claim gets only the
-labels it has evidence for:
+[Post-merge CI 36749917450](https://github.com/jedemarco1030/favalog/actions/runs/36749917450)
+ran source `1c076a3eb4b94672251ca64e6ab33475a4311fe1`: 20 retry-free first-list
+journeys plus auth setup, 34 first-attempt fixtures, configured Explore 14 passes
+and one paid-semantic skip, following feed one pass. Database/type-drift and
+validation/build jobs passed. Likes failed during local Inbucket binding on
+54324, before Playwright; the overall run failed. A single requested rerun was
+denied by GitHub permissions, so the conflict is not yet classified as transient.
+
+This follow-up separates the exact historical demonstration identities without
+rewriting user references, fixes mock-first title rendering and safe artwork
+fallbacks, and captures scoped CI startup diagnostics. It is not production
+applied or final-source CI-verified. Local verification: 1,562 unit/component
+passes and 131 focused regressions; Docker-backed checks remain unavailable,
+and native Playwright is blocked by missing system libraries. The full
+[release checklist](mvp1-release-checklist.md) is authoritative.
+
+The five latest inspected refresh schedules skipped; newest
+[36702695138](https://github.com/jedemarco1030/favalog/actions/runs/36702695138).
+No protected hosted rehearsal or live schedule activation is claimed. RAWG
+remains keyword-only; permission and separate live embedding activation are
+still unresolved. The fixture-only golden dataset cannot be used to claim
+live semantic quality; a genuine-provider evaluation dataset is an explicit
+operator-tooling deferral, not a waiver of required beta checks.
+
+## Historical status reconciliation (2026-09-29)
+
+This dated section is superseded by the current closeout evidence above.
+It preserves historical capability labels rather than asserting final-source
+or release acceptance. A claim gets only the labels it has evidence for:
 
 - **Implemented**: the code is on `main`.
 - **CI-verified**: a job in `.github/workflows/ci.yml` exercises it.

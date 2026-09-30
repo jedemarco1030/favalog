@@ -7,7 +7,40 @@ decisions behind it and the evidence for each claim. It does not claim
 anything that isn't verified in code, CI, or owner-confirmed production
 behaviour.
 
-## Inspected fixture captures
+## Current release evidence (2026-09-30)
+
+[Post-merge main CI 36749917450](https://github.com/jedemarco1030/favalog/actions/runs/36749917450),
+source `1c076a3`, confirms 20 first-list repetitions without retries, 34 fixture
+passes and one following-feed pass. This supersedes the earlier pending JSON
+transport verification described as history below. Likes failed before browser
+execution, so **engineering closeout and beta acceptance remain incomplete**.
+
+The follow-up addresses a separate identity/presentation defect: exact legacy
+mock identities persisted as ordinary catalog rows. Its forward-only retrieval
+filters preserve every saved identity/reference, keep genuine internal records,
+and prevent provider imports from linking to similar-name demonstrations.
+Configured title pages now resolve real database content rather than preferring
+mock records, and no longer fabricate related recommendations or rating charts.
+Missing/broken artwork has an intentional fallback; synthetic bundled imagery
+cannot become a provider backdrop. The migration and final-source CI are still
+owner/review dependencies, not completed production work. Inbucket port 54324's
+listener owner remains unknown because GitHub denied a single requested rerun;
+new scoped startup diagnostics are not a claimed root-cause fix.
+
+![Production desktop Home with authentic RAWG artwork](screenshots/home-desktop-production.png)
+
+[Production mobile Home](screenshots/home-mobile-production.png).
+Captured read-only on 2026-09-30 at 1280×900 and 390×844 after visible artwork
+decoded. These are genuine deployed-baseline captures, not images of the
+unapplied follow-up or proof of release acceptance.
+
+The current follow-up passed 1,562 unit/component tests and focused browser
+presentation checks. Native Playwright and local database verification remain
+blocked by unavailable browser libraries/Docker; full CI is still required.
+The synthetic golden evaluation corpus is explicitly local-only; live semantic
+quality requires a reviewed genuine-provider dataset and is not claimed here.
+
+## Historical fixture captures
 
 ![Desktop Home with decoded fixture hero and discovery shelves](screenshots/home-desktop-fixture.png)
 

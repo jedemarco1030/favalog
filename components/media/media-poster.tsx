@@ -77,7 +77,7 @@ export function MediaPoster({
     <div
       className={cn(
         "relative w-full overflow-hidden rounded-lg bg-surface-2 ring-1 ring-inset ring-border/60",
-        RATIO_CLASS[ratio],
+        artwork ? RATIO_CLASS[ratio] : RATIO_CLASS["16/9"],
         className,
       )}
     >

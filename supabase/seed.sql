@@ -87,6 +87,27 @@ where id = '00000000-0000-0000-0000-0000000000a3';
 -- keeps a single source of truth for catalog identity and lets the same demo
 -- data resolve against the real curated catalog in any environment.
 
+-- Synthetic SEARCH fixtures, local reset only; never a hosted migration.
+-- Saved demonstration records retain their original identity and references.
+-- Separate fixture identities exercise discovery without re-exposing those rows.
+insert into public.media_items (
+  id, kind, source, external_id, slug, title, subtitle, synopsis, year,
+  genres, details, average_rating
+)
+select md5('test-fixture:' || external_id)::uuid, kind, 'favalog',
+  'test-fixture:' || external_id, 'fixture-' || slug, title, subtitle,
+  synopsis, year, genres, details, average_rating
+from public.media_items
+where source = 'favalog' and external_id in (
+  'm_afterglow','m_paperlantern','m_lowcountry','m_duneparttwo',
+  'm_quietsignal','m_thecartographer','m_nightferry','m_arclighthouse',
+  'm_bluehourrun','m_slowmountain','t_northlight','t_gildedroom',
+  't_harbourlines','t_latecheckin','t_signalglass','t_ridgeandriver',
+  't_paperwatch','t_undertheeaves','b_smallhours','b_orbital_notes',
+  'b_bright_index','b_salt_tide','b_weight_of_sand','b_northroom',
+  'b_paperbirds','b_quietinstruments','b_seasofglass','b_theslowdial'
+);
+
 -- ---------------------------------------------------------------------------
 -- Diary entries (chronological log; supports a rewatch)
 -- ---------------------------------------------------------------------------

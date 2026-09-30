@@ -231,6 +231,12 @@ select is(
 -- TMDB movie 693134 to the curated 'Dune: Part Two', then re-import it with
 -- DIFFERENT genres/year and prove the curated metadata is retained.
 -- ---------------------------------------------------------------------------
+-- Transaction-local legitimate-curation fixture. Demo conflicts are tested
+-- independently without altering the historical identities.
+delete from public.media_items where source = 'favalog' and external_id = 'test-fixture:m_duneparttwo';
+update public.media_items set external_id = 'curation-fixture:dune'
+where source = 'favalog' and external_id = 'm_duneparttwo';
+
 create temporary table _dune_curated_before as
   select id, slug, title, year, genres, average_rating
   from public.media_items
