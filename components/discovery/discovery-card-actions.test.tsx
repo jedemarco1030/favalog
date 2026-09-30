@@ -19,10 +19,6 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-vi.mock("@/app/discovery/actions", () => ({
-  createAndSaveDiscoveredTitleAction: vi.fn(),
-}));
-
 const identity: ExternalRef = {
   provider: "tmdb",
   kind: "movie",

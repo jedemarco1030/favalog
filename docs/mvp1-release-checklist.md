@@ -23,9 +23,24 @@ final-commit artifact review remain release gates.
   for save-only retry on partial failure; verification is still pending.
   Final execution counts, retries, decoded screenshots, and raw measurements
   must be inspected before this ledger can be marked complete.
-- Local format, lint, typecheck, and 1,497 unit/component tests passed for
-  `629fa3a`. Docker is unavailable in the v0 sandbox; isolated E2E, pgTAP,
-  production and Storybook builds are delegated to GitHub CI.
+- Source `3bc4561`, [CI 36666650203](https://github.com/jedemarco1030/favalog/actions/runs/36666650203):
+  twenty retry-free first-list attempts executed, **all failed**. Seven retained
+  the pending “Saving” stall even with a single Server Action; thirteen reached
+  server-confirmed success, persisted one title after refresh, then failed a
+  page-wide uniqueness assertion because the same public list appears in both
+  Your lists and Community lists. The assertion now scopes to Your lists.
+  The next candidate returns create/save through an authenticated, same-origin,
+  bounded JSON endpoint, independently of streamed RSC refresh completion.
+  Existing write authorization/RLS and save-only partial-failure retry remain.
+  This candidate is **not yet browser-verified**; combining Server Actions alone
+  did not fix the stall and must not be reported as the final root cause/fix.
+- Source `3bc4561` passed format, lint, typecheck, all 1,503 unit/component tests
+  with coverage (93.66% statements, 86.28% branches, 96.19% functions, 94.57%
+  lines), production build, Storybook, pgTAP and generated-type drift checks.
+  The JSON-boundary candidate additionally passes 43 focused route/client/action/
+  component tests, format, lint and typecheck; its full CI remains required.
+  Docker is unavailable in the v0 sandbox; isolated E2E, pgTAP, production and
+  Storybook builds are delegated to GitHub CI.
 - Default no-env candidate run: 44 first-attempt passes, six intentional skips;
   no-env-specific run: five passes. The default execution gate initially failed
   because four pre-existing `test.fixme` list placeholders were not allow-listed.

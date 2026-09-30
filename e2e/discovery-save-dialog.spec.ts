@@ -188,7 +188,9 @@ test.describe.serial("@fixtures discovery save continuation", () => {
     expect(await countMediaByExternalId("tmdb", "movie:999101")).toBe(1);
     await page.goto("/lists");
     await expect(
-      page.getByRole("link", { name: new RegExp(firstList) }),
+      page
+        .getByRole("region", { name: "Your lists", exact: true })
+        .getByRole("link", { name: firstList, exact: true }),
     ).toHaveCount(1);
   });
 });

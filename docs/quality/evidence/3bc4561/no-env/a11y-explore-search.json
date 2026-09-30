@@ -1,0 +1,33 @@
+{
+  "axe-mobile": {
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "aria-valid-attr-value",
+        "impact": "critical",
+        "help": "ARIA attributes must conform to valid values",
+        "nodes": 1,
+        "targets": ["button[aria-haspopup=\"menu\"]"]
+      }
+    ]
+  },
+  "axe-desktop": {
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "aria-valid-attr-value",
+        "impact": "critical",
+        "help": "ARIA attributes must conform to valid values",
+        "nodes": 1,
+        "targets": ["button[aria-haspopup=\"menu\"]"]
+      }
+    ]
+  },
+  "firstTabStops": [
+    "a[href=#main-content] \"Skip to content\"",
+    "a[href=/] \"Favalog — home\"",
+    "a[href=/] \"Home\""
+  ],
+  "hasSkipLink": true,
+  "longAnimationsUnderReducedMotion": []
+}

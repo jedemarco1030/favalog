@@ -1,0 +1,43 @@
+{
+  "axe-mobile": {
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "aria-valid-attr-value",
+        "impact": "critical",
+        "help": "ARIA attributes must conform to valid values",
+        "nodes": 1,
+        "targets": ["button[aria-haspopup=\"menu\"]"]
+      },
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": 2,
+        "targets": [
+          ".min-h-14[aria-current=\"page\"][href=\"/\"]",
+          "button[aria-label=\"Search\"]"
+        ]
+      }
+    ]
+  },
+  "axe-desktop": {
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "aria-valid-attr-value",
+        "impact": "critical",
+        "help": "ARIA attributes must conform to valid values",
+        "nodes": 1,
+        "targets": ["button[aria-haspopup=\"menu\"]"]
+      }
+    ]
+  },
+  "firstTabStops": [
+    "a[href=#main-content] \"Skip to content\"",
+    "a[href=/] \"Favalog — home\"",
+    "a[href=/] \"Home\""
+  ],
+  "hasSkipLink": true,
+  "longAnimationsUnderReducedMotion": []
+}

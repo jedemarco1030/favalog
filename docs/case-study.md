@@ -46,15 +46,19 @@ and fails independently. A failing provider hides its own shelves and emits a
 redacted, schema-versioned event (`docs/ai-discovery-operations.md`). The
 page itself doesn't error.
 
-**Save has staged writes, not overlapping client requests.** Saving materializes
+**Save completion must not depend on streamed page refresh.** Saving materializes
 the title, then adds it to a list. First-attempt traces reproduced the first-list
-stall while two successive Server Actions refreshed streamed discovery. The
-closeout combines creation and save into one server request with independent
-authentication/authorization at the existing write gates. A partial failure
-returns the created list; retry re-runs only save and never creates another list.
-This is not a database transaction or a claim that network retries are atomic.
-Signed-out viewers go through sign-in and return to the same card with the
-picker open. Every return path is validated as a same-origin relative path.
+pending stall with two successive Server Actions. Combining them into one still
+stalled in seven of twenty retry-free attempts on `3bc4561`; thirteen reached
+success and persistence but exposed a separate, over-broad list-link assertion.
+The next candidate uses a bounded, same-origin JSON response with independent
+session validation and existing per-write authorization/RLS, so unrelated RSC
+refresh completion does not hold the dialog pending. Verification remains
+required; this is not a claim that the candidate has passed the browser gate.
+A partial failure returns the created list; retry re-runs only save rather than
+creating another list. This is not a database transaction or a claim that network
+retries are atomic. Signed-out viewers go through sign-in and return to the same
+card with its picker open. Every return path is validated as same-origin relative.
 
 ## Verification
 

@@ -5,7 +5,7 @@ import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useFormStatus } from "react-dom";
 import { Bookmark, Loader2, Plus, X } from "lucide-react";
-import { createAndSaveDiscoveredTitleAction } from "@/app/discovery/actions";
+import { createAndSaveDiscoveredTitle } from "@/lib/discovery/create-save-client";
 import {
   initialCreateListFormState,
   type CreateListFormState,
@@ -150,7 +150,7 @@ export function DiscoveryCardActions({
   returnTo,
   openAction,
   saveAction,
-  createAction = createAndSaveDiscoveredTitleAction,
+  createAction = createAndSaveDiscoveredTitle,
 }: DiscoveryCardActionsProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -373,8 +373,8 @@ function SaveDialog({
     setDraftName("");
     setDraftVisibility("public");
 
-    // Production creates and saves in one request, avoiding overlapping RSC
-    // revalidation streams. Create-only injected actions retain the retry seam.
+    // Production returns both writes as JSON, independent of streamed page
+    // refresh completion. Create-only injected actions retain the retry seam.
     const save =
       create.save ??
       (await runSave(initialDiscoverySaveState, saveFormData(created.id)));
