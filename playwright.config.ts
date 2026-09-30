@@ -195,7 +195,10 @@ export default defineConfig({
   forbidOnly: isCI,
   retries: isCI ? 2 : 0,
   workers: isCI ? 1 : undefined,
-  reporter: isCI ? [["github"], ["html", { open: "never" }]] : "list",
+  // The JSON report feeds scripts/assert-e2e-results.mjs, which fails a job
+  // whose required specs executed nothing. Each CI step sets its own
+  // PLAYWRIGHT_JSON_OUTPUT_NAME so suites never overwrite each other.
+  reporter: isCI ? [["github"], ["html", { open: "never" }], ["json"]] : "list",
   use: {
     trace: "on-first-retry",
   },
