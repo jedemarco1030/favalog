@@ -42,8 +42,13 @@ covered Home, Explore, search and a genuine Open Library title at 942×664 and
 the owner applies the new migration. Authenticated Save capture requires CI or
 an owner-controlled session, not a hosted mutation during read-only inspection.
 
-Follow-up local coverage: 1,562 passes across 163 files, 93.66% statements,
-86.31% branches, 96.20% functions, 94.57% lines. Native no-env Playwright reported
+Earlier follow-up local coverage: 1,562 passes across 163 files, 93.66%
+statements, 86.31% branches, 96.20% functions, 94.57% lines. Revised `5847189`
+local coverage reported 1,574 passing tests with the same coverage, but exited
+137; one single-worker recovery also exited 137 after reporting all passes.
+Neither invocation is a clean completed check. Formatting/lint/typecheck passed
+locally; revised-source CI independently completed 1,574 tests and both builds.
+Native no-env Playwright reported
 five browser-launch failures and no behavior passes (`libnspr4.so` absent).
 One dependency-recovery attempt failed because `apt-get` is unavailable. Docker
 is also absent: final-source pgTAP/type-drift and configured fixtures/social/likes
@@ -68,8 +73,39 @@ not inferred from green job status. `quality-evidence-no-env` Home reports zero
 axe violations, a retained incomplete `aria-valid-attr-value` finding on the
 menu button, a skip link and no long animations under reduced motion.
 These are no-env laboratory observations, not production accessibility or
-performance certification. Likes and following feed executed successfully;
-complete configured/first-list evidence remains pending review.
+performance certification. Likes and following feed executed successfully.
+Complete configured artifacts were subsequently inspected: this run **failed**.
+Configured Explore passed 15 tests with one intentional paid-semantic skip;
+first-list passed 20 journey repetitions plus one auth setup without retries.
+Fixtures had 22 first-attempt passes, five retry attempts, one flaky duplicate
+save, one failed materialization and seven cascade skips. All eight separate
+slow/partial/empty/disabled desktop/mobile invocations passed once without
+retries; production fixture-refusal passed once. Do not count the failed
+fixture invocation as 34 clean passes.
+
+The materialization assertion targeted an obsolete mock slug despite successful
+navigation to the correct fixture slug. The duplicate-save trace had HTTP 200
+but stalled behind an unrelated streamed page refresh. Application source
+`5847189027249bc3a9b939cc490af9c90f4f6340` corrects the fixture identity assertion
+and routes existing-list/save-only results through bounded, authenticated JSON,
+matching create-and-save without weakening assertions or timeouts.
+[CI 36763709617](https://github.com/jedemarco1030/favalog/actions/runs/36763709617)
+completed successfully, including all E2E jobs. The revised-source invocation
+reports are detailed below. This is not final documentation-branch or post-merge
+acceptance.
+
+Inspected configured quality artifacts from the failed `76bb608` run remain
+valid only for their individual checks: `a11y-save-dialog.json` reports initial
+Close focus, zero page-focus escapes, two native browser-chrome stops, name-input
+focus on create and Escape restoration; dialog/create-form axe violations and
+incomplete lists are empty. `configured-reflow-320.json` and
+`configured-zoom-200.json` report no overflow. The latter is a **640 px layout
+proxy**, not actual 200% browser zoom. Reduced-motion findings are laboratory
+checks, not screen-reader acceptance. The 16 surface/theme/viewport contrast
+checks report zero violations but retain incomplete `aria-prohibited-attr` on
+Home's `.pt-6`, `aria-valid-attr-value` on closed-menu `aria-controls`, and
+`color-contrast` on mobile Explore navigation. Review these targets manually;
+none is silently counted as passed accessibility compliance.
 
 Genuine-provider development-preview screenshots were visually inspected at
 942×664 and 390×844 after required visible images decoded and fonts settled.
@@ -87,6 +123,63 @@ local section; these captures do not claim local corpus completeness. They use
 the unchanged hosted schema: migrated search exclusion and actual browser zoom
 are not established. No hosted saves/writes were performed. Authenticated Save
 captures belong to isolated CI fixtures or an owner-controlled session.
+
+## Revised source evidence (2026-09-30)
+
+[CI 36763709617](https://github.com/jedemarco1030/favalog/actions/runs/36763709617)
+uses application source `5847189027249bc3a9b939cc490af9c90f4f6340` and temporary
+PR merge `625eac07c507ccac67e45c91846871b03548197f`, not post-merge main.
+The validation job completed 1,574 tests across 163 files with coverage and
+production/Storybook builds. Database/RLS and generated-type drift passed; the
+downloaded `database-types-5847189027249bc3a9b939cc490af9c90f4f6340` has SHA-256
+`72f4b396a36b70146cc61442c0eeb3d61ba695504373e2b644e4c07522020702`, matching
+the committed file byte-for-byte.
+
+Downloaded and inspected `e2e-results-social` and `e2e-results-likes` each contain
+one first-attempt pass with no skips, retries or flaky outcomes; the repository's
+execution gate was run against both reports. `e2e-results-no-env` contains 44
+first-attempt default passes with six intentional skips (four existing list
+placeholders, authenticated list deletion and favorites), and five explicit
+no-env passes without skips. Both have zero retries/flaky outcomes and the skip
+names were checked. `quality-evidence-no-env` again reports no Home violations,
+retains the closed-menu ARIA incomplete target, confirms the skip link and no
+long reduced-motion animations. Complete `e2e-results-explore-integration`
+inspection confirms configured 15 passes/one intentional paid-semantic skip,
+first-list 20 repetitions plus auth setup, fixtures 34 passes, production
+fixture-refusal one pass, and eight independent slow/partial/empty/disabled
+layout passes. Every invocation has zero retries, flaky outcomes, unexpected
+skips, failures, invalid attempts or top-level errors. The overall run is
+completed **success**.
+
+Revised-source configured quality reports again confirm no Save-dialog
+page-focus escapes, create-name focus and Escape restoration, no dialog/form
+axe violations or incomplete findings, no 320 px overflow and reduced motion
+with maximum duration 0.00001 seconds. The 640 px zoom proxy is still **not**
+actual browser zoom. All 16 surface/theme/viewport contrast reports have zero
+violations but retain ARIA and mobile Explore contrast incomplete targets in
+`configured-contrast.json`; owner screen-reader, real zoom and incomplete-target
+acceptance is required.
+
+The exact-source `portfolio-screenshots` ready Save dialog was visually inspected
+at 1280×800 and 390×844: populated list choices, create-list option, selected-list
+state and enabled Save button are visible without clipping. Retained
+[desktop](../screenshots/save-dialog-desktop-fixture-followup.png) and
+[mobile](../screenshots/save-dialog-mobile-fixture-followup.png) captures use
+**synthetic offline fixture content/artwork**, not authentic covers or production
+portfolio evidence. The final documentation/capture-only branch update still
+needs its own CI review; no post-merge main verification is implied.
+
+All eight Home/Explore/search/title provider-preview captures above were
+refreshed on application source `5847189` at 942×664 and 390×844, after fonts
+settled and visible genuine RAWG/TMDB/Open Library artwork was ready. They were
+visually inspected, including Explore's Save entry points and search's honest
+missing-artwork fallback. Explore and desktop title scroll widths were measured
+as viewport-equal. These are development-preview/read-only captures, not proof
+of the unapplied hosted retrieval migration or authenticated Save success. A fresh read-only 942×664 dark preview check
+clicked a genuine TMDB title's Save link and reached the sign-in page with a
+same-origin `/explore?save=tmdb:movie:…` continuation. No account sign-in or hosted save was attempted. Authenticated
+success/duplicate behavior requires the isolated fixture reports and owner
+acceptance, not this signed-out navigation check.
 
 ## Historical status
 

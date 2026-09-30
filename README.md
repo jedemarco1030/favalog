@@ -7,9 +7,12 @@ catalog stores only the titles people actually engage with.
 
 > Status is reconciled as of **2026-09-30** against post-merge `main` at
 > `1c076a3` (merged PR #21) and [PR #22](https://github.com/jedemarco1030/favalog/pull/22)
-> application source `76bb608`. Likes and following feed now execute and pass on
-> the follow-up CI attempt; complete final-branch and post-merge CI remain release
-> gates. **MVP 1 acceptance is still pending**; see the
+> application source `5847189`. The earlier `76bb608` run executed likes/feed
+> successfully but failed configured fixtures; its discovered Save/fixture
+> regressions are fixed, not waived. Complete revised-source CI is green: 1,574
+> unit/component passes, 34 retry-free fixtures, 20 retry-free first-list journeys,
+> executed likes/feed and passing database/type drift. Final documentation-branch
+> and post-merge CI remain gates. **MVP 1 acceptance is still pending**; see the
 > [release checklist](docs/mvp1-release-checklist.md). Each capability
 > below is labelled by its evidence: implemented in code, CI-verified,
 > owner-confirmed in production, or unverified/deferred. The authoritative

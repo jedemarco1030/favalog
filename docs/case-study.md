@@ -14,9 +14,25 @@ source `1c076a3`, confirms 20 first-list repetitions without retries, 34 fixture
 passes and one following-feed pass. This supersedes the earlier pending JSON
 transport verification described as history below. Likes failed before browser
 execution on that baseline. [PR #22 CI 36760089274](https://github.com/jedemarco1030/favalog/actions/runs/36760089274),
-application source `76bb608`, now executes likes and following feed successfully.
-Complete final-branch and post-merge evidence plus owner acceptance still gate
-the release.
+application source `76bb608`, executes likes and following feed successfully but
+**fails overall**: the inspected fixture report has five retry attempts, one
+flaky duplicate-save test, one failed materialization and seven cascade skips.
+Configured Explore has 15 passes/one paid-semantic skip; first-list has 20
+retry-free repetitions plus setup. All eight provider-layout scenarios and
+production fixture-refusal pass independently. Application source `5847189`
+fixes the obsolete mock-slug assertion and returns existing-list/save-only
+results as bounded JSON independent of unrelated RSC refresh streams, preserving
+authentication, RLS and safe redirects.
+[CI 36763709617](https://github.com/jedemarco1030/favalog/actions/runs/36763709617)
+completed successfully; downloaded reports confirm 34 retry-free fixtures,
+20 retry-free first-list repetitions plus auth setup, configured 15 passes/one
+paid-semantic skip, eight independent provider-layout passes, production
+fixture-refusal one pass, and likes/feed one pass each. Default no-env has
+44 passes/six intentional skips; explicit no-env has five passes/no skips.
+There are no retries or flaky outcomes in any revised-source invocation.
+Validation, builds and database/type drift pass, with byte-identical generated
+types. Final documentation/capture-branch and post-merge evidence plus owner
+acceptance still gate the release.
 
 The follow-up addresses a separate identity/presentation defect: exact legacy
 mock identities persisted as ordinary catalog rows. Its forward-only retrieval
@@ -45,9 +61,12 @@ Open Library title captures are linked in the
 The hosted retrieval migration remains unapplied; these captures do not prove
 its search exclusion or authenticated Save behavior.
 
-The current follow-up passed 1,562 unit/component tests and focused browser
-presentation checks. Native Playwright and local database verification remain
-blocked by unavailable browser libraries/Docker; full CI is still required.
+The earlier follow-up passed 1,562 unit/component tests and focused browser
+presentation checks. Revised-source CI completed 1,574 tests across 163 files
+and both builds; local coverage reported the same tests but exited 137 even
+after one single-worker recovery, so that local check remains incomplete.
+Native Playwright and local database verification remain blocked by unavailable
+browser libraries/Docker; full final-branch CI is still required.
 The synthetic golden evaluation corpus is explicitly local-only; live semantic
 quality requires a reviewed genuine-provider dataset and is not claimed here.
 

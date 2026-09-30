@@ -82,16 +82,67 @@ prior requested rerun was denied by GitHub. A fresh successful attempt is eviden
 of non-recurrence, not proof of the original owner or a permanent root-cause fix.
 Ports, assertions, skips and failure semantics were not relaxed, and no unknown
 listener/container was killed. Scoped startup diagnostics remain in every
-DB-backed job. Complete Explore evidence and final branch CI must still be
-reviewed before engineering closeout.
+DB-backed job. Complete Explore evidence was subsequently inspected: this run's overall
+conclusion is **failure**, not green. Its configured invocation passed 15 tests
+with one intentional paid-semantic skip; first-list passed 20 repetitions plus
+one auth setup. Fixtures recorded 22 first-attempt passes, five retry attempts,
+one flaky duplicate-save test, one failed materialization test and seven
+cascade-skipped tests. Each of eight slow/partial/empty/disabled layout
+invocations passed once, and production fixture-refusal passed once.
 
-Local follow-up checks: 1,562 unit/component tests across 163 files passed with
-coverage (93.66% statements, 86.31% branches, 96.20% functions, 94.57% lines);
-131 focused catalog/artwork regressions passed, and typecheck passed. Format,
-lint and production/Storybook builds passed. The first full-coverage invocation
-did not yield a completed result; the bounded-worker invocation above did.
-Docker is absent, so local pgTAP, type generation and configured/social/likes/
-fixture E2E could not execute. Native no-env Playwright had five browser-launch
+The materialization failure waited for the obsolete `/title/dune-part-two`
+mock slug after correctly navigating to `/title/fixture-dune-part-two`; retries
+then could not find the already-imported result. The E2E now asserts the stable
+fixture identity and its fixture title instead. The duplicate-save trace
+recorded HTTP 200 while waiting for an unrelated RSC page-refresh stream;
+existing-list and save-only retries now use the same bounded JSON result
+boundary as create-and-save. Authentication, authorization/RLS, safe redirects,
+CSRF-origin and request-size checks remain enforced; focused tests cover both
+intents, expired auth, rejected origins, body limits and malformed responses.
+No timeout, assertion, retry or skip allowlist was relaxed.
+
+Application source `5847189027249bc3a9b939cc490af9c90f4f6340` contains these
+regressions' fixes. [CI 36763709617](https://github.com/jedemarco1030/favalog/actions/runs/36763709617)
+is **completed, success**. PR jobs use temporary merge `625eac07c507ccac67e45c91846871b03548197f`;
+database/type generation checks out the exact application source. Downloaded
+JSON reports were inspected, not inferred from job conclusions:
+
+| Invocation                            |                       First-attempt passes |                            Intentional skips | Retries / flaky |
+| ------------------------------------- | -----------------------------------------: | -------------------------------------------: | --------------- |
+| Unit/component coverage               |                     1,574 across 163 files |                                            0 | Not Playwright  |
+| Strict configured Explore             |                                         15 |                    1 paid live-semantic test | 0 / 0           |
+| First-list repetitions                |                          20 + 1 auth setup |                                            0 | 0 / 0           |
+| Offline provider fixtures             |                   34, including auth setup |                                            0 | 0 / 0           |
+| Slow/partial/empty/disabled discovery | 1 per scenario per viewport; 8 invocations |                                            0 | 0 / 0           |
+| Production fixture-refusal            |                                          1 |                                            0 | 0 / 0           |
+| Following feed                        |                                          1 |                                            0 | 0 / 0           |
+| Likes                                 |                                          1 |                                            0 | 0 / 0           |
+| Default no-env                        |                                         44 | 6 existing placeholders/auth-dependent cases | 0 / 0           |
+| Explicit no-env                       |                                          5 |                                            0 | 0 / 0           |
+
+Formatting, lint, typecheck, coverage, production/Storybook builds, pgTAP/RLS
+and generated-type drift passed. The downloaded generated types are byte-identical
+to the committed file. Inspected artifacts: `e2e-results-explore-integration`,
+`e2e-results-social`, `e2e-results-likes`, `e2e-results-no-env`,
+`quality-evidence-configured-fixtures`, `quality-evidence-no-env`,
+`portfolio-screenshots`, and `database-types-5847189027249bc3a9b939cc490af9c90f4f6340`.
+These results supersede the failed `76bb608` fixture attempt for application
+behavior; they do not erase its failures or establish new post-merge main CI.
+The final documentation/capture-only branch update still requires its own CI
+review, so engineering closeout remains incomplete until that gate is inspected.
+
+Earlier local follow-up checks: 1,562 unit/component tests across 163 files
+passed with coverage (93.66% statements, 86.31% branches, 96.20% functions,
+94.57% lines); 131 focused catalog/artwork regressions passed, and typecheck
+passed. Format, lint and production/Storybook builds passed for that earlier
+source. Revised source `5847189` passed formatting, lint and typecheck locally.
+Its coverage command reported 1,574 passing tests and the same coverage, then
+exited 137 rather than successfully completing. One targeted single-worker
+recovery again reported 1,574 passes before exit 137; no further retries were
+made. These local coverage invocations are **incomplete**, not clean passes.
+The revised-source CI validation job independently completed with 1,574 passes
+and successful production/Storybook builds. Docker is absent, so local pgTAP,
+type generation and configured/social/likes/fixture E2E could not execute. Native no-env Playwright had five browser-launch
 errors and **zero behavior passes**, caused by missing `libnspr4.so`; one
 `install-deps` recovery failed because this OS has no `apt-get`. No assertions,
 timeouts or skip allowlists were relaxed. Final-source CI remains mandatory.
@@ -112,16 +163,19 @@ owner-controlled session, not an unauthorized hosted save.
 
 ## Remaining engineering and deployment gates
 
-- [ ] Open/update the follow-up review PR and inspect the exact source SHA.
-- [ ] Resolve or demonstrate the transient likes startup cause with one retained
-      runner attempt; verify likes actually execute and pass.
+- [x] Open/update [PR #22](https://github.com/jedemarco1030/favalog/pull/22) and
+      inspect application source `5847189027249bc3a9b939cc490af9c90f4f6340`.
+- [x] Retain a scoped follow-up runner attempt where likes execute and pass
+      (`36760089274`); the bind failure did not recur. Original ownership remains
+      unknown, so this is not a permanent root-cause-fix claim.
 - [ ] Review complete final-source CI, including all mandatory invocation counts,
       first-list repetitions without retries, provider failure scenarios, feed,
       likes, pgTAP and generated types. Signatures/types are unchanged by the
       migration, but drift must still be checked rather than assumed.
-- [ ] Fresh final-source desktop/mobile captures for Home, Explore, search,
-      genuine-provider title detail and ready Save dialog; required images decode.
-      Inspect them visually; synthetic fixtures remain test evidence only.
+- [x] Fresh application-source desktop/mobile captures for Home, Explore,
+      search, genuine-provider title detail and ready Save dialog were visually
+      inspected. Provider captures use `5847189`; Save uses its isolated CI
+      fixtures, clearly labelled as synthetic test evidence only.
 - [ ] Owner reviews and merges only after engineering gates pass. Verify the
       **new post-merge main CI**, not merely PR CI, before the release decision.
 - [ ] Owner separately approves/applies the forward migration after a fresh

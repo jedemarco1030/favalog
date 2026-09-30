@@ -25,9 +25,25 @@ title rendering and safe artwork fallbacks, and captures scoped CI startup
 diagnostics. [Follow-up CI 36760089274](https://github.com/jedemarco1030/favalog/actions/runs/36760089274)
 passed source validation/builds and database/type drift; likes and following
 feed executed successfully. The historical bind failure did not recur on that
-attempt, but its original listener owner remains unknown. Complete Explore and
-final branch CI remain required, and nothing is production-applied here.
-Local verification: 1,562 unit/component passes and 131 focused regressions;
+attempt, but its original listener owner remains unknown. Complete artifacts
+show that this run nevertheless **failed**: configured Explore passed 15 plus
+one paid-semantic skip; first-list passed 20 repetitions plus auth setup without
+retries, while fixtures had five retries, one flaky duplicate-save, one failed
+materialization and seven cascade skips. All eight isolated provider-layout
+scenarios and production fixture-refusal passed. Source `5847189` fixes the
+obsolete materialization slug assertion and duplicate-save result's dependency
+on streamed RSC refresh. Its [CI 36763709617](https://github.com/jedemarco1030/favalog/actions/runs/36763709617)
+completed successfully: 1,574 unit/component tests across 163 files, configured
+15 passes/one paid-semantic skip, 20 first-list repetitions plus auth setup,
+34 fixtures, eight independent provider-layout passes, production fixture-refusal
+one pass, following feed one pass and likes one pass. All executed E2E tests
+passed on their first attempt, with zero retries/flaky outcomes. Default no-env
+has 44 passes/six intentional skips; explicit no-env has five passes/no skips.
+Builds, pgTAP/RLS and generated-type drift passed; generated types are
+byte-identical. Fresh genuine-provider Home/Explore/search/title screenshots and
+ready fixture Save captures were inspected. Final documentation/capture-branch
+and post-merge main CI remain required. Nothing is production-applied here.
+Earlier local verification: 1,562 unit/component passes and 131 focused regressions;
 Docker and native Playwright remain unavailable in this sandbox, not in CI.
 The full [release checklist](mvp1-release-checklist.md) is authoritative.
 

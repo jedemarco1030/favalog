@@ -12,7 +12,16 @@ retry-free first-list and fixture journeys, but likes did not execute on that
 baseline. [PR #22 CI 36760089274](https://github.com/jedemarco1030/favalog/actions/runs/36760089274)
 now executes likes and following feed successfully on application source
 `76bb608`; the historical startup conflict did not recur on this attempt.
-The demonstration-separation follow-up still needs complete final-branch CI,
+That run failed configured fixtures (one failure, one flaky test, five retry
+attempts and seven cascade skips). Source `5847189` fixes the incorrect fixture
+slug assertion and streamed duplicate-save result; its
+[CI 36763709617](https://github.com/jedemarco1030/favalog/actions/runs/36763709617)
+completed successfully: 1,574 unit/component tests, 34 retry-free fixtures,
+20 retry-free first-list repetitions, eight provider-layout scenarios, and
+executed likes/feed. Configured Explore has 15 passes/one paid-semantic skip;
+default no-env has 44 passes/six intentional skips; explicit no-env has five
+passes/no skips. No revised-source E2E retries or flaky outcomes were recorded.
+The demonstration-separation follow-up still needs final documentation/capture-branch CI,
 owner migration/deployment approval, new post-merge main CI, and explicit owner
 accessibility/operational acceptance.
 Use the browser-only steps in the
