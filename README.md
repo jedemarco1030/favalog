@@ -15,15 +15,20 @@ catalog stores only the titles people actually engage with.
 > and executed feed/likes. One paid-semantic and six default no-env skips remain
 > skips, not passes. The preceding read-only audit confirms all 35 hosted
 > migration versions/names, installed demonstration-exclusion guards and a Ready
-> production deployment on the reviewed SHA. **MVP 1 engineering closeout
-> complete; MVP 1 NOT ACCEPTED.** Authenticated production/saved-record checks,
-> manual accessibility and protected refresh rehearsal/schedule-state
-> confirmation remain open, with no reviewed release deferral supplied for them.
+> production deployment on the reviewed SHA. **MVP 1 ACCEPTED by the owner
+> for an invited beta against this verified production release.** The owner
+> confirms Steps 3–5: production account/save/persistence/visibility/isolation/social
+> journeys and manual accessibility behave as expected; protected refresh
+> rehearsal completed with `dry_run=true`, `limit=1`, embedding step skipped and
+> live scheduling disabled. These are **owner-reported results**, separate from
+> direct observations and CI. No matching refresh run is accessible read-only;
+> its URL/independent outcome details are missing, not proof of an unperformed
+> rehearsal. RAWG semantic embeddings, live scheduled refresh and genuine-provider
+> semantic-quality evaluation remain explicit owner-accepted deferrals.
 > The [release checklist](docs/mvp1-release-checklist.md#reconciled-acceptance-record-2026-09-30)
 > is authoritative; the [roadmap](docs/product-roadmap.md#current-closeout-evidence-2026-09-30)
-> separates current evidence from historical owner-confirmed baselines. CI and
-> deployment readiness do not establish owner acceptance or authorize
-> invitations, deployments, production writes, scheduling or embeddings.
+> preserves historical evidence and limits. Acceptance does not authorize
+> invitations, merges, deployments, production writes, scheduling or embeddings.
 > The earlier, longer README is preserved verbatim at
 > [`docs/history/readme-through-phase-4d.md`](docs/history/readme-through-phase-4d.md).
 
@@ -38,8 +43,9 @@ catalog stores only the titles people actually engage with.
   Home, Explore, search and title images are retained in the
   [quality evidence index](docs/quality/baseline.md#follow-up-source-evidence-2026-09-30).
   The subsequent read-only audit confirms the hosted retrieval migration is
-  applied; authenticated Save evidence remains isolated CI fixtures, not a
-  fresh owner-controlled production session.
+  applied. Retained authenticated Save captures are isolated CI fixtures;
+  final production journey acceptance is separately owner-reported, without
+  new screenshots or an assistant-replayed production session.
 - **Engineering case study:** [`docs/case-study.md`](docs/case-study.md).
 
 ![Production Home with genuine RAWG artwork, captured read-only](docs/screenshots/home-desktop-production.png)
@@ -66,9 +72,11 @@ activation steps.
 
 ### Current user journeys
 
-These journeys are implemented and owner-confirmed in the production baseline
-through 2026-09-29. Closeout presentation/reliability changes require fresh
-release acceptance; fixture CI is not production confirmation:
+These journeys are implemented, with historical owner confirmation through
+2026-09-29 and final owner acceptance against the verified production release
+recorded for PR #24. Production account/save/persistence/visibility/isolation/
+social and manual accessibility checks are owner-reported; fixture CI is not
+production confirmation and no new detailed session transcript is claimed:
 
 1. **Discover without searching.** Home and the empty-query Explore view show
    provider-ranked shelves (Trending, New releases, Coming soon, Highest
@@ -166,8 +174,9 @@ production behavior.
 - The read-only audit confirms hosted migration
   `20260930180000_separate_demonstration_catalog.sql` and its installed guards.
   It preserves saved IDs/routes/references and excludes the 28 exact legacy
-  demonstration identities, not every internal catalog title. Authenticated
-  saved-record access and broad cross-media production exclusion remain unverified.
+  demonstration identities, not every internal catalog title. Final account/
+  save/persistence acceptance is owner-reported. Direct production exclusion
+  observations retain their limited search/route scope; no new broad sweep claimed.
 - The synthetic golden dataset is now local-fixture-only. Live semantic-quality
   evaluation is explicitly deferred until genuine-provider judgments are reviewed;
   the evaluator refuses paid calls against that fixture dataset.
@@ -178,27 +187,30 @@ production behavior.
 
 - RAWG content is not semantically searchable (see above).
 - Community reviews on some surfaces still come from the labelled mock layer.
-- Catalog-refresh scheduling exists, but the five latest observed scheduled
-  runs skipped the refresh job (latest: `36702695138`, inspected 2026-09-30). This is not evidence
-  of processing. Activation is a **GitHub Actions** variable, not a Vercel
-  environment variable. Recorded activation-variable access returned 403, so
-  its current value is unknown, not confirmed disabled. Protected dry-run
-  rehearsal, schedule-state confirmation and any intentional scheduling deferral
-  remain owner checks; no workflow is dispatched here.
-- MVP 1 is **not accepted**: authenticated production/saved-record flows, manual
-  assistive technology/actual zoom/contrast and safe failure/operational rehearsals
-  have no completed results or reviewed release waivers. See the
-  [release checklist](docs/mvp1-release-checklist.md). Invitations still require
-  separate approval; this documentation PR authorizes no operational changes.
+- Live scheduled refresh is explicitly deferred by the owner; live scheduling
+  is disabled as owner-reported. Protected rehearsal completed as owner-reported
+  with `dry_run=true`, `limit=1` and the embedding step skipped. No matching run
+  URL or independent outcome/count evidence is accessible read-only. Historical
+  skipped schedules and the earlier activation-variable 403 remain inspection
+  limits, not a live processing result. Automatic metadata freshness is not yet
+  verified; metadata may become stale. Activation is a **GitHub Actions** variable,
+  not a Vercel variable, and still needs separate approval.
+- MVP 1 is owner-accepted for invited beta, not a claim of accessibility
+  compliance or live semantic quality. Browser/assistive-technology versions,
+  exact announcements, execution timestamps and new screenshots were not
+  supplied with owner confirmation. See the [release checklist](docs/mvp1-release-checklist.md)
+  for evidence provenance and the three deferrals. Invitations require separate
+  approval; this documentation PR authorizes no operational changes.
 - Possible duplicate RAWG candidates are tracked as a data-quality issue.
   Records are never merged on title similarity alone.
 - There are no notifications, comments, blocking, or private accounts yet.
 
 ## Next priorities
 
-Phase 4E: production quality and portfolio readiness. Measured
-performance and accessibility fixes, regression coverage for the critical
-journeys, redacted operational events, an engineering case study, and a small
-invited-beta session ([`docs/beta/invited-beta-checklist.md`](docs/beta/invited-beta-checklist.md)).
+MVP 1 release acceptance is complete for the verified production revision;
+Phase 4E's invited-beta evaluation and portfolio follow-up remain owner-led.
+Prepare a small invited-beta session using the
+[beta checklist](docs/beta/invited-beta-checklist.md) only after separate invitation
+approval; no participant research or outreach has been performed by this PR.
 Notifications, billing, mini-games, new providers, and personalized
 recommendations are outside this phase.

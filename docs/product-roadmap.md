@@ -4,8 +4,10 @@
 > post-merge `main` at `b017f83` (merged PR #23). Latest main CI and recorded
 > hosted migration/deployment identity are verified in
 > [the release checklist](mvp1-release-checklist.md#reconciled-acceptance-record-2026-09-30).
-> MVP 1 is **not accepted**: authenticated production/saved-record, manual
-> accessibility and operational owner checks remain open, not silently deferred.
+> MVP 1 is **owner-accepted for an invited beta against this verified production
+> release**. Final Steps 3–5 confirmation is owner-reported, separate from direct
+> observations and CI; RAWG embeddings, live scheduled refresh and live semantic
+> quality evaluation remain explicitly deferred.
 > Update this file whenever a phase
 > ships, a capability becomes production-verified, or the agreed sequence
 > changes. When a statement is only true at a point in time, keep it and date it
@@ -25,31 +27,39 @@ no-env 44 passes/six skips and explicit no-env five passes. Zero executed E2E
 failures, retries, flaky outcomes or runner errors; all six jobs, formatting,
 lint, typecheck, coverage and both builds passed. Skips remain skips.
 
-**MVP 1 engineering closeout complete; MVP 1 NOT ACCEPTED.** The preceding
-read-only migration/acceptance record supplies the hosted results below, not a
-new authenticated session or signed owner release decision. The
+**MVP 1 engineering closeout complete; MVP 1 ACCEPTED by the owner for an invited
+beta against the verified production release.** For PR #24, the owner confirms
+Steps 3–5: production account/save/persistence/visibility/isolation/social
+journeys and manual accessibility behave as expected; protected refresh
+rehearsal completed as expected with `dry_run=true`, `limit=1`, embedding step
+skipped and live scheduling disabled. This is owner-reported evidence, not a
+new assistant-authenticated session or additional automated CI result. The
 [release checklist](mvp1-release-checklist.md#reconciled-acceptance-record-2026-09-30)
-records full evidence, limits, blockers and deferral treatment.
+records the exact release identity, evidence limits and three explicit deferrals.
+The prior pending decision is superseded; no browser/assistive-technology
+versions, announcement text, execution timestamps or captures are fabricated.
 
-| Current capability / gate                          | Evidence                                                                                                                                                                                           | Release status                                                                                                                                                                     |
-| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Engineering closeout                               | Latest main CI `36778248362`; required execution reports and quality artifacts inspected.                                                                                                          | Verified for `b017f83`, not production owner acceptance.                                                                                                                           |
-| Hosted migration and project identity              | All 35 versions/names match; Vercel production config matches connected Supabase ref. `20260930180000` is recorded, exclusions/alias guards installed, zero aliases on 28 exact legacy identities. | Verified by preceding read-only audit; not pending application.                                                                                                                    |
-| Production deployment                              | `dpl_Gx3wtzXB1bwvb7DLhVVRWdptKxw8` Ready on exact reviewed `b017f83`.                                                                                                                              | Deployment identity verified; authenticated smoke still pending.                                                                                                                   |
-| Demonstration separation and saved records         | “paper watch” has zero local production search results; labelled `/title/paper-watch` still resolves; migration preserves identities/references.                                                   | Partial production observation; broad exclusion and authenticated existing-record access remain open.                                                                              |
-| Save and personal/social journeys                  | Signed-out Save retains selected title in sign-in `returnTo`; local fixture/feed/likes and RLS tests pass.                                                                                         | Fresh authenticated continuation, list saves/duplicates/refresh, cross-media, two-account isolation, visibility/revocation, feed/likes and diary/reviews/favorites still required. |
-| Accessibility and safe partial failure             | CI Save focus/axe and 320 px reflow checks pass; recorded production skip link and 320 px Home check.                                                                                              | No screen-reader announcements or actual 200% zoom; light/dark contrast, axe incomplete targets, other narrow surfaces and safe nonproduction failure rehearsal remain open.       |
-| Catalog refresh                                    | Recorded five skipped schedules; no manual-dispatch rehearsal; no reviewer/branch protections at inspection; activation-variable read 403.                                                         | No processing or verified-disabled flag claim. Protected `dry_run=true`, `limit=1` rehearsal, schedule-state confirmation and owner review remain required.                        |
-| RAWG semantic embeddings / live quality evaluation | RAWG permission unresolved; genuine-provider evaluation judgments pending.                                                                                                                         | Documented scope/tooling deferrals: keyword-only games and no live relevance/corpus-completeness claim.                                                                            |
+| Current capability / gate                          | Evidence                                                                                                                                                                                           | Release status                                                                                                                                                                                                           |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Engineering closeout                               | Latest main CI `36778248362`; required execution reports and quality artifacts inspected.                                                                                                          | Verified for `b017f83`, not production owner acceptance.                                                                                                                                                                 |
+| Hosted migration and project identity              | All 35 versions/names match; Vercel production config matches connected Supabase ref. `20260930180000` is recorded, exclusions/alias guards installed, zero aliases on 28 exact legacy identities. | Verified by preceding read-only audit; not pending application.                                                                                                                                                          |
+| Production deployment                              | `dpl_Gx3wtzXB1bwvb7DLhVVRWdptKxw8` Ready on exact reviewed `b017f83`.                                                                                                                              | Deployment identity directly verified; final release acceptance owner-reported against this SHA.                                                                                                                         |
+| Demonstration separation and saved records         | “paper watch” has zero local production search results; labelled `/title/paper-watch` still resolves; migration preserves identities/references.                                                   | Direct exclusion observations retain their scope; account/save/persistence acceptance is owner-reported in Step 3. No new broad assistant sweep claimed.                                                                 |
+| Save and personal/social journeys                  | Signed-out Save retains selected title in sign-in `returnTo`; local fixture/feed/likes and RLS tests pass.                                                                                         | Owner confirms Step 3 production account, save, persistence, visibility, isolation and social journeys behave as expected; not inferred from fixture CI.                                                                 |
+| Accessibility and safe partial failure             | CI Save focus/axe and 320 px reflow checks pass; recorded production skip link and 320 px Home check.                                                                                              | Owner confirms Step 4 manual accessibility checks behave as expected. Versions/announcement text not supplied; automated incomplete findings remain historical evidence, not recomputed passes.                          |
+| Catalog refresh                                    | Owner confirms Step 5 protected `dry_run=true`, `limit=1` rehearsal completed, embedding step skipped, live scheduling disabled. Matching run unavailable read-only.                               | Owner-reported completion accepted; run URL and independent outcome/count evidence unavailable. Earlier 403/protection observations are historical. Live scheduled processing and automatic freshness remain unverified. |
+| RAWG semantic embeddings / live quality evaluation | RAWG permission unresolved; genuine-provider evaluation judgments pending.                                                                                                                         | Documented scope/tooling deferrals: keyword-only games and no live relevance/corpus-completeness claim.                                                                                                                  |
 
-Intentional live-scheduling deferral still needs owner confirmation with user
-impact (unverified automatic freshness); it is not inferred from a skipped run
-or this task's no-activation constraint. No remaining account, accessibility or
-operational gate has a reviewed release waiver. Acceptance requires recorded
-results or explicit owner-reviewed deferrals (reviewer/date, scope, reason,
-impact, mitigation, follow-up), followed by an explicit release decision.
-Nothing here authorizes invitations, deployment, hosted writes, scheduling or
-embedding runs.
+The owner explicitly retains three deferrals: RAWG live semantic embeddings
+(games support keyword discovery/search), live scheduled refresh (automatic
+metadata freshness is not yet verified; metadata may become stale), and live
+semantic-quality evaluation pending genuine-provider judgments (no live relevance
+or corpus-completeness claim). Final owner confirmation and acceptance are
+recorded, not silently waived. No matching `workflow_dispatch` refresh run is
+accessible through the read-only list/API (`total_count=0`); its URL and
+independent outcome/count evidence remain missing without negating the reported
+rehearsal. Prior skips and 403 are not that rehearsal. Nothing here authorizes
+invitations, merge, deployment, hosted writes, scheduling or embedding runs.
 
 ### PR #22 evidence before the hosted audit
 
@@ -105,13 +115,14 @@ Earlier local verification: 1,562 unit/component passes and 131 focused regressi
 Docker and native Playwright remain unavailable in this sandbox, not in CI.
 The full [release checklist](mvp1-release-checklist.md) is authoritative.
 
-The five latest inspected refresh schedules skipped; newest
+Historical refresh inspection: the five accessible schedules skipped; newest
 [36702695138](https://github.com/jedemarco1030/favalog/actions/runs/36702695138).
-No protected hosted rehearsal or live schedule activation is claimed. RAWG
-remains keyword-only; permission and separate live embedding activation are
-still unresolved. The fixture-only golden dataset cannot be used to claim
-live semantic quality; a genuine-provider evaluation dataset is an explicit
-operator-tooling deferral, not a waiver of required beta checks.
+That inspection did not establish a rehearsal or disabled activation flag; final
+protected rehearsal completion and disabled live scheduling are now
+owner-reported above. RAWG remains keyword-only; permission and separate live
+embedding activation remain unresolved. The fixture-only golden dataset cannot
+establish live semantic quality; genuine-provider judgments remain an explicit
+owner-retained evaluation deferral.
 
 ## Historical status reconciliation (2026-09-29)
 
@@ -639,15 +650,16 @@ future work here. Closeout PR #21 restores discovery-first Explore, corrects
 artwork-backed screenshot/quality readiness, retains first-failure traces,
 adds retry-free first-list repetitions, and completes per-invocation CI gates.
 
-MVP 1 is **not accepted yet**. Latest main CI counts/artifacts, the hosted
-migration and deployed SHA are verified. Authenticated production/saved-record
-smoke, screen-reader announcements, actual zoom, contrast/manual axe review,
-safe partial-failure rehearsal and protected refresh/schedule-state acceptance
-remain open, with no reviewed release waiver. See the
-[release checklist](mvp1-release-checklist.md). The existing
-[invited-beta script](beta/invited-beta-checklist.md) stays a future owner-led
-activity, not evidence of completed user research. No performance improvement
-is claimed without comparable measurements.
+MVP 1 is **owner-accepted for an invited beta against the verified production
+release**. Latest main CI counts/artifacts, hosted migration and deployed SHA
+remain verified; final Steps 3–5 acceptance is owner-reported. RAWG live semantic
+embeddings, live scheduled refresh and live semantic-quality evaluation are
+explicitly retained deferrals. See the [release checklist](mvp1-release-checklist.md)
+for provenance and missing independent refresh run evidence. The
+[invited-beta script](beta/invited-beta-checklist.md) remains a future owner-led
+activity requiring separate invitation approval, not evidence of completed
+user research. No performance improvement is claimed without comparable
+measurements.
 
 Out of scope: notifications, billing, mini-games, new providers, and
 personalized recommendations.
@@ -707,12 +719,16 @@ the owner-controlled hosted rollout.
 The following remain deferred and are not implied by the Phase 4B.1 delivery or
 the locally implemented Phase 4B.2 feed:
 
-- Live scheduled catalog refresh remains owner-controlled and unverified:
-  observed schedules skipped, and activation-variable access returned 403.
-  Intentional release deferral is not yet owner-confirmed; automatic freshness
-  may be unavailable. Protected dry-run rehearsal and schedule-state confirmation
-  remain acceptance gates, not passed checks (see the release checklist).
-- Live RAWG embedding, until permission is documented.
+- Live scheduled catalog refresh is explicitly retained as a deferral in final
+  owner beta acceptance. Protected `dry_run=true`, `limit=1` rehearsal completion,
+  skipped embedding step and disabled live scheduling are owner-reported; no
+  matching run link is accessible read-only. Automatic metadata freshness is
+  not yet verified, and metadata may become stale. No activation is authorized.
+- Live RAWG semantic embeddings remain explicitly deferred until provider
+  permission and separate activation are approved; games support keyword
+  discovery/search.
+- Live semantic-quality evaluation remains explicitly deferred pending
+  genuine-provider judgments; fixture results are not a live relevance claim.
 - Notifications, email, and push.
 - Moderation.
 - Entertainment mini-games, which are separate from video-game tracking.

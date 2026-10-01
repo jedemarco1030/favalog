@@ -7,7 +7,8 @@ behavioral tracking. Each of those needs separate owner approval.
 
 ## Release gate (2026-09-30)
 
-**MVP 1 NOT ACCEPTED — do not invite participants.** After merged
+**MVP 1 ACCEPTED by the owner for an invited beta against the verified production release.**
+This is release acceptance, not permission to send invitations. After merged
 [PR #23](https://github.com/jedemarco1030/favalog/pull/23), reviewed main is
 `b017f839e12a541278511a5bf69a7240d35fdd8a`.
 [Latest main CI 36778248362](https://github.com/jedemarco1030/favalog/actions/runs/36778248362)
@@ -22,37 +23,36 @@ live checks. The preceding read-only audit confirms the hosted migration ledger,
 installed exclusion/alias-conflict guards and a Ready production deployment on
 the reviewed SHA; these are no longer unapplied-migration blockers.
 
-**Engineering closeout complete; owner release acceptance pending.** The
+**Engineering closeout complete; final owner release acceptance recorded.** The
 [reconciled acceptance record](../mvp1-release-checklist.md#reconciled-acceptance-record-2026-09-30)
-is authoritative. Neither deployment readiness nor local fixtures establish
-real-account or accessibility acceptance.
+is authoritative and separates inspected CI/read-only hosted evidence from
+owner-reported results. The owner confirms Steps 3, 4 and 5: production account,
+save, persistence, visibility, isolation and social journeys behave as expected;
+manual accessibility checks behave as expected; protected refresh rehearsal
+completed as expected with `dry_run=true`, `limit=1`, the embedding step skipped
+and live scheduling disabled. These are owner confirmations, not newly replayed
+assistant observations or automated manual passes.
 
-Before acceptance, the owner must verify authenticated saved-record access,
-post-login Save continuation, existing/new-list saves, duplicate prevention and
-refresh, cross-media saving, two-account isolation, private/followers-only access
-and revocation, feed/likes and diary/reviews/favorites. Manual keyboard/dialog,
-screen-reader announcements, actual 200% zoom, narrow surfaces, light/dark
-contrast, axe incomplete-target review and a safe nonproduction partial-failure
-rehearsal remain open. The recorded headless skip-link and 320 px Home checks
-are partial evidence, not manual passes.
+No matching manual-dispatch refresh run is accessible in the read-only workflow
+lookup (API `total_count=0`); its URL and independent outcome/count evidence
+remain unavailable. **The rehearsal is completed as owner-reported**, not
+unperformed. The earlier skipped schedules, 403 and protection observations are
+historical evidence, not the owner's rehearsal or a current blocker. No browser/
+assistive-technology versions, exact announcement text, execution timestamps or
+screenshots were supplied with final confirmation; none is invented.
 
-Protected refresh rehearsal is also unperformed: no run URL or counts. Owner
-review of `catalog-refresh` protections and secret names/target, schedule-state
-confirmation and separately approved `dry_run=true`, `limit=1` evidence with
-zero writes and a skipped embedding step are still required. Recorded schedules
-skipped; activation-variable access returned **403**, so its current value is
-unknown, not verified disabled. No reviewer/branch protections were configured
-at inspection. Do not dispatch a workflow or activate anything under this PR.
+The owner explicitly retains these beta deferrals:
 
-RAWG live semantic embeddings and genuine-provider semantic-quality evaluation
-are documented deferrals, with keyword-only games and no live relevance/corpus
-claim. Intentional deferral of live scheduled refresh is **not owner-confirmed**;
-manual/accessibility/account/operational gaps have no reviewed release waiver.
-Any proposed deferral must record owner reviewer/date, scope, reason, user
-impact, mitigation and follow-up in the release checklist, followed by an
-explicit release decision. Even after acceptance, invitations need separate
-owner approval. No deployment, production write, scheduling, embeddings or
-invitation is authorized here.
+- RAWG live semantic embeddings: games support keyword discovery/search.
+- Live scheduled refresh: scheduling remains disabled as owner-reported;
+  automatic metadata freshness is not yet verified and metadata may become stale.
+- Live semantic-quality evaluation pending genuine-provider judgments: no live
+  relevance/corpus-completeness claim.
+
+Acceptance does not enable deferred functionality, claim a live processing pass,
+or establish completed participant research. Invitations still require separate
+owner approval. No merge, deployment, production write, workflow dispatch,
+scheduling activation, embedding run or invitation is authorized under PR #24.
 
 ### Historical candidates
 

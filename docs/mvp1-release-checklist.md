@@ -1,19 +1,55 @@
 # MVP 1 release checklist — Phase 4E
 
-**Decision, 2026-09-30: MVP 1 engineering closeout complete; beta acceptance pending owner checks.**
-**MVP 1 NOT ACCEPTED.** Latest passing main CI, hosted migration and deployment
-identity are verified; authenticated production, manual accessibility and
-operational acceptance remain incomplete. Invitations require a separate owner
-approval even after release acceptance. This documentation-only reconciliation
-does not authorize a merge, deployment, hosted migration/write, user-record
-change, secret change, schedule activation, embedding run or invitation.
+**Decision, 2026-09-30: MVP 1 ACCEPTED for an invited beta by the owner against the verified production release.**
+Engineering CI, hosted migration and deployment identity are verified as recorded
+below. The owner now confirms Steps 3, 4 and 5 and explicitly accepts the three
+deferrals below. Owner-reported results are not assistant-observed sessions or
+new automated passes. Invitations still require separate approval. This
+documentation-only update to PR #24 does not authorize a merge, deployment,
+hosted migration/write, user-record change, secret change, schedule activation,
+embedding run or invitation.
 
 ## Reconciled acceptance record (2026-09-30)
 
-This record reconciles the preceding read-only migration audit and acceptance
-evidence record with newly inspected main CI. It is not a new authenticated
-owner session or signed owner release approval. Historical observations below
-remain dated evidence, not current blockers where superseded here.
+This record reconciles the preceding read-only migration audit, inspected main
+CI and the owner's final acceptance supplied for PR #24. The earlier
+**not accepted / owner checks pending** decision is superseded by this explicit
+owner decision, not rewritten as an assistant-observed pass. Historical
+observations below remain dated evidence, not current blockers where superseded.
+
+### Final owner confirmation (reported, not independently observed)
+
+The owner confirms Steps 3, 4 and 5 of the browser-only checklist below:
+
+- Production account, save, persistence, visibility, isolation and social
+  journeys behave as expected.
+- Manual accessibility checks behave as expected.
+- The protected refresh rehearsal completed as expected with `dry_run=true`,
+  `limit=1`, the embedding step skipped and live scheduling disabled.
+
+The owner explicitly states: **“I accept MVP 1 for an invited beta against the
+verified production release.”** The owner retains RAWG live semantic embeddings,
+live scheduled refresh and live semantic-quality evaluation as explicit
+deferrals. This is release acceptance of the production identity below, not a
+new deployment or approval to send invitations.
+
+No browser/assistive-technology versions, exact announcement text, execution
+timestamps, screenshots, refresh run URL or redacted outcome counts were supplied
+with this confirmation; none is inferred from prior headless or CI evidence.
+These missing detail fields do not negate the owner's confirmation of the steps.
+Broad cross-media exclusion has only the recorded direct SQL/search evidence;
+no additional assistant-observed sweep is claimed.
+
+### Read-only refresh run lookup
+
+Both `gh run list --workflow catalog-refresh.yml --event workflow_dispatch` and
+the workflow-runs API filtered to `workflow_dispatch` returned no matching run
+(the API reported `total_count=0`). Accessible recent runs are historical skipped
+schedules, not the owner's rehearsal. **Rehearsal completed as owner-reported;
+matching run URL and independent GitHub outcome/count evidence unavailable.**
+Do not cite a skipped schedule as that rehearsal or call it unperformed. The
+owner reports disabled live scheduling; the earlier 403 remains a limit on
+independent configuration inspection, not a contradiction of owner confirmation.
 
 - **Reviewed main revision:** `b017f839e12a541278511a5bf69a7240d35fdd8a`, after
   [PR #23](https://github.com/jedemarco1030/favalog/pull/23). Application,
@@ -29,32 +65,32 @@ remain dated evidence, not current blockers where superseded here.
 
 ### Required gates and evidence limits
 
-| Gate                                            | Recorded result                                                                                                                                                                                                                                   | Acceptance status / remaining evidence                                                                                                                                                                                                                                                  |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Engineering CI                                  | Latest main run `36778248362` passed all six jobs; logs and downloaded invocation reports inspected below.                                                                                                                                        | Satisfied for `b017f83`; skipped tests are not passes.                                                                                                                                                                                                                                  |
-| Hosted migration ledger                         | All 35 migration versions/names match, with no missing/extra entries; `20260930180000_separate_demonstration_catalog.sql` is recorded.                                                                                                            | Satisfied by the preceding read-only audit. Do not reapply or repair it.                                                                                                                                                                                                                |
-| Installed retrieval/materialization guards      | Keyword, semantic, hybrid and compatible-embedding reads contain the exact legacy exclusion. Materialization has both candidate exclusions and both alias-conflict guards. Zero provider aliases point to the 28 exact legacy identities.         | Satisfied for the inspected definitions/identities, not a live semantic-quality claim.                                                                                                                                                                                                  |
-| Production revision                             | Recorded Ready deployment source equals `b017f839e12a541278511a5bf69a7240d35fdd8a`.                                                                                                                                                               | Deployment identity satisfied; not authenticated smoke acceptance.                                                                                                                                                                                                                      |
-| Demonstration exclusion and saved records       | Production “paper watch” search returns zero local results; `/title/paper-watch` resolves with the demonstration notice. Migration preserves identities/references.                                                                               | Partial evidence only. Broad cross-media exclusion and authenticated access to existing saved records remain unverified.                                                                                                                                                                |
-| Authenticated production journeys               | Signed-out Save reaches sign-in with the selected title in `returnTo`.                                                                                                                                                                            | Pending post-login picker continuation; existing/new-list save, duplicate prevention/refresh, cross-media saving, two-account isolation, private/followers-only access and revocation, feed/likes, diary/reviews/favorites. Local fixture/RLS passes do not replace these checks.       |
-| Manual accessibility and safe failure rehearsal | Automated Linux x86_64 / HeadlessChrome 151.0.0.0; first production Tab reaches the skip link; loaded production Home at 320×800 dark has no page-level overflow. OS distribution/version unavailable; no VoiceOver/NVDA session.                 | Pending owner keyboard/dialog checks, actual success/error/already-saved announcements, actual 200% zoom, other narrow surfaces/dialogs, light/dark artwork contrast, axe manual reviews and safe nonproduction save-only partial-failure rehearsal.                                    |
-| Protected refresh rehearsal and schedule state  | No manual-dispatch run found in the recorded inspection; no run URL or outcome counts. Latest five observed schedules skipped, newest `36702695138`. Activation-variable read returned 403; `catalog-refresh` had no reviewer/branch protections. | Pending protection/secret-name/target review, a separately approved `dry_run=true`, `limit=1` rehearsal with zero writes and skipped embedding step, redacted counts, and owner confirmation that scheduling remains disabled. Current activation value is unknown, not verified false. |
-| Owner release decision                          | Prior acceptance record: **Not accepted — owner sign-off pending**.                                                                                                                                                                               | Still not accepted. Required gaps have neither results nor explicit reviewed release deferrals.                                                                                                                                                                                         |
+| Gate                                            | Recorded result                                                                                                                                                                                                                                                                                  | Acceptance status / remaining evidence                                                                                                                                                                                                                                                                            |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Engineering CI                                  | Latest main run `36778248362` passed all six jobs; logs and downloaded invocation reports inspected below.                                                                                                                                                                                       | Satisfied for `b017f83`; skipped tests are not passes.                                                                                                                                                                                                                                                            |
+| Hosted migration ledger                         | All 35 migration versions/names match, with no missing/extra entries; `20260930180000_separate_demonstration_catalog.sql` is recorded.                                                                                                                                                           | Satisfied by the preceding read-only audit. Do not reapply or repair it.                                                                                                                                                                                                                                          |
+| Installed retrieval/materialization guards      | Keyword, semantic, hybrid and compatible-embedding reads contain the exact legacy exclusion. Materialization has both candidate exclusions and both alias-conflict guards. Zero provider aliases point to the 28 exact legacy identities.                                                        | Satisfied for the inspected definitions/identities, not a live semantic-quality claim.                                                                                                                                                                                                                            |
+| Production revision                             | Recorded Ready deployment source equals `b017f839e12a541278511a5bf69a7240d35fdd8a`.                                                                                                                                                                                                              | Deployment identity directly verified; production acceptance now owner-reported against this release.                                                                                                                                                                                                             |
+| Demonstration exclusion and saved records       | Production “paper watch” search returns zero local results; `/title/paper-watch` resolves with the demonstration notice. Migration preserves identities/references.                                                                                                                              | Direct exclusion observations retain their limited scope. Owner confirms Step 3 account/save/persistence journeys and accepts this release; no new assistant sweep or authenticated observation claimed.                                                                                                          |
+| Authenticated production journeys               | Signed-out Save reaches sign-in with the selected title in `returnTo`.                                                                                                                                                                                                                           | Owner confirms Step 3 production account, save, persistence, visibility, isolation and social journeys behave as expected. Accepted as owner-reported evidence, not inferred from fixtures or directly replayed by the assistant.                                                                                 |
+| Manual accessibility and safe failure rehearsal | Automated Linux x86_64 / HeadlessChrome 151.0.0.0; first production Tab reaches the skip link; loaded production Home at 320×800 dark has no page-level overflow. OS distribution/version unavailable; no VoiceOver/NVDA session.                                                                | Owner confirms Step 4 manual accessibility checks behave as expected, accepting its keyboard/dialog, announcements, actual zoom/reflow, contrast/incomplete-target and safe failure checklist. Versions, announcement text and captures not supplied; this is not an assistant-observed or automated manual pass. |
+| Protected refresh rehearsal and schedule state  | Owner confirms Step 5 protected rehearsal completed as expected: `dry_run=true`, `limit=1`, embedding step skipped, live scheduling disabled. Read-only matching run lookup returns no run; URL, independent outcome and counts unavailable. Earlier 403/protection observations are historical. | Satisfied for owner acceptance on reported Step 5 results; no independently inspected run or current protection/activation metadata claimed. Dry-run acceptance does not verify live processing or automatic metadata freshness.                                                                                  |
+| Owner release decision                          | Owner explicitly accepts MVP 1 for an invited beta against the verified production release, with the three retained deferrals.                                                                                                                                                                   | MVP 1 ACCEPTED on owner-reported Steps 3–5 plus existing verified engineering/hosted evidence. No invitation or operational change authorized.                                                                                                                                                                    |
 
 ### Deferrals and user impact
 
-| Item                                                           | Recorded disposition                                                                                                                                                                 | User impact / release treatment                                                                                                                |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| RAWG live semantic embeddings                                  | Documented scope deferral: provider permission unresolved; independent activation also required.                                                                                     | Games retain keyword discovery/search only. Fixture semantics are not live RAWG semantic support.                                              |
-| Live semantic-quality evaluation                               | Documented operator-tooling deferral pending reviewed genuine-provider judgments; fixture golden data refuses paid live evaluation.                                                  | No live relevance or corpus-completeness acceptance claim. This does not waive normal search or production smoke checks.                       |
-| Live scheduled refresh                                         | Not activated in these checks; intentional release deferral still needs explicit owner review. A prohibition on activation is not evidence of a disabled flag or an accepted waiver. | Automated freshness/processing unverified; metadata may become stale. Protected dry-run rehearsal and schedule-state confirmation remain open. |
-| Any remaining authenticated, accessibility or operational gate | No reviewed release deferral supplied.                                                                                                                                               | Remains blocking, not passed or silently waived.                                                                                               |
+| Item                             | Recorded disposition                                                                                                                              | User impact / release treatment                                                                                                                                                         |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RAWG live semantic embeddings    | Explicitly retained by the owner in final beta acceptance. Provider permission unresolved; independent activation still required.                 | Games retain keyword discovery/search only. Fixture semantics are not live RAWG semantic support.                                                                                       |
+| Live semantic-quality evaluation | Explicitly retained by the owner pending genuine-provider judgments; fixture golden data refuses paid live evaluation.                            | No live relevance or corpus-completeness acceptance claim. This does not waive normal search or production smoke checks.                                                                |
+| Live scheduled refresh           | Explicitly retained by the owner in final beta acceptance; live scheduling disabled as owner-reported. Separate approval required for activation. | Automatic metadata freshness is not yet verified; metadata may become stale. Owner-confirmed dry run is not live scheduled processing. Follow up before separately approved activation. |
 
-Before changing the decision to accepted, record each required result or an
-explicit owner-reviewed deferral with reviewer/date, exact scope, reason, user
-impact, mitigation and follow-up. Then record an explicit owner release decision
-against the reviewed/deployed revision. A missing credential/session, 403,
-skipped job, fixture-only result or viewport proxy cannot be promoted to a pass.
+The owner has now supplied the required confirmation and explicit release
+decision, retaining only the three deferrals above. Their operational/provider
+limits and follow-up remain visible; acceptance does not waive them or enable
+anything. Missing run links or environment details remain missing evidence,
+not invented detail. A 403, skipped job, fixture-only result or viewport proxy
+is still never promoted to a direct or automated pass.
 
 ## Latest passing main CI — PR #23
 
@@ -86,7 +122,9 @@ restoration and zero dialog/form axe violations or incomplete targets; 320 px
 reflow has no overflow on the four inspected pages. `configured-zoom-200.json`
 is a **640 px viewport proxy**, not actual browser zoom. Sixteen contrast scans
 still contain `aria-prohibited-attr`, `aria-valid-attr-value` and mobile Explore
-`color-contrast` incomplete findings. Manual review remains required. The
+`color-contrast` incomplete findings. These automated findings remain in the
+artifact; manual checklist acceptance is now owner-reported in Step 4, not a
+recomputed axe result or fabricated target-by-target report. The
 `quality-evidence-no-env` artifact and required `portfolio-screenshots` upload
 are present. No new visual-capture or manual accessibility pass is claimed here;
 previous genuine-provider and synthetic fixture captures stay separately dated.
@@ -373,22 +411,31 @@ owner-controlled session, not an unauthorized hosted save.
       or authorized by this documentation PR.
 - [x] Recorded production deployment `dpl_Gx3wtzXB1bwvb7DLhVVRWdptKxw8` is
       Ready on reviewed `b017f839e12a541278511a5bf69a7240d35fdd8a`.
-- [ ] Owner verifies broad cross-media exclusion and authenticated existing
-      saved-record access; a public demonstration route alone is insufficient.
-- [ ] Owner records all authenticated production journey results below.
-- [ ] Owner records manual accessibility and safe nonproduction partial-failure
-      rehearsal results, including actual assistive technology/browser versions.
-- [ ] Owner reviews refresh protections/secret names/target, confirms disabled
-      schedule state and supplies separately approved bounded dry-run evidence.
-- [ ] Any required check proposed for deferral has explicit owner review,
-      reason, user impact, mitigation and follow-up; no new waiver is recorded here.
-- [ ] Explicit owner release acceptance against the reviewed/deployed revision.
-      Separate approval is required before invitations.
+- [x] Owner confirms Step 3 production account, save, persistence, visibility,
+      isolation and social journeys behave as expected. Direct demonstration
+      exclusion observations retain their recorded scope, not a new broad sweep.
+- [x] Owner confirms Step 4 manual accessibility checks behave as expected.
+      Browser/assistive-technology versions and announcement details were not
+      supplied and are not fabricated.
+- [x] Owner confirms Step 5 protected refresh rehearsal completed as expected,
+      `dry_run=true`, `limit=1`, embedding step skipped, live scheduling disabled.
+      Matching run link and independent outcome/count evidence remain unavailable.
+- [x] Owner explicitly retains RAWG live semantic embeddings, live scheduled
+      refresh and live semantic-quality evaluation as beta deferrals, with
+      limitations and follow-up recorded above.
+- [x] Owner explicitly accepts MVP 1 for an invited beta against the verified
+      production revision. No new release/deployment is created by this decision.
+- [ ] Obtain separate invitation approval before contacting participants; no
+      invitations are authorized or sent under this PR.
 
 ## Browser-only owner acceptance
 
-These are remaining owner steps, **not authorization to execute them in this
-PR**. Any account write or hosted workflow operation needs separate approval.
+This reference checklist preserves the scope used for owner acceptance. The
+owner now confirms Steps 3, 4 and 5 and explicitly accepts the verified release
+with the three deferrals above. Retained instructions below are not fresh pending
+gates or authorization to repeat account writes or hosted workflow operations
+under this PR. Step 2's direct evidence remains limited to the recorded audit/
+search/route observations; final acceptance is the owner's release decision.
 
 1. Retain latest main run `36778248362` on reviewed `b017f83` and its required
    reports, plus historical PR/main runs `36771309279` / `36773633454`. Existing
@@ -415,9 +462,12 @@ PR**. Any account write or hosted workflow operation needs separate approval.
    failure rehearsal. Record VoiceOver/Safari or NVDA/browser versions and actual
    announcements. Check **actual 200% browser zoom**, 320 px reflow, reduced
    motion and light/dark artwork contrast. Review axe incomplete targets.
-5. GitHub **Settings → Environments → catalog-refresh**: the read-only API
-   currently reports **no reviewer protections and no branch policy**. Review
-   and configure owner-approved protections before rehearsal; verify secret names `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_PROJECT_REF`,
+5. GitHub **Settings → Environments → catalog-refresh**: before the owner's
+   final confirmation, the read-only API reported **no reviewer protections and
+   no branch policy**. The owner now confirms the protected rehearsal completed
+   as expected; current protections were not independently re-inspected. Reference
+   procedure: review owner-approved protections and verify secret names
+   `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_PROJECT_REF`,
    `TMDB_API_READ_TOKEN`; do not share their values. Ensure the URL's project ref
    matches the intended project. Keep `CATALOG_REFRESH_ENABLED` unset/`false`.
    **Actions → Catalog metadata refresh → Run workflow → branch `main` after
@@ -433,18 +483,24 @@ PR**. Any account write or hosted workflow operation needs separate approval.
    revision. Only after acceptance **and separate invitation approval** use the
    [invited-beta checklist](beta/invited-beta-checklist.md).
 
-Latest five observed scheduled refresh runs were **skipped**; newest
+Historical direct refresh observations: the latest five accessible scheduled
+runs were **skipped**; newest
 [36702695138](https://github.com/jedemarco1030/favalog/actions/runs/36702695138).
-Scheduling is not operationally verified, and no protected hosted dry run was
-performed. The recorded 403 prevents confirmation of the current activation
-value; skipped runs do not establish it is disabled now. GitHub Actions
-configuration is separate from Vercel Vars. Live scheduling and embedding work
-require separate approval and are not run under this PR. RAWG remains keyword
-discovery/search only until permission **and** independent activation are
-verified. Proposed live-scheduling deferral still needs explicit owner review
-with user impact; required gaps are never converted into passed gates.
+The earlier activation-variable 403 limited independent inspection; skipped runs
+alone did not prove a disabled flag. These are not the owner's protected
+rehearsal. That rehearsal is now **completed as owner-reported**, with
+`dry_run=true`, `limit=1`, embedding step skipped and live scheduling disabled.
+The matching run URL and independent GitHub outcome/count evidence are
+unavailable in the read-only lookup. No checked-row count, zero-write log or
+live processing outcome is invented. A dry run does not verify automatic
+metadata freshness. GitHub Actions configuration is separate from Vercel Vars.
+Live scheduling and embedding work remain deferred and require separate approval;
+RAWG remains keyword discovery/search only until permission **and** independent
+activation are verified.
 
-Latest main CI plus the recorded migration/deployment evidence support:
-**“MVP 1 engineering closeout complete; beta acceptance pending owner checks.”**
-This is not MVP 1 acceptance and does not authorize invitations, hosted writes,
-live scheduling, or paid embedding work. Owner acceptance must be explicit.
+Latest main CI and recorded migration/deployment evidence, together with final
+owner-reported Steps 3–5 and the three explicit owner-retained deferrals, support:
+**“MVP 1 ACCEPTED by the owner for an invited beta against the verified production release.”**
+The prior pending decision is superseded. This is not permission to merge,
+deploy, change hosted data, activate scheduling, run embeddings or send
+invitations. No such operation was performed by this documentation update.
