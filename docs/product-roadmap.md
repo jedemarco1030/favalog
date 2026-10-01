@@ -1,10 +1,13 @@
 # Favalog product roadmap
 
 > Living document. Last reconciled: 2026-09-30 (Phase 4E closeout), against
-> post-merge `main` at `f1a392e` (merged PR #22). Final PR evidence is verified;
-> the new main run is reviewed separately in
-> [the release checklist](mvp1-release-checklist.md). Beta acceptance still needs
-> explicit owner migration/deployment, accessibility and operational checks.
+> post-merge `main` at `b017f83` (merged PR #23). Latest main CI and recorded
+> hosted migration/deployment identity are verified in
+> [the release checklist](mvp1-release-checklist.md#reconciled-acceptance-record-2026-09-30).
+> MVP 1 is **owner-accepted for an invited beta against this verified production
+> release**. Final Steps 3–5 confirmation is owner-reported, separate from direct
+> observations and CI; RAWG embeddings, live scheduled refresh and live semantic
+> quality evaluation remain explicitly deferred.
 > Update this file whenever a phase
 > ships, a capability becomes production-verified, or the agreed sequence
 > changes. When a statement is only true at a point in time, keep it and date it
@@ -12,35 +15,65 @@
 
 ## Current closeout evidence (2026-09-30)
 
+After merged [PR #23](https://github.com/jedemarco1030/favalog/pull/23),
+[latest main CI 36778248362](https://github.com/jedemarco1030/favalog/actions/runs/36778248362)
+completed successfully on `b017f839e12a541278511a5bf69a7240d35fdd8a`.
+Inspected logs and downloaded reports confirm **1,615 unit/component tests
+across 166 files**, **617 pgTAP tests across 19 files**, byte-identical generated
+types, 34 first-attempt fixtures, 20 first-list repetitions plus auth setup,
+configured Explore 15 passes/one paid-semantic skip, eight provider-layout
+passes, production fixture-refusal one pass, feed/likes one pass each, default
+no-env 44 passes/six skips and explicit no-env five passes. Zero executed E2E
+failures, retries, flaky outcomes or runner errors; all six jobs, formatting,
+lint, typecheck, coverage and both builds passed. Skips remain skips.
+
+**MVP 1 engineering closeout complete; MVP 1 ACCEPTED by the owner for an invited
+beta against the verified production release.** For PR #24, the owner confirms
+Steps 3–5: production account/save/persistence/visibility/isolation/social
+journeys and manual accessibility behave as expected; protected refresh
+rehearsal completed as expected with `dry_run=true`, `limit=1`, embedding step
+skipped and live scheduling disabled. This is owner-reported evidence, not a
+new assistant-authenticated session or additional automated CI result. The
+[release checklist](mvp1-release-checklist.md#reconciled-acceptance-record-2026-09-30)
+records the exact release identity, evidence limits and three explicit deferrals.
+The prior pending decision is superseded; no browser/assistive-technology
+versions, announcement text, execution timestamps or captures are fabricated.
+
+| Current capability / gate                          | Evidence                                                                                                                                                                                           | Release status                                                                                                                                                                                                           |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Engineering closeout                               | Latest main CI `36778248362`; required execution reports and quality artifacts inspected.                                                                                                          | Verified for `b017f83`, not production owner acceptance.                                                                                                                                                                 |
+| Hosted migration and project identity              | All 35 versions/names match; Vercel production config matches connected Supabase ref. `20260930180000` is recorded, exclusions/alias guards installed, zero aliases on 28 exact legacy identities. | Verified by preceding read-only audit; not pending application.                                                                                                                                                          |
+| Production deployment                              | `dpl_Gx3wtzXB1bwvb7DLhVVRWdptKxw8` Ready on exact reviewed `b017f83`.                                                                                                                              | Deployment identity directly verified; final release acceptance owner-reported against this SHA.                                                                                                                         |
+| Demonstration separation and saved records         | “paper watch” has zero local production search results; labelled `/title/paper-watch` still resolves; migration preserves identities/references.                                                   | Direct exclusion observations retain their scope; account/save/persistence acceptance is owner-reported in Step 3. No new broad assistant sweep claimed.                                                                 |
+| Save and personal/social journeys                  | Signed-out Save retains selected title in sign-in `returnTo`; local fixture/feed/likes and RLS tests pass.                                                                                         | Owner confirms Step 3 production account, save, persistence, visibility, isolation and social journeys behave as expected; not inferred from fixture CI.                                                                 |
+| Accessibility and safe partial failure             | CI Save focus/axe and 320 px reflow checks pass; recorded production skip link and 320 px Home check.                                                                                              | Owner confirms Step 4 manual accessibility checks behave as expected. Versions/announcement text not supplied; automated incomplete findings remain historical evidence, not recomputed passes.                          |
+| Catalog refresh                                    | Owner confirms Step 5 protected `dry_run=true`, `limit=1` rehearsal completed, embedding step skipped, live scheduling disabled. Matching run unavailable read-only.                               | Owner-reported completion accepted; run URL and independent outcome/count evidence unavailable. Earlier 403/protection observations are historical. Live scheduled processing and automatic freshness remain unverified. |
+| RAWG semantic embeddings / live quality evaluation | RAWG permission unresolved; genuine-provider evaluation judgments pending.                                                                                                                         | Documented scope/tooling deferrals: keyword-only games and no live relevance/corpus-completeness claim.                                                                                                                  |
+
+The owner explicitly retains three deferrals: RAWG live semantic embeddings
+(games support keyword discovery/search), live scheduled refresh (automatic
+metadata freshness is not yet verified; metadata may become stale), and live
+semantic-quality evaluation pending genuine-provider judgments (no live relevance
+or corpus-completeness claim). Final owner confirmation and acceptance are
+recorded, not silently waived. No matching `workflow_dispatch` refresh run is
+accessible through the read-only list/API (`total_count=0`); its URL and
+independent outcome/count evidence remain missing without negating the reported
+rehearsal. Prior skips and 403 are not that rehearsal. Nothing here authorizes
+invitations, merge, deployment, hosted writes, scheduling or embedding runs.
+
+### PR #22 evidence before the hosted audit
+
 The owner merged [PR #22](https://github.com/jedemarco1030/favalog/pull/22),
 final source `cf82d647d5ccbb685ec5aba25b9c5e48a7ecaa37`, into main
 `f1a392e2d43dad39e690383451b829b77824f361` with an identical tree.
 [Final PR CI 36771309279](https://github.com/jedemarco1030/favalog/actions/runs/36771309279)
-completed successfully. Downloaded reports confirm **1,615 unit/component tests
-across 166 files**, **617 pgTAP tests across 19 files**, unchanged generated
-types, 34 fixture passes, 20 first-list repetitions plus auth setup, configured
-Explore 15 passes/one intentional paid-semantic skip, eight provider-layout
-passes, production fixture-refusal one pass, feed and likes one pass each.
-Default no-env has 44 passes/six intentional skips; explicit no-env has five
-passes. Every executed E2E test passed first attempt, with zero retries/flaky
-outcomes or runner errors. Formatting, lint, typecheck and both builds passed.
-
-The final CI fix reserves local Supabase ports before image pulls, preserving
-Linux reservations, and prevents dependent Explore suites running after failed
-setup while still failing the job. No tests, report requirements, assertions,
-retries or timeouts were weakened. Original historical socket ownership remains
-unknown. [New main CI 36773633454](https://github.com/jedemarco1030/favalog/actions/runs/36773633454)
-completed successfully. Separately downloaded main reports confirm every
-count and zero-retry result above, along with quality/screenshot artifacts and
-byte-identical generated types; validation/database logs confirm both test
-counts. **MVP 1 engineering closeout complete; beta acceptance pending these
-owner checks.** Hosted migration/deployment, real-account saved-record flows,
-manual accessibility and operational rehearsal remain acceptance dependencies.
-
-Fresh refresh inspection found five skipped schedules, no configured reviewer
-or branch protections on `catalog-refresh`, and a 403 when reading the activation
-variable. Owner review and a separately approved read-only rehearsal remain
-required. Nothing was activated or written remotely.
+and [first main CI 36773633454](https://github.com/jedemarco1030/favalog/actions/runs/36773633454)
+passed; their separately inspected reports confirm the counts above. Main
+`b017f83` leaves application, workflow, script and migration trees unchanged;
+#23 added documentation and retained screenshots. The CI fix reserves local
+Supabase ports before image pulls and gates dependent suites on successful
+setup without relaxing tests, artifacts, assertions, retries or timeouts.
+Original historical socket ownership remains unknown.
 
 ### Historical candidates and baseline
 
@@ -82,13 +115,14 @@ Earlier local verification: 1,562 unit/component passes and 131 focused regressi
 Docker and native Playwright remain unavailable in this sandbox, not in CI.
 The full [release checklist](mvp1-release-checklist.md) is authoritative.
 
-The five latest inspected refresh schedules skipped; newest
+Historical refresh inspection: the five accessible schedules skipped; newest
 [36702695138](https://github.com/jedemarco1030/favalog/actions/runs/36702695138).
-No protected hosted rehearsal or live schedule activation is claimed. RAWG
-remains keyword-only; permission and separate live embedding activation are
-still unresolved. The fixture-only golden dataset cannot be used to claim
-live semantic quality; a genuine-provider evaluation dataset is an explicit
-operator-tooling deferral, not a waiver of required beta checks.
+That inspection did not establish a rehearsal or disabled activation flag; final
+protected rehearsal completion and disabled live scheduling are now
+owner-reported above. RAWG remains keyword-only; permission and separate live
+embedding activation remain unresolved. The fixture-only golden dataset cannot
+establish live semantic quality; genuine-provider judgments remain an explicit
+owner-retained evaluation deferral.
 
 ## Historical status reconciliation (2026-09-29)
 
@@ -587,7 +621,11 @@ Status:
   preview check.
 - **Not hosted or production-verified.** No migrations are required.
 
-## Remaining gaps
+## Historical remaining gaps (pre-Phase 4E)
+
+The following list preserves the pre-closeout planning record. Current status
+and accepted deferrals are reconciled in the closeout evidence above; this is
+not a list of new blockers for the accepted beta.
 
 - Community reviews still render from the `@/lib/data` mock layer rather than
   real Supabase reads. Home's activity is now real (Phase 4B.2), but there is
@@ -608,7 +646,7 @@ Status:
 - Growth and monetization have not started. Portfolio packaging begins in
   Phase 4E (below).
 
-## Phase 4E — Production quality and portfolio readiness (in progress)
+## Phase 4E — Production quality and portfolio readiness (owner-accepted)
 
 The earlier two-PR plan has been delivered across the baseline/evidence and
 quality-fix PRs through #20. It is retained in Git history, not described as
@@ -616,48 +654,189 @@ future work here. Closeout PR #21 restores discovery-first Explore, corrects
 artwork-backed screenshot/quality readiness, retains first-failure traces,
 adds retry-free first-list repetitions, and completes per-invocation CI gates.
 
-MVP 1 is **not accepted yet**. Final-source CI counts/artifacts and owner
-screen-reader, actual zoom, contrast, operational rehearsal, and production
-smoke results are explicit gates in the
-[release checklist](mvp1-release-checklist.md). The existing
-[invited-beta script](beta/invited-beta-checklist.md) stays a future owner-led
-activity, not evidence of completed user research. No performance improvement
-is claimed without comparable measurements.
+MVP 1 is **owner-accepted for an invited beta against the verified production
+release**. Latest main CI counts/artifacts, hosted migration and deployed SHA
+remain verified; final Steps 3–5 acceptance is owner-reported. RAWG live semantic
+embeddings, live scheduled refresh and live semantic-quality evaluation are
+explicitly retained deferrals. See the [release checklist](mvp1-release-checklist.md)
+for provenance and missing independent refresh run evidence. The
+[invited-beta script](beta/invited-beta-checklist.md) remains a future owner-led
+activity requiring separate invitation approval, not evidence of completed
+user research. No performance improvement is claimed without comparable
+measurements.
 
 Out of scope: notifications, billing, mini-games, new providers, and
 personalized recommendations.
 
+## Post-MVP 1 priorities (2026-09-30 planning revision)
+
+MVP 1's accepted scope is a complete first-use journey: browse genuine popular
+films, series, books and games; search by title or keywords; save to an existing
+or newly created list; return to that record; follow people and interact with
+their activity. Keep this scope stable for the invited beta. The priorities
+below are planned work, not shipped capabilities or new acceptance evidence.
+
+### Phase 4F — Invited beta and observed friction (next)
+
+Run the existing [invited-beta sessions](beta/invited-beta-checklist.md) with
+an owner-selected initial cohort, suggested at 5–10 cross-media enthusiasts.
+Invitations remain owner-controlled. Gather consented, private notes about
+discovery, registration, first save, list retrieval, following and return use.
+Record task completion with/without help, search misses, confusing moments and
+whether participants return after approximately a week. These are proposed
+observations, not current traffic, retention or statistical evidence.
+
+Prioritize failures that stop registration, recovery, finding a title, saving
+or retrieving it; then repeated confusion. Summarize findings without names,
+emails, private lists or raw participant searches. The existing session script
+can cover these observations without a new analytics system. Before the next
+feature increment, choose the smallest improvement supported by the findings.
+
+**Account baseline, not an auth redesign.** Repository review confirms existing
+sign-up, email confirmation, sign-in, forgot-password and update-password paths,
+server-side input checks, neutral reset responses and password-manager
+autocomplete. Public production registration and recovery pages were inspected
+read-only; email delivery and completed password changes were not exercised by
+that inspection. Preserve previously recorded owner acceptance without
+inventing additional end-to-end recovery evidence.
+
+When checking readiness for external participants, ensure confirmation and
+recovery email reaches an ordinary address outside the Supabase project team.
+Supabase's default sender is restricted to team addresses; a production email
+provider/custom SMTP setup is needed for other recipients. If already
+configured and verified, this is covered, not new implementation work. Verify
+that recovery completes, invalid/expired links give a useful next step, the new
+password works, the old password fails and saved content survives. Verify
+hosted password enforcement matches the form's advertised requirements; do not
+infer hosted policy or email settings from committed application code.
+
+Keep registration short. More required profile fields, a password-strength
+meter, MFA and a large settings area are not requirements for this beta.
+Clear password guidance, accessible feedback, password-manager/paste support,
+correct email links and a recognizable sender matter more than elaborate
+templates. A strength meter is advisory; enforcement must remain server-side
+and consistent with Supabase.
+
+### Phase 4G — Account controls, trust and portability (after initial feedback)
+
+Build a focused account/settings surface when beta evidence supports it:
+editing profile details, account email/password controls, clear privacy choices
+and a documented route to support. Evaluate export and account-deletion
+self-service before expanding beyond a small invited cohort. Prefer a few
+reliable controls over an empty dashboard of future settings.
+
+Treat show/hide password, accessible strength feedback, confirmation resend
+with rate limits, clearer transactional email and optional social sign-in as
+small usability candidates, not one required bundle. Add optional MFA only
+with enrollment, challenge, removal and loss-of-factor recovery designed and
+tested together. MFA is a separate security feature, not another registration
+field. Operator-account security is independent of consumer feature scope.
+
+Before broad public social growth, plan reporting, blocking and moderation
+alongside any expansion of comments or notifications. Existing private and
+followers-only list behavior remains a core authorization contract. None of
+these proposed controls is represented as already available.
+
+### Phase 4H — Search quality and catalog operations (bounded technical work)
+
+The recommended first Python contribution is an **offline retrieval evaluation
+and catalog-quality tool**, not another production application service.
+Extend or consume the existing `eval:search` artifacts and contracts rather than
+replacing the TypeScript retrieval implementation or duplicating its fixture CI.
+
+Use a small, versioned, genuine-provider evaluation set with independently
+reviewed relevance judgments and documented provenance. Compare keyword and
+hybrid retrieval using top-result/title accuracy, ranked relevance, per-media
+coverage and measured latency; inspect aliases, ambiguous names, remakes and
+franchise queries. Report indexed local-catalog retrieval separately from
+external provider discovery so absent indexed records are not misrepresented
+as ranking defects. RAWG keyword results must remain separate from semantic
+coverage until permission and activation are resolved.
+
+A useful deliverable is a reproducible Python CLI, tested metric calculations,
+JSON/HTML reports and a short case study recording dataset/source revision,
+retrieval settings, actual baseline results, limitations and one measured
+improvement. Keep private user records and search logs out of the evaluation
+dataset. Do not commit provider payloads unless retention/redistribution is
+permitted; use permitted identifiers, redacted outputs or reproducible fetch
+instructions where appropriate. Paid calls, hosted writes, scheduled refresh
+and embeddings require their existing explicit gates. This is proposed work,
+not completed live semantic-quality acceptance.
+
+Catalog monitoring and eventual refresh activation belong here as separate
+owner-controlled work. The accepted deferrals remain intact: RAWG live
+embeddings, live scheduled refresh and live semantic-quality evaluation.
+Offline Python analysis can support future decisions without making the
+invited beta depend on those activations.
+
+### Later — Retention, differentiation and sustainable revenue
+
+Choose among a cross-media Up Next queue, simple personal/yearly stats,
+taste-based discovery, import/export and carefully scoped notifications using
+beta evidence. Personal stats must distinguish unique titles from log events
+and must not combine provider ratings into a fictitious common score.
+Streaming/store availability needs region-aware, licensed, fresh data and is
+a separate investigation, not an assumption about the current providers.
+
+Entertainment mini-games, news aggregation, console sync, native apps and
+billing are optional later experiments. Do not add them to finish MVP 1.
+Explore premium stats, advanced organization or personalization only after
+repeat use and willingness to pay are observed, with provider-use terms
+rechecked for the actual proposed commercial use.
+
+### Comparative product references
+
+These are research inputs, not commitments to copy competitors or claims of
+feature parity:
+
+- [Letterboxd](https://letterboxd.com/about/) emphasizes a personal diary,
+  watchlists, reviews and the follower activity loop; its
+  [paid plans](https://letterboxd.com/about/pro/) show personal statistics as a
+  possible later premium direction.
+- [Goodreads](https://www.goodreads.com/about/us) emphasizes reading status,
+  friends' activity and discovery through reviews/recommendations. For Favalog,
+  clear personal status and finding one's saved record come before more profile
+  fields.
+- [Reelgood's product-design explanation](https://ads.reelgood.com/what-to-watch-the-search-and-browse-experience/)
+  distinguishes effortless, imagery-led discovery from deliberate filtered
+  search. Favalog already has both browsing and search; improve their usefulness
+  through observed tasks before adding another news/content surface.
+- [The StoryGraph](https://thestorygraph.com/) emphasizes tracking, stats,
+  mood-based discovery and an Up Next queue. These are candidates for a
+  cross-media return-use experience, not MVP 1 requirements.
+
+Favalog's product hypothesis is a consistent personal and social record across
+four media types. Validate that convenience and the artwork-led experience
+with actual users rather than competing on feature count. Portfolio packaging
+can proceed alongside beta research: explain the identity, RLS, retrieval,
+provider-failure and CI tradeoffs with reproducible evidence. Adding Python is
+valuable when it answers a product/engineering question; a language checkbox
+does not establish proficiency or guarantee any hiring or compensation outcome.
+
 ## Agreed phase sequence
 
-1. **Product Reality and Discovery UX (delivered)** — real server-backed catalog
-   browsing, sorting, filtering, pagination, theming, and truthful documentation.
-2. **Social Graph and Network Loops** — follows, follower-aware visibility,
-   likes, notifications, and the social feedback loops around the personal
-   record.
-   - **Phase 4C (reprioritized, before the invited beta):** 4C.1 video-game
-     tracking via RAWG and 4C.2 artwork-led Home. Notifications follow as the
-     next social increment.
-3. **Entertainment mini-games** — lightweight entertainment-knowledge games
-   layered on the catalog. This is distinct from video-game tracking (4C.1).
-4. **Personalized AI Discovery** — personalized, taste-aware recommendations
-   built on the existing retrieval foundation.
-5. **Catalog and AI Operations** — scaling ingestion, embedding operations,
-   observability, and provider expansion (including the TMDB compliance gate).
-6. **Growth and Monetization** — acquisition, retention, and sustainable revenue.
-7. **Portfolio Packaging** — case studies, writeups, and presentation of the
-   work.
+This 2026-09-30 planning revision supersedes the earlier ordering that put
+entertainment mini-games immediately after social features. Completed phases
+and dated evidence above remain historical records.
 
-### Outcomes per phase
-
-| Phase                             | Product                                                                     | Technical                                                                                                            | Career                                                                          | Branding                                                    |
-| --------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| 1. Product Reality & Discovery UX | A visitor can genuinely browse and theme the real catalog, not just a demo. | A server-only browse DAL with stable ordering, bounded pagination, validated URL state, and a no-flash theme system. | Demonstrates production data plumbing, accessibility, and honest documentation. | A polished, editorial, light/dark-ready first impression.   |
-| 2. Social Graph & Network Loops   | People connect around their records and get feedback.                       | Real follows/likes/notifications with RLS and safe fan-out.                                                          | Shows social-system and authorization design.                                   | Positions Favalog as a social platform, not a solo tracker. |
-| 3. Entertainment mini-games       | A fun, sticky reason to return.                                             | Deterministic, catalog-backed game logic with fair scoring.                                                          | Demonstrates playful product thinking on real data.                             | Distinctive, memorable brand moments.                       |
-| 4. Personalized AI Discovery      | Recommendations that feel personally tuned.                                 | Taste modeling on top of the existing embedding/retrieval seam.                                                      | Shows applied ML/retrieval judgment with guardrails.                            | "Discovery that gets you" as a brand promise.               |
-| 5. Catalog & AI Operations        | A larger, fresher, more trustworthy catalog.                                | Robust ingestion/embedding ops, observability, provider governance.                                                  | Demonstrates operational maturity and compliance discipline.                    | Trust through accuracy and attribution.                     |
-| 6. Growth & Monetization          | A sustainable, growing product.                                             | Acquisition, retention, and billing infrastructure done safely.                                                      | Shows business and growth literacy.                                             | A credible, fundable brand story.                           |
-| 7. Portfolio Packaging            | A clearly communicated body of work.                                        | Reproducible writeups and demos.                                                                                     | A strong, honest portfolio artifact.                                            | Consistent, professional external presentation.             |
+1. **MVP 1 closeout (Phase 4E, owner-accepted)** — preserve the working discovery,
+   search, save and social journeys and the three explicit deferrals.
+2. **Invited beta and observed friction (Phase 4F, next)** — learn from real
+   first-use and return-use sessions; fix blocking defects and repeated confusion.
+3. **Account controls and trust (Phase 4G)** — improve recovery/settings,
+   portability and social safety in response to feedback and rollout scale.
+4. **Search quality and catalog operations (Phase 4H)** — a bounded Python
+   evaluation project and separately gated freshness/embedding work; can proceed
+   alongside beta without widening its runtime scope.
+5. **Retention and personalized discovery** — select queue, stats, notifications
+   or taste-aware features based on evidence of what makes people return.
+6. **Growth and monetization** — validate value and willingness to pay before
+   building billing or premium tiers.
+7. **Optional experiments** — entertainment mini-games, news and new
+   integrations only when there is a product reason.
+8. **Portfolio packaging (parallel)** — document verified technical decisions,
+   real measurements and what user feedback changed; never invent usage,
+   relevance, revenue or performance claims.
 
 ## Historical non-goals for Phase 1 — Product Reality
 
@@ -682,10 +861,16 @@ the owner-controlled hosted rollout.
 The following remain deferred and are not implied by the Phase 4B.1 delivery or
 the locally implemented Phase 4B.2 feed:
 
-- Operational acceptance of scheduled catalog refresh: the workflow is
-  installed, but observed scheduled jobs skipped. Hosted write activation and
-  bounded processing evidence remain owner-controlled (see the release checklist).
-- Live RAWG embedding, until permission is documented.
+- Live scheduled catalog refresh is explicitly retained as a deferral in final
+  owner beta acceptance. Protected `dry_run=true`, `limit=1` rehearsal completion,
+  skipped embedding step and disabled live scheduling are owner-reported; no
+  matching run link is accessible read-only. Automatic metadata freshness is
+  not yet verified, and metadata may become stale. No activation is authorized.
+- Live RAWG semantic embeddings remain explicitly deferred until provider
+  permission and separate activation are approved; games support keyword
+  discovery/search.
+- Live semantic-quality evaluation remains explicitly deferred pending
+  genuine-provider judgments; fixture results are not a live relevance claim.
 - Notifications, email, and push.
 - Moderation.
 - Entertainment mini-games, which are separate from video-game tracking.

@@ -5,26 +5,31 @@ organizing, and discovering **movies, TV series, books, and video games** in one
 cross-media record. Discovery is led by external providers. The canonical
 catalog stores only the titles people actually engage with.
 
-> Status reconciled on **2026-09-30** after the owner merged
-> [PR #22](https://github.com/jedemarco1030/favalog/pull/22): `main` at
-> `f1a392e2d43dad39e690383451b829b77824f361`, identical tree to reviewed source
-> `cf82d647d5ccbb685ec5aba25b9c5e48a7ecaa37`.
-> [Final PR CI](https://github.com/jedemarco1030/favalog/actions/runs/36771309279)
-> passed: 1,615 unit/component tests, 617 pgTAP tests, byte-identical generated
-> types, 34 retry-free fixtures, 20 retry-free first-list repetitions, and
-> executed likes/feed. The new [main CI](https://github.com/jedemarco1030/favalog/actions/runs/36773633454)
-> completed successfully; its separately downloaded reports confirm the same
-> retry-free counts. **MVP 1 engineering closeout complete; beta acceptance
-> pending these owner checks.** Migration/deployment, real-account, manual
-> accessibility and operational checks remain in the
-> [release checklist](docs/mvp1-release-checklist.md).
-> Merge and fixture CI do not establish hosted migration or owner acceptance.
-> Each capability
-> below is labelled by its evidence: implemented in code, CI-verified,
-> owner-confirmed in production, or unverified/deferred. The authoritative
-> per-capability table is the "Status reconciliation" section of
-> [`docs/product-roadmap.md`](docs/product-roadmap.md). The earlier, longer
-> README is preserved verbatim at
+> Status reconciled on **2026-09-30**, after merged
+> [PR #23](https://github.com/jedemarco1030/favalog/pull/23), against `main`
+> `b017f839e12a541278511a5bf69a7240d35fdd8a`.
+> [Latest main CI 36778248362](https://github.com/jedemarco1030/favalog/actions/runs/36778248362)
+> passed all six jobs. Inspected logs/downloaded reports confirm 1,615
+> unit/component tests, 617 pgTAP tests, byte-identical generated types,
+> 34 retry-free fixtures, 20 retry-free first-list repetitions plus setup,
+> and executed feed/likes. One paid-semantic and six default no-env skips remain
+> skips, not passes. The preceding read-only audit confirms all 35 hosted
+> migration versions/names, installed demonstration-exclusion guards and a Ready
+> production deployment on the reviewed SHA. **MVP 1 ACCEPTED by the owner
+> for an invited beta against this verified production release.** The owner
+> confirms Steps 3–5: production account/save/persistence/visibility/isolation/social
+> journeys and manual accessibility behave as expected; protected refresh
+> rehearsal completed with `dry_run=true`, `limit=1`, embedding step skipped and
+> live scheduling disabled. These are **owner-reported results**, separate from
+> direct observations and CI. No matching refresh run is accessible read-only;
+> its URL/independent outcome details are missing, not proof of an unperformed
+> rehearsal. RAWG semantic embeddings, live scheduled refresh and genuine-provider
+> semantic-quality evaluation remain explicit owner-accepted deferrals.
+> The [release checklist](docs/mvp1-release-checklist.md#reconciled-acceptance-record-2026-09-30)
+> is authoritative; the [roadmap](docs/product-roadmap.md#current-closeout-evidence-2026-09-30)
+> preserves historical evidence and limits. Acceptance does not authorize
+> invitations, merges, deployments, production writes, scheduling or embeddings.
+> The earlier, longer README is preserved verbatim at
 > [`docs/history/readme-through-phase-4d.md`](docs/history/readme-through-phase-4d.md).
 
 ## Live demo and screenshots
@@ -32,13 +37,15 @@ catalog stores only the titles people actually engage with.
 - **Live deployment:** <https://favalog.vercel.app>
 - **Screenshots:** fresh read-only production Home captures on **2026-09-30**,
   with decoded genuine RAWG artwork, at 1280×900 and 390×844. They show the
-  deployed baseline, not this unapplied follow-up or release acceptance.
+  deployed baseline at capture time, not authenticated release acceptance.
   Offline fixture captures are separate test evidence, never authentic covers.
 - **Genuine provider preview captures:** final application-source desktop/mobile
   Home, Explore, search and title images are retained in the
   [quality evidence index](docs/quality/baseline.md#follow-up-source-evidence-2026-09-30).
-  The hosted retrieval migration is not yet applied; authenticated Save evidence
-  comes separately from isolated CI fixtures.
+  The subsequent read-only audit confirms the hosted retrieval migration is
+  applied. Retained authenticated Save captures are isolated CI fixtures;
+  final production journey acceptance is separately owner-reported, without
+  new screenshots or an assistant-replayed production session.
 - **Engineering case study:** [`docs/case-study.md`](docs/case-study.md).
 
 ![Production Home with genuine RAWG artwork, captured read-only](docs/screenshots/home-desktop-production.png)
@@ -65,9 +72,11 @@ activation steps.
 
 ### Current user journeys
 
-These journeys are implemented and owner-confirmed in the production baseline
-through 2026-09-29. Closeout presentation/reliability changes require fresh
-release acceptance; fixture CI is not production confirmation:
+These journeys are implemented, with historical owner confirmation through
+2026-09-29 and final owner acceptance against the verified production release
+recorded for PR #24. Production account/save/persistence/visibility/isolation/
+social and manual accessibility checks are owner-reported; fixture CI is not
+production confirmation and no new detailed session transcript is claimed:
 
 1. **Discover without searching.** Home and the empty-query Explore view show
    provider-ranked shelves (Trending, New releases, Coming soon, Highest
@@ -162,35 +171,46 @@ production behavior.
 
 ## Known limitations
 
-- The demonstration-separation follow-up requires owner application of
-  `20260930180000_separate_demonstration_catalog.sql` before deployment acceptance.
-  Saved IDs/routes/references are preserved; ordinary discovery excludes only
-  the known demonstration identities, not every internal catalog title.
+- The read-only audit confirms hosted migration
+  `20260930180000_separate_demonstration_catalog.sql` and its installed guards.
+  It preserves saved IDs/routes/references and excludes the 28 exact legacy
+  demonstration identities, not every internal catalog title. Final account/
+  save/persistence acceptance is owner-reported. Direct production exclusion
+  observations retain their limited search/route scope; no new broad sweep claimed.
 - The synthetic golden dataset is now local-fixture-only. Live semantic-quality
   evaluation is explicitly deferred until genuine-provider judgments are reviewed;
   the evaluator refuses paid calls against that fixture dataset.
-- Inspected post-merge CI `36749917450` passed 20 retry-free first-list journeys
-  and 34 fixtures, but failed likes startup on port 54324 before tests executed.
-  Its results do not verify this follow-up or authorize an invited beta.
+- Historical CI `36749917450` failed likes startup before execution. Later
+  inspected main runs, latest `36778248362`, execute feed/likes and the retry-free
+  first-list/fixture journeys successfully. That supersedes the engineering
+  blocker, not the unknown original socket owner or owner release gates.
 
 - RAWG content is not semantically searchable (see above).
 - Community reviews on some surfaces still come from the labelled mock layer.
-- Catalog-refresh scheduling exists, but the five latest observed scheduled
-  runs skipped the refresh job (latest: `36702695138`, inspected 2026-09-30). This is not evidence
-  of processing. Activation is a **GitHub Actions** variable, not a Vercel
-  environment variable; owner operational acceptance is still required.
-- MVP 1 is **not yet accepted**. See the
-  [release checklist](docs/mvp1-release-checklist.md) for outstanding evidence
-  and owner screen-reader/operational checks.
+- Live scheduled refresh is explicitly deferred by the owner; live scheduling
+  is disabled as owner-reported. Protected rehearsal completed as owner-reported
+  with `dry_run=true`, `limit=1` and the embedding step skipped. No matching run
+  URL or independent outcome/count evidence is accessible read-only. Historical
+  skipped schedules and the earlier activation-variable 403 remain inspection
+  limits, not a live processing result. Automatic metadata freshness is not yet
+  verified; metadata may become stale. Activation is a **GitHub Actions** variable,
+  not a Vercel variable, and still needs separate approval.
+- MVP 1 is owner-accepted for invited beta, not a claim of accessibility
+  compliance or live semantic quality. Browser/assistive-technology versions,
+  exact announcements, execution timestamps and new screenshots were not
+  supplied with owner confirmation. See the [release checklist](docs/mvp1-release-checklist.md)
+  for evidence provenance and the three deferrals. Invitations require separate
+  approval; this documentation PR authorizes no operational changes.
 - Possible duplicate RAWG candidates are tracked as a data-quality issue.
   Records are never merged on title similarity alone.
 - There are no notifications, comments, blocking, or private accounts yet.
 
 ## Next priorities
 
-Phase 4E: production quality and portfolio readiness. Measured
-performance and accessibility fixes, regression coverage for the critical
-journeys, redacted operational events, an engineering case study, and a small
-invited-beta session ([`docs/beta/invited-beta-checklist.md`](docs/beta/invited-beta-checklist.md)).
+MVP 1 release acceptance is complete for the verified production revision;
+Phase 4E's invited-beta evaluation and portfolio follow-up remain owner-led.
+Prepare a small invited-beta session using the
+[beta checklist](docs/beta/invited-beta-checklist.md) only after separate invitation
+approval; no participant research or outreach has been performed by this PR.
 Notifications, billing, mini-games, new providers, and personalized
 recommendations are outside this phase.

@@ -1,15 +1,135 @@
 # MVP 1 release checklist — Phase 4E
 
-**Decision, 2026-09-30: MVP 1 engineering closeout complete; beta acceptance pending these owner checks.**
-**MVP 1 NOT ACCEPTED.** Invited beta cannot begin until owner acceptance is
-recorded. The checklist below retains migration/deployment, real-account,
-manual accessibility and operational gates. The owner merged
-[PR #22](https://github.com/jedemarco1030/favalog/pull/22) into `main` at
-`f1a392e2d43dad39e690383451b829b77824f361`. No new merge, deployment, hosted
-migration/write, user-record deletion, secret change, schedule activation, or
-paid embedding invocation is authorized by this checklist.
+**Decision, 2026-09-30: MVP 1 ACCEPTED for an invited beta by the owner against the verified production release.**
+Engineering CI, hosted migration and deployment identity are verified as recorded
+below. The owner now confirms Steps 3, 4 and 5 and explicitly accepts the three
+deferrals below. Owner-reported results are not assistant-observed sessions or
+new automated passes. Invitations still require separate approval. This
+documentation-only update to PR #24 does not authorize a merge, deployment,
+hosted migration/write, user-record change, secret change, schedule activation,
+embedding run or invitation.
 
-## Final PR and post-merge verification
+## Reconciled acceptance record (2026-09-30)
+
+This record reconciles the preceding read-only migration audit, inspected main
+CI and the owner's final acceptance supplied for PR #24. The earlier
+**not accepted / owner checks pending** decision is superseded by this explicit
+owner decision, not rewritten as an assistant-observed pass. Historical
+observations below remain dated evidence, not current blockers where superseded.
+
+### Final owner confirmation (reported, not independently observed)
+
+The owner confirms Steps 3, 4 and 5 of the browser-only checklist below:
+
+- Production account, save, persistence, visibility, isolation and social
+  journeys behave as expected.
+- Manual accessibility checks behave as expected.
+- The protected refresh rehearsal completed as expected with `dry_run=true`,
+  `limit=1`, the embedding step skipped and live scheduling disabled.
+
+The owner explicitly states: **“I accept MVP 1 for an invited beta against the
+verified production release.”** The owner retains RAWG live semantic embeddings,
+live scheduled refresh and live semantic-quality evaluation as explicit
+deferrals. This is release acceptance of the production identity below, not a
+new deployment or approval to send invitations.
+
+No browser/assistive-technology versions, exact announcement text, execution
+timestamps, screenshots, refresh run URL or redacted outcome counts were supplied
+with this confirmation; none is inferred from prior headless or CI evidence.
+These missing detail fields do not negate the owner's confirmation of the steps.
+Broad cross-media exclusion has only the recorded direct SQL/search evidence;
+no additional assistant-observed sweep is claimed.
+
+### Read-only refresh run lookup
+
+Both `gh run list --workflow catalog-refresh.yml --event workflow_dispatch` and
+the workflow-runs API filtered to `workflow_dispatch` returned no matching run
+(the API reported `total_count=0`). Accessible recent runs are historical skipped
+schedules, not the owner's rehearsal. **Rehearsal completed as owner-reported;
+matching run URL and independent GitHub outcome/count evidence unavailable.**
+Do not cite a skipped schedule as that rehearsal or call it unperformed. The
+owner reports disabled live scheduling; the earlier 403 remains a limit on
+independent configuration inspection, not a contradiction of owner confirmation.
+
+- **Reviewed main revision:** `b017f839e12a541278511a5bf69a7240d35fdd8a`, after
+  [PR #23](https://github.com/jedemarco1030/favalog/pull/23). Application,
+  workflow, script and migration trees are unchanged from `f1a392e`; #23 changed
+  documentation and retained screenshots only.
+- **Recorded production identity:** <https://favalog.vercel.app>, deployment
+  `dpl_Gx3wtzXB1bwvb7DLhVVRWdptKxw8`, **READY**, source SHA matching the reviewed
+  revision. Deployment URL:
+  <https://favalog-efs150j2r-jedemarco1030s-projects.vercel.app>.
+- **Recorded database target:** Vercel production Supabase configuration matches
+  connected project ref `bbfutvrzdrutuijmslpl`. No configuration values or
+  account details are reproduced here.
+
+### Required gates and evidence limits
+
+| Gate                                            | Recorded result                                                                                                                                                                                                                                                                                  | Acceptance status / remaining evidence                                                                                                                                                                                                                                                                            |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Engineering CI                                  | Latest main run `36778248362` passed all six jobs; logs and downloaded invocation reports inspected below.                                                                                                                                                                                       | Satisfied for `b017f83`; skipped tests are not passes.                                                                                                                                                                                                                                                            |
+| Hosted migration ledger                         | All 35 migration versions/names match, with no missing/extra entries; `20260930180000_separate_demonstration_catalog.sql` is recorded.                                                                                                                                                           | Satisfied by the preceding read-only audit. Do not reapply or repair it.                                                                                                                                                                                                                                          |
+| Installed retrieval/materialization guards      | Keyword, semantic, hybrid and compatible-embedding reads contain the exact legacy exclusion. Materialization has both candidate exclusions and both alias-conflict guards. Zero provider aliases point to the 28 exact legacy identities.                                                        | Satisfied for the inspected definitions/identities, not a live semantic-quality claim.                                                                                                                                                                                                                            |
+| Production revision                             | Recorded Ready deployment source equals `b017f839e12a541278511a5bf69a7240d35fdd8a`.                                                                                                                                                                                                              | Deployment identity directly verified; production acceptance now owner-reported against this release.                                                                                                                                                                                                             |
+| Demonstration exclusion and saved records       | Production “paper watch” search returns zero local results; `/title/paper-watch` resolves with the demonstration notice. Migration preserves identities/references.                                                                                                                              | Direct exclusion observations retain their limited scope. Owner confirms Step 3 account/save/persistence journeys and accepts this release; no new assistant sweep or authenticated observation claimed.                                                                                                          |
+| Authenticated production journeys               | Signed-out Save reaches sign-in with the selected title in `returnTo`.                                                                                                                                                                                                                           | Owner confirms Step 3 production account, save, persistence, visibility, isolation and social journeys behave as expected. Accepted as owner-reported evidence, not inferred from fixtures or directly replayed by the assistant.                                                                                 |
+| Manual accessibility and safe failure rehearsal | Automated Linux x86_64 / HeadlessChrome 151.0.0.0; first production Tab reaches the skip link; loaded production Home at 320×800 dark has no page-level overflow. OS distribution/version unavailable; no VoiceOver/NVDA session.                                                                | Owner confirms Step 4 manual accessibility checks behave as expected, accepting its keyboard/dialog, announcements, actual zoom/reflow, contrast/incomplete-target and safe failure checklist. Versions, announcement text and captures not supplied; this is not an assistant-observed or automated manual pass. |
+| Protected refresh rehearsal and schedule state  | Owner confirms Step 5 protected rehearsal completed as expected: `dry_run=true`, `limit=1`, embedding step skipped, live scheduling disabled. Read-only matching run lookup returns no run; URL, independent outcome and counts unavailable. Earlier 403/protection observations are historical. | Satisfied for owner acceptance on reported Step 5 results; no independently inspected run or current protection/activation metadata claimed. Dry-run acceptance does not verify live processing or automatic metadata freshness.                                                                                  |
+| Owner release decision                          | Owner explicitly accepts MVP 1 for an invited beta against the verified production release, with the three retained deferrals.                                                                                                                                                                   | MVP 1 ACCEPTED on owner-reported Steps 3–5 plus existing verified engineering/hosted evidence. No invitation or operational change authorized.                                                                                                                                                                    |
+
+### Deferrals and user impact
+
+| Item                             | Recorded disposition                                                                                                                              | User impact / release treatment                                                                                                                                                         |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RAWG live semantic embeddings    | Explicitly retained by the owner in final beta acceptance. Provider permission unresolved; independent activation still required.                 | Games retain keyword discovery/search only. Fixture semantics are not live RAWG semantic support.                                                                                       |
+| Live semantic-quality evaluation | Explicitly retained by the owner pending genuine-provider judgments; fixture golden data refuses paid live evaluation.                            | No live relevance or corpus-completeness acceptance claim. This does not waive normal search or production smoke checks.                                                                |
+| Live scheduled refresh           | Explicitly retained by the owner in final beta acceptance; live scheduling disabled as owner-reported. Separate approval required for activation. | Automatic metadata freshness is not yet verified; metadata may become stale. Owner-confirmed dry run is not live scheduled processing. Follow up before separately approved activation. |
+
+The owner has now supplied the required confirmation and explicit release
+decision, retaining only the three deferrals above. Their operational/provider
+limits and follow-up remain visible; acceptance does not waive them or enable
+anything. Missing run links or environment details remain missing evidence,
+not invented detail. A 403, skipped job, fixture-only result or viewport proxy
+is still never promoted to a direct or automated pass.
+
+## Latest passing main CI — PR #23
+
+[Main CI 36778248362](https://github.com/jedemarco1030/favalog/actions/runs/36778248362)
+completed **success** on exact main source
+`b017f839e12a541278511a5bf69a7240d35fdd8a` (started 2026-09-30 21:15 UTC).
+All six jobs passed, including execution-count gates, required artifact uploads
+and local Supabase cleanup. No workflow was dispatched or rerun for this review.
+
+Validation logs record **1,615 tests across 166 files**, formatting, lint,
+typecheck, coverage, production build and Storybook build. Database logs record
+**617 pgTAP tests across 19 files**. Downloaded generated types are byte-identical
+to committed `lib/database.types.ts`, SHA-256
+`72f4b396a36b70146cc61442c0eeb3d61ba695504373e2b644e4c07522020702`.
+
+Downloaded `e2e-results-explore-integration`, `e2e-results-social`,
+`e2e-results-likes` and `e2e-results-no-env` independently confirm the invocation
+counts in the next section's table: configured 15 passes/one paid-semantic skip,
+20 first-list repetitions plus auth setup, 34 fixtures including setup, eight
+individual provider-layout passes, production fixture-refusal one pass, feed and
+likes one pass each, default no-env 44 passes/six skips, explicit no-env five
+passes. All executed tests passed first attempt; zero failed/invalid tests,
+retries, flaky outcomes or runner errors. Every report identifies `b017f83`.
+The six default skips are five list journeys and one favorites journey; they
+remain skipped, not authenticated production verification.
+
+Downloaded `quality-evidence-configured-fixtures` confirms Save trapping/focus
+restoration and zero dialog/form axe violations or incomplete targets; 320 px
+reflow has no overflow on the four inspected pages. `configured-zoom-200.json`
+is a **640 px viewport proxy**, not actual browser zoom. Sixteen contrast scans
+still contain `aria-prohibited-attr`, `aria-valid-attr-value` and mobile Explore
+`color-contrast` incomplete findings. These automated findings remain in the
+artifact; manual checklist acceptance is now owner-reported in Step 4, not a
+recomputed axe result or fabricated target-by-target report. The
+`quality-evidence-no-env` artifact and required `portfolio-screenshots` upload
+are present. No new visual-capture or manual accessibility pass is claimed here;
+previous genuine-provider and synthetic fixture captures stay separately dated.
+
+## PR #22 and first post-merge verification (historical)
 
 [Final PR CI 36771309279](https://github.com/jedemarco1030/favalog/actions/runs/36771309279)
 is **completed, success**, application source
@@ -36,7 +156,8 @@ byte-identical to the committed file (SHA-256
 `72f4b396a36b70146cc61442c0eeb3d61ba695504373e2b644e4c07522020702`).
 All E2E invocations have zero failed/invalid tests and zero runner errors.
 The configured skip needs real paid-semantic credentials/corpus; the six no-env
-skips are four list placeholders plus authenticated deletion/favorites.
+skips are five list journeys (including deletion) plus favorites. They are not
+executed authenticated checks.
 
 Inspected artifacts: `e2e-results-explore-integration`, `e2e-results-social`,
 `e2e-results-likes`, `e2e-results-no-env`, `quality-evidence-configured-fixtures`,
@@ -96,7 +217,8 @@ must be confirmed before beta acceptance.
 ## Historical inspected post-merge baseline
 
 [CI 36749917450](https://github.com/jedemarco1030/favalog/actions/runs/36749917450)
-ran against the exact main source above. Its overall conclusion is **failure**,
+ran against source `1c076a3eb4b94672251ca64e6ab33475a4311fe1`, not current
+`b017f83`. Its overall conclusion is **failure**,
 not green: likes failed during Supabase startup, before Playwright executed.
 Downloaded JSON artifacts were inspected separately from job conclusions.
 
@@ -252,14 +374,15 @@ images decoded and no horizontal overflow; the
 [quality evidence index](quality/baseline.md#follow-up-source-evidence-2026-09-30)
 links the retained `*-provider-preview.png` images. `q=portal` shows genuine
 federated TMDB results below the empty local section; missing artwork is honest.
-Other search inspection still exposed legacy rows because the hosted migration
-is intentionally unapplied: these checks do not prove migrated retrieval.
-Authentic production Home captures remain under
-`docs/screenshots/home-*-production.png`; production search still showed legacy
-titles. A fresh authenticated Save capture requires isolated CI or an
+At that earlier capture point, search still exposed legacy rows and migrated
+retrieval was unverified. The subsequent read-only audit recorded above confirms
+the hosted migration and its installed guards; these earlier images are not
+post-migration acceptance evidence. Authentic production Home captures remain
+under `docs/screenshots/home-*-production.png`; the earlier production search
+inspection showed legacy titles. A fresh authenticated Save capture requires isolated CI or an
 owner-controlled session, not an unauthorized hosted save.
 
-## Remaining engineering and deployment gates
+## Engineering, deployment and remaining owner gates
 
 - [x] Open/update [PR #22](https://github.com/jedemarco1030/favalog/pull/22) and
       inspect application source `5847189027249bc3a9b939cc490af9c90f4f6340`.
@@ -275,36 +398,60 @@ owner-controlled session, not an unauthorized hosted save.
       inspected. Provider captures use `5847189`; Save uses its isolated CI
       fixtures, clearly labelled as synthetic test evidence only.
 - [x] Owner merged reviewed PR #22 after successful final-source PR CI.
-- [x] Verify **new post-merge main CI `36773633454`**, completed success on
-      `f1a392e`, and independently inspect all required invocation reports,
-      quality evidence, screenshots, pgTAP logs and generated types.
-- [ ] Owner confirms whether forward migration
-      `20260930180000_separate_demonstration_catalog.sql` is already applied.
-      If not, separately approve/apply it after a fresh alias-conflict check,
-      then deploy/confirm the reviewed application revision. Never apply
-      `seed.sql` to hosted production. Verify exclusion and saved-record access
-      before inviting participants. No backfill or identity reconciliation is
-      implicitly authorized.
+- [x] Verify first post-merge main CI `36773633454` on `f1a392e` and its
+      independent reports/captures (historical evidence above).
+- [x] Verify **latest main CI `36778248362`** on `b017f83`; independently inspect
+      invocation reports, validation/pgTAP logs, quality evidence and byte-identical
+      generated types. Required screenshot upload is present; no fresh manual
+      visual or accessibility acceptance is claimed.
+- [x] Recorded read-only audit confirms all 35 hosted migration versions/names,
+      applied `20260930180000`, installed exclusion/alias-conflict guards and
+      zero provider-alias conflicts on the 28 legacy identities. No migration
+      application, repair, seed, backfill or identity reconciliation is needed
+      or authorized by this documentation PR.
+- [x] Recorded production deployment `dpl_Gx3wtzXB1bwvb7DLhVVRWdptKxw8` is
+      Ready on reviewed `b017f839e12a541278511a5bf69a7240d35fdd8a`.
+- [x] Owner confirms Step 3 production account, save, persistence, visibility,
+      isolation and social journeys behave as expected. Direct demonstration
+      exclusion observations retain their recorded scope, not a new broad sweep.
+- [x] Owner confirms Step 4 manual accessibility checks behave as expected.
+      Browser/assistive-technology versions and announcement details were not
+      supplied and are not fabricated.
+- [x] Owner confirms Step 5 protected refresh rehearsal completed as expected,
+      `dry_run=true`, `limit=1`, embedding step skipped, live scheduling disabled.
+      Matching run link and independent outcome/count evidence remain unavailable.
+- [x] Owner explicitly retains RAWG live semantic embeddings, live scheduled
+      refresh and live semantic-quality evaluation as beta deferrals, with
+      limitations and follow-up recorded above.
+- [x] Owner explicitly accepts MVP 1 for an invited beta against the verified
+      production revision. No new release/deployment is created by this decision.
+- [ ] Obtain separate invitation approval before contacting participants; no
+      invitations are authorized or sent under this PR.
 
 ## Browser-only owner acceptance
 
-1. In GitHub Actions, retain final-source PR run `36771309279` and new main
-   run `36773633454` with their required reports; the historical failed job does
-   not need another rerun to substitute for current evidence. If binding recurs,
-   retain scoped socket-owner diagnostics and request a cause-specific fix,
-   rather than rerunning until green. Follow the current engineering decision
-   above before proceeding.
-2. In Supabase Dashboard, confirm the applied-migration history for
-   `20260930180000_separate_demonstration_catalog.sql`. If absent, first obtain
-   separate migration approval and inspect its exact alias-conflict guard against
-   the intended project. Apply only that reviewed forward SQL, never `seed.sql`;
-   an alias conflict blocks application and needs separate reconciliation.
-   In Vercel's project Deployments, confirm the reviewed main revision is Ready
-   after the schema gate. Then, signed out, check Home and
-   Explore discovery first across all media types; search real TMDB/Open Library/
-   RAWG titles, inspect attribution, counts/filters/page URLs and artwork. Paper
-   Watch/Under the Eaves must not appear as ordinary production results. A saved
-   legacy title route must still resolve with its demonstration indication.
+This reference checklist preserves the scope used for owner acceptance. The
+owner now confirms Steps 3, 4 and 5 and explicitly accepts the verified release
+with the three deferrals above. Retained instructions below are not fresh pending
+gates or authorization to repeat account writes or hosted workflow operations
+under this PR. Step 2's direct evidence remains limited to the recorded audit/
+search/route observations; final acceptance is the owner's release decision.
+
+1. Retain latest main run `36778248362` on reviewed `b017f83` and its required
+   reports, plus historical PR/main runs `36771309279` / `36773633454`. Existing
+   evidence has been inspected; no rerun is needed to replace a historical
+   failure. If binding recurs in future CI, retain scoped socket-owner diagnostics
+   and request a cause-specific fix rather than rerunning until green.
+2. Use the recorded applied-migration and Ready deployment identity above;
+   **do not reapply the migration or redeploy as part of this reconciliation**.
+   If the owner later observes target/revision drift, stop for a new review;
+   never apply `seed.sql` to production or repair/reconcile identities implicitly.
+   Complete broad signed-out Home/Explore discovery checks across media types:
+   real TMDB/Open Library/RAWG search, attribution, counts/filters/page URLs and
+   artwork. Paper Watch/Under the Eaves must not appear as ordinary production
+   results. Then use an owner-controlled authenticated session to verify existing
+   saved legacy records still resolve and retain their references/labels; the
+   public `/title/paper-watch` observation alone does not satisfy that check.
 3. With owner-controlled accounts, check Save sign-in continuation, first/new/
    existing-list save, refresh and duplicate prevention; check diary/reviews/
    favorites, account isolation, follow/unfollow/feed, review/list likes and
@@ -315,9 +462,12 @@ owner-controlled session, not an unauthorized hosted save.
    failure rehearsal. Record VoiceOver/Safari or NVDA/browser versions and actual
    announcements. Check **actual 200% browser zoom**, 320 px reflow, reduced
    motion and light/dark artwork contrast. Review axe incomplete targets.
-5. GitHub **Settings → Environments → catalog-refresh**: the read-only API
-   currently reports **no reviewer protections and no branch policy**. Review
-   and configure owner-approved protections before rehearsal; verify secret names `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_PROJECT_REF`,
+5. GitHub **Settings → Environments → catalog-refresh**: before the owner's
+   final confirmation, the read-only API reported **no reviewer protections and
+   no branch policy**. The owner now confirms the protected rehearsal completed
+   as expected; current protections were not independently re-inspected. Reference
+   procedure: review owner-approved protections and verify secret names
+   `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_PROJECT_REF`,
    `TMDB_API_READ_TOKEN`; do not share their values. Ensure the URL's project ref
    matches the intended project. Keep `CATALOG_REFRESH_ENABLED` unset/`false`.
    **Actions → Catalog metadata refresh → Run workflow → branch `main` after
@@ -327,19 +477,30 @@ owner-controlled session, not an unauthorized hosted save.
    stale-embedding backfill skipped**. Record redacted checked/changed/unchanged/
    failed/unavailable counts (at most one checked row). `checked=0` proves only a
    no-work rehearsal, not metadata processing. Do not run `dry_run=false`.
-6. Record explicit owner acceptance in the PR. Only after all required evidence
-   exists use the [invited-beta checklist](beta/invited-beta-checklist.md).
+6. Record results or explicit reviewed deferrals for every required gate, using
+   the reviewer/date, scope, reason, user-impact, mitigation and follow-up fields
+   above. Record an explicit owner release decision against the reviewed/deployed
+   revision. Only after acceptance **and separate invitation approval** use the
+   [invited-beta checklist](beta/invited-beta-checklist.md).
 
-Latest five observed scheduled refresh runs were **skipped**; newest
+Historical direct refresh observations: the latest five accessible scheduled
+runs were **skipped**; newest
 [36702695138](https://github.com/jedemarco1030/favalog/actions/runs/36702695138).
-Scheduling is not operationally verified, and no protected hosted dry run was
-performed here. GitHub Actions configuration is separate from Vercel Vars.
-Live scheduling and paid embedding work require separate approval. RAWG remains
-keyword discovery/search only until permission **and** independent activation
-are verified. Optional deferral must be owner-recorded with user impact, never
-silently converted into a passed release gate.
+The earlier activation-variable 403 limited independent inspection; skipped runs
+alone did not prove a disabled flag. These are not the owner's protected
+rehearsal. That rehearsal is now **completed as owner-reported**, with
+`dry_run=true`, `limit=1`, embedding step skipped and live scheduling disabled.
+The matching run URL and independent GitHub outcome/count evidence are
+unavailable in the read-only lookup. No checked-row count, zero-write log or
+live processing outcome is invented. A dry run does not verify automatic
+metadata freshness. GitHub Actions configuration is separate from Vercel Vars.
+Live scheduling and embedding work remain deferred and require separate approval;
+RAWG remains keyword discovery/search only until permission **and** independent
+activation are verified.
 
-The inspected final PR and new post-merge main evidence now support:
-**“MVP 1 engineering closeout complete; beta acceptance pending these owner checks.”**
-This is not MVP 1 acceptance and does not authorize invitations, hosted writes,
-live scheduling, or paid embedding work. Owner acceptance must be explicit.
+Latest main CI and recorded migration/deployment evidence, together with final
+owner-reported Steps 3–5 and the three explicit owner-retained deferrals, support:
+**“MVP 1 ACCEPTED by the owner for an invited beta against the verified production release.”**
+The prior pending decision is superseded. This is not permission to merge,
+deploy, change hosted data, activate scheduling, run embeddings or send
+invitations. No such operation was performed by this documentation update.
