@@ -621,7 +621,11 @@ Status:
   preview check.
 - **Not hosted or production-verified.** No migrations are required.
 
-## Remaining gaps
+## Historical remaining gaps (pre-Phase 4E)
+
+The following list preserves the pre-closeout planning record. Current status
+and accepted deferrals are reconciled in the closeout evidence above; this is
+not a list of new blockers for the accepted beta.
 
 - Community reviews still render from the `@/lib/data` mock layer rather than
   real Supabase reads. Home's activity is now real (Phase 4B.2), but there is
@@ -642,7 +646,7 @@ Status:
 - Growth and monetization have not started. Portfolio packaging begins in
   Phase 4E (below).
 
-## Phase 4E — Production quality and portfolio readiness (in progress)
+## Phase 4E — Production quality and portfolio readiness (owner-accepted)
 
 The earlier two-PR plan has been delivered across the baseline/evidence and
 quality-fix PRs through #20. It is retained in Git history, not described as
@@ -664,37 +668,175 @@ measurements.
 Out of scope: notifications, billing, mini-games, new providers, and
 personalized recommendations.
 
+## Post-MVP 1 priorities (2026-09-30 planning revision)
+
+MVP 1's accepted scope is a complete first-use journey: browse genuine popular
+films, series, books and games; search by title or keywords; save to an existing
+or newly created list; return to that record; follow people and interact with
+their activity. Keep this scope stable for the invited beta. The priorities
+below are planned work, not shipped capabilities or new acceptance evidence.
+
+### Phase 4F — Invited beta and observed friction (next)
+
+Run the existing [invited-beta sessions](beta/invited-beta-checklist.md) with
+an owner-selected initial cohort, suggested at 5–10 cross-media enthusiasts.
+Invitations remain owner-controlled. Gather consented, private notes about
+discovery, registration, first save, list retrieval, following and return use.
+Record task completion with/without help, search misses, confusing moments and
+whether participants return after approximately a week. These are proposed
+observations, not current traffic, retention or statistical evidence.
+
+Prioritize failures that stop registration, recovery, finding a title, saving
+or retrieving it; then repeated confusion. Summarize findings without names,
+emails, private lists or raw participant searches. The existing session script
+can cover these observations without a new analytics system. Before the next
+feature increment, choose the smallest improvement supported by the findings.
+
+**Account baseline, not an auth redesign.** Repository review confirms existing
+sign-up, email confirmation, sign-in, forgot-password and update-password paths,
+server-side input checks, neutral reset responses and password-manager
+autocomplete. Public production registration and recovery pages were inspected
+read-only; email delivery and completed password changes were not exercised by
+that inspection. Preserve previously recorded owner acceptance without
+inventing additional end-to-end recovery evidence.
+
+When checking readiness for external participants, ensure confirmation and
+recovery email reaches an ordinary address outside the Supabase project team.
+Supabase's default sender is restricted to team addresses; a production email
+provider/custom SMTP setup is needed for other recipients. If already
+configured and verified, this is covered, not new implementation work. Verify
+that recovery completes, invalid/expired links give a useful next step, the new
+password works, the old password fails and saved content survives. Verify
+hosted password enforcement matches the form's advertised requirements; do not
+infer hosted policy or email settings from committed application code.
+
+Keep registration short. More required profile fields, a password-strength
+meter, MFA and a large settings area are not requirements for this beta.
+Clear password guidance, accessible feedback, password-manager/paste support,
+correct email links and a recognizable sender matter more than elaborate
+templates. A strength meter is advisory; enforcement must remain server-side
+and consistent with Supabase.
+
+### Phase 4G — Account controls, trust and portability (after initial feedback)
+
+Build a focused account/settings surface when beta evidence supports it:
+editing profile details, account email/password controls, clear privacy choices
+and a documented route to support. Evaluate export and account-deletion
+self-service before expanding beyond a small invited cohort. Prefer a few
+reliable controls over an empty dashboard of future settings.
+
+Treat show/hide password, accessible strength feedback, confirmation resend
+with rate limits, clearer transactional email and optional social sign-in as
+small usability candidates, not one required bundle. Add optional MFA only
+with enrollment, challenge, removal and loss-of-factor recovery designed and
+tested together. MFA is a separate security feature, not another registration
+field. Operator-account security is independent of consumer feature scope.
+
+Before broad public social growth, plan reporting, blocking and moderation
+alongside any expansion of comments or notifications. Existing private and
+followers-only list behavior remains a core authorization contract. None of
+these proposed controls is represented as already available.
+
+### Phase 4H — Search quality and catalog operations (bounded technical work)
+
+The recommended first Python contribution is an **offline retrieval evaluation
+and catalog-quality tool**, not another production application service.
+Extend or consume the existing `eval:search` artifacts and contracts rather than
+replacing the TypeScript retrieval implementation or duplicating its fixture CI.
+
+Use a small, versioned, genuine-provider evaluation set with independently
+reviewed relevance judgments and documented provenance. Compare keyword and
+hybrid retrieval using top-result/title accuracy, ranked relevance, per-media
+coverage and measured latency; inspect aliases, ambiguous names, remakes and
+franchise queries. Report indexed local-catalog retrieval separately from
+external provider discovery so absent indexed records are not misrepresented
+as ranking defects. RAWG keyword results must remain separate from semantic
+coverage until permission and activation are resolved.
+
+A useful deliverable is a reproducible Python CLI, tested metric calculations,
+JSON/HTML reports and a short case study recording dataset/source revision,
+retrieval settings, actual baseline results, limitations and one measured
+improvement. Keep private user records and search logs out of the evaluation
+dataset. Do not commit provider payloads unless retention/redistribution is
+permitted; use permitted identifiers, redacted outputs or reproducible fetch
+instructions where appropriate. Paid calls, hosted writes, scheduled refresh
+and embeddings require their existing explicit gates. This is proposed work,
+not completed live semantic-quality acceptance.
+
+Catalog monitoring and eventual refresh activation belong here as separate
+owner-controlled work. The accepted deferrals remain intact: RAWG live
+embeddings, live scheduled refresh and live semantic-quality evaluation.
+Offline Python analysis can support future decisions without making the
+invited beta depend on those activations.
+
+### Later — Retention, differentiation and sustainable revenue
+
+Choose among a cross-media Up Next queue, simple personal/yearly stats,
+taste-based discovery, import/export and carefully scoped notifications using
+beta evidence. Personal stats must distinguish unique titles from log events
+and must not combine provider ratings into a fictitious common score.
+Streaming/store availability needs region-aware, licensed, fresh data and is
+a separate investigation, not an assumption about the current providers.
+
+Entertainment mini-games, news aggregation, console sync, native apps and
+billing are optional later experiments. Do not add them to finish MVP 1.
+Explore premium stats, advanced organization or personalization only after
+repeat use and willingness to pay are observed, with provider-use terms
+rechecked for the actual proposed commercial use.
+
+### Comparative product references
+
+These are research inputs, not commitments to copy competitors or claims of
+feature parity:
+
+- [Letterboxd](https://letterboxd.com/about/) emphasizes a personal diary,
+  watchlists, reviews and the follower activity loop; its
+  [paid plans](https://letterboxd.com/about/pro/) show personal statistics as a
+  possible later premium direction.
+- [Goodreads](https://www.goodreads.com/about/us) emphasizes reading status,
+  friends' activity and discovery through reviews/recommendations. For Favalog,
+  clear personal status and finding one's saved record come before more profile
+  fields.
+- [Reelgood's product-design explanation](https://ads.reelgood.com/what-to-watch-the-search-and-browse-experience/)
+  distinguishes effortless, imagery-led discovery from deliberate filtered
+  search. Favalog already has both browsing and search; improve their usefulness
+  through observed tasks before adding another news/content surface.
+- [The StoryGraph](https://thestorygraph.com/) emphasizes tracking, stats,
+  mood-based discovery and an Up Next queue. These are candidates for a
+  cross-media return-use experience, not MVP 1 requirements.
+
+Favalog's product hypothesis is a consistent personal and social record across
+four media types. Validate that convenience and the artwork-led experience
+with actual users rather than competing on feature count. Portfolio packaging
+can proceed alongside beta research: explain the identity, RLS, retrieval,
+provider-failure and CI tradeoffs with reproducible evidence. Adding Python is
+valuable when it answers a product/engineering question; a language checkbox
+does not establish proficiency or guarantee any hiring or compensation outcome.
+
 ## Agreed phase sequence
 
-1. **Product Reality and Discovery UX (delivered)** — real server-backed catalog
-   browsing, sorting, filtering, pagination, theming, and truthful documentation.
-2. **Social Graph and Network Loops** — follows, follower-aware visibility,
-   likes, notifications, and the social feedback loops around the personal
-   record.
-   - **Phase 4C (reprioritized, before the invited beta):** 4C.1 video-game
-     tracking via RAWG and 4C.2 artwork-led Home. Notifications follow as the
-     next social increment.
-3. **Entertainment mini-games** — lightweight entertainment-knowledge games
-   layered on the catalog. This is distinct from video-game tracking (4C.1).
-4. **Personalized AI Discovery** — personalized, taste-aware recommendations
-   built on the existing retrieval foundation.
-5. **Catalog and AI Operations** — scaling ingestion, embedding operations,
-   observability, and provider expansion (including the TMDB compliance gate).
-6. **Growth and Monetization** — acquisition, retention, and sustainable revenue.
-7. **Portfolio Packaging** — case studies, writeups, and presentation of the
-   work.
+This 2026-09-30 planning revision supersedes the earlier ordering that put
+entertainment mini-games immediately after social features. Completed phases
+and dated evidence above remain historical records.
 
-### Outcomes per phase
-
-| Phase                             | Product                                                                     | Technical                                                                                                            | Career                                                                          | Branding                                                    |
-| --------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| 1. Product Reality & Discovery UX | A visitor can genuinely browse and theme the real catalog, not just a demo. | A server-only browse DAL with stable ordering, bounded pagination, validated URL state, and a no-flash theme system. | Demonstrates production data plumbing, accessibility, and honest documentation. | A polished, editorial, light/dark-ready first impression.   |
-| 2. Social Graph & Network Loops   | People connect around their records and get feedback.                       | Real follows/likes/notifications with RLS and safe fan-out.                                                          | Shows social-system and authorization design.                                   | Positions Favalog as a social platform, not a solo tracker. |
-| 3. Entertainment mini-games       | A fun, sticky reason to return.                                             | Deterministic, catalog-backed game logic with fair scoring.                                                          | Demonstrates playful product thinking on real data.                             | Distinctive, memorable brand moments.                       |
-| 4. Personalized AI Discovery      | Recommendations that feel personally tuned.                                 | Taste modeling on top of the existing embedding/retrieval seam.                                                      | Shows applied ML/retrieval judgment with guardrails.                            | "Discovery that gets you" as a brand promise.               |
-| 5. Catalog & AI Operations        | A larger, fresher, more trustworthy catalog.                                | Robust ingestion/embedding ops, observability, provider governance.                                                  | Demonstrates operational maturity and compliance discipline.                    | Trust through accuracy and attribution.                     |
-| 6. Growth & Monetization          | A sustainable, growing product.                                             | Acquisition, retention, and billing infrastructure done safely.                                                      | Shows business and growth literacy.                                             | A credible, fundable brand story.                           |
-| 7. Portfolio Packaging            | A clearly communicated body of work.                                        | Reproducible writeups and demos.                                                                                     | A strong, honest portfolio artifact.                                            | Consistent, professional external presentation.             |
+1. **MVP 1 closeout (Phase 4E, owner-accepted)** — preserve the working discovery,
+   search, save and social journeys and the three explicit deferrals.
+2. **Invited beta and observed friction (Phase 4F, next)** — learn from real
+   first-use and return-use sessions; fix blocking defects and repeated confusion.
+3. **Account controls and trust (Phase 4G)** — improve recovery/settings,
+   portability and social safety in response to feedback and rollout scale.
+4. **Search quality and catalog operations (Phase 4H)** — a bounded Python
+   evaluation project and separately gated freshness/embedding work; can proceed
+   alongside beta without widening its runtime scope.
+5. **Retention and personalized discovery** — select queue, stats, notifications
+   or taste-aware features based on evidence of what makes people return.
+6. **Growth and monetization** — validate value and willingness to pay before
+   building billing or premium tiers.
+7. **Optional experiments** — entertainment mini-games, news and new
+   integrations only when there is a product reason.
+8. **Portfolio packaging (parallel)** — document verified technical decisions,
+   real measurements and what user feedback changed; never invent usage,
+   relevance, revenue or performance claims.
 
 ## Historical non-goals for Phase 1 — Product Reality
 
