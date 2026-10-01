@@ -7,32 +7,52 @@ behavioral tracking. Each of those needs separate owner approval.
 
 ## Release gate (2026-09-30)
 
-**Do not invite participants yet.** The owner merged
-[PR #22](https://github.com/jedemarco1030/favalog/pull/22) at main
-`f1a392e2d43dad39e690383451b829b77824f361`, identical tree to final review source
-`cf82d647d5ccbb685ec5aba25b9c5e48a7ecaa37`.
-[Final PR CI 36771309279](https://github.com/jedemarco1030/favalog/actions/runs/36771309279)
-passed with 1,615 unit/component tests, 617 pgTAP tests, unchanged types,
-34 retry-free fixtures, 20 retry-free first-list repetitions plus setup, and
-executed feed/likes. Configured Explore has 15 passes/one paid-semantic skip;
-eight provider-layout invocations each pass, as does production fixture-refusal.
-Default no-env has 44 passes/six intentional skips; explicit no-env has five
-passes. No E2E retries/flaky outcomes occurred. New post-merge main
-[CI 36773633454](https://github.com/jedemarco1030/favalog/actions/runs/36773633454)
-completed successfully. Its separately downloaded reports confirm the same
-counts, zero retries/flaky outcomes, required quality/capture artifacts and
-unchanged generated types. **MVP 1 engineering closeout complete; beta
-acceptance pending these owner checks.** The
-[release checklist](../mvp1-release-checklist.md) records the inspected evidence;
-engineering completion alone does not authorize invitations.
+**MVP 1 NOT ACCEPTED — do not invite participants.** After merged
+[PR #23](https://github.com/jedemarco1030/favalog/pull/23), reviewed main is
+`b017f839e12a541278511a5bf69a7240d35fdd8a`.
+[Latest main CI 36778248362](https://github.com/jedemarco1030/favalog/actions/runs/36778248362)
+passed all six jobs. Inspected logs/downloaded reports confirm 1,615
+unit/component tests, 617 pgTAP tests, byte-identical types, 34 retry-free
+fixtures, 20 retry-free first-list repetitions plus setup, and executed
+feed/likes. Configured Explore has 15 passes/one paid-semantic skip; eight
+provider-layout invocations and production fixture-refusal pass. Default no-env
+has 44 passes/six intentional skips; explicit no-env has five passes. Zero
+E2E retries/flaky outcomes or runner errors. Skips do not establish unavailable
+live checks. The preceding read-only audit confirms the hosted migration ledger,
+installed exclusion/alias-conflict guards and a Ready production deployment on
+the reviewed SHA; these are no longer unapplied-migration blockers.
 
-Before invitations, the owner must confirm migration/deployment status, verify
-saved-record access and real-account isolation/save/social flows, perform
-screen-reader/actual-zoom/incomplete-target acceptance, and complete the approved
-read-only refresh rehearsal. `catalog-refresh` currently has no reviewer or
-branch protections configured; review these before rehearsal. Keep schedules
-and paid embeddings off. This document does not authorize any hosted operation
-or invitation, and no acceptance gate is silently waived.
+**Engineering closeout complete; owner release acceptance pending.** The
+[reconciled acceptance record](../mvp1-release-checklist.md#reconciled-acceptance-record-2026-09-30)
+is authoritative. Neither deployment readiness nor local fixtures establish
+real-account or accessibility acceptance.
+
+Before acceptance, the owner must verify authenticated saved-record access,
+post-login Save continuation, existing/new-list saves, duplicate prevention and
+refresh, cross-media saving, two-account isolation, private/followers-only access
+and revocation, feed/likes and diary/reviews/favorites. Manual keyboard/dialog,
+screen-reader announcements, actual 200% zoom, narrow surfaces, light/dark
+contrast, axe incomplete-target review and a safe nonproduction partial-failure
+rehearsal remain open. The recorded headless skip-link and 320 px Home checks
+are partial evidence, not manual passes.
+
+Protected refresh rehearsal is also unperformed: no run URL or counts. Owner
+review of `catalog-refresh` protections and secret names/target, schedule-state
+confirmation and separately approved `dry_run=true`, `limit=1` evidence with
+zero writes and a skipped embedding step are still required. Recorded schedules
+skipped; activation-variable access returned **403**, so its current value is
+unknown, not verified disabled. No reviewer/branch protections were configured
+at inspection. Do not dispatch a workflow or activate anything under this PR.
+
+RAWG live semantic embeddings and genuine-provider semantic-quality evaluation
+are documented deferrals, with keyword-only games and no live relevance/corpus
+claim. Intentional deferral of live scheduled refresh is **not owner-confirmed**;
+manual/accessibility/account/operational gaps have no reviewed release waiver.
+Any proposed deferral must record owner reviewer/date, scope, reason, user
+impact, mitigation and follow-up in the release checklist, followed by an
+explicit release decision. Even after acceptance, invitations need separate
+owner approval. No deployment, production write, scheduling, embeddings or
+invitation is authorized here.
 
 ### Historical candidates
 
@@ -52,11 +72,10 @@ default no-env has 44 passes/six intentional skips; explicit no-env has five
 passes/no skips. No revised-source E2E retries or flaky outcomes were recorded.
 At that point the demonstration-separation follow-up still needed final
 workflow/documentation-branch and new main CI; current evidence is above.
-Owner migration/deployment and accessibility/operational acceptance remain
-separate gates.
-Use the browser-only steps in the
-[release checklist](../mvp1-release-checklist.md). No gate has been silently
-deferred. Games support keyword discovery/search; do not promise RAWG live
+At that historical point, owner migration/deployment and accessibility/operational
+acceptance were separate gates; the later hosted audit resolves only migration
+and deployment identity. Use the current browser-only owner steps in the
+[release checklist](../mvp1-release-checklist.md). No gate is silently deferred. Games support keyword discovery/search; do not promise RAWG live
 semantic search. Production Home portfolio screenshots are real baseline
 captures, not acceptance evidence for this follow-up.
 

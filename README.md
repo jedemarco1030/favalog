@@ -5,26 +5,26 @@ organizing, and discovering **movies, TV series, books, and video games** in one
 cross-media record. Discovery is led by external providers. The canonical
 catalog stores only the titles people actually engage with.
 
-> Status reconciled on **2026-09-30** after the owner merged
-> [PR #22](https://github.com/jedemarco1030/favalog/pull/22): `main` at
-> `f1a392e2d43dad39e690383451b829b77824f361`, identical tree to reviewed source
-> `cf82d647d5ccbb685ec5aba25b9c5e48a7ecaa37`.
-> [Final PR CI](https://github.com/jedemarco1030/favalog/actions/runs/36771309279)
-> passed: 1,615 unit/component tests, 617 pgTAP tests, byte-identical generated
-> types, 34 retry-free fixtures, 20 retry-free first-list repetitions, and
-> executed likes/feed. The new [main CI](https://github.com/jedemarco1030/favalog/actions/runs/36773633454)
-> completed successfully; its separately downloaded reports confirm the same
-> retry-free counts. **MVP 1 engineering closeout complete; beta acceptance
-> pending these owner checks.** Migration/deployment, real-account, manual
-> accessibility and operational checks remain in the
-> [release checklist](docs/mvp1-release-checklist.md).
-> Merge and fixture CI do not establish hosted migration or owner acceptance.
-> Each capability
-> below is labelled by its evidence: implemented in code, CI-verified,
-> owner-confirmed in production, or unverified/deferred. The authoritative
-> per-capability table is the "Status reconciliation" section of
-> [`docs/product-roadmap.md`](docs/product-roadmap.md). The earlier, longer
-> README is preserved verbatim at
+> Status reconciled on **2026-09-30**, after merged
+> [PR #23](https://github.com/jedemarco1030/favalog/pull/23), against `main`
+> `b017f839e12a541278511a5bf69a7240d35fdd8a`.
+> [Latest main CI 36778248362](https://github.com/jedemarco1030/favalog/actions/runs/36778248362)
+> passed all six jobs. Inspected logs/downloaded reports confirm 1,615
+> unit/component tests, 617 pgTAP tests, byte-identical generated types,
+> 34 retry-free fixtures, 20 retry-free first-list repetitions plus setup,
+> and executed feed/likes. One paid-semantic and six default no-env skips remain
+> skips, not passes. The preceding read-only audit confirms all 35 hosted
+> migration versions/names, installed demonstration-exclusion guards and a Ready
+> production deployment on the reviewed SHA. **MVP 1 engineering closeout
+> complete; MVP 1 NOT ACCEPTED.** Authenticated production/saved-record checks,
+> manual accessibility and protected refresh rehearsal/schedule-state
+> confirmation remain open, with no reviewed release deferral supplied for them.
+> The [release checklist](docs/mvp1-release-checklist.md#reconciled-acceptance-record-2026-09-30)
+> is authoritative; the [roadmap](docs/product-roadmap.md#current-closeout-evidence-2026-09-30)
+> separates current evidence from historical owner-confirmed baselines. CI and
+> deployment readiness do not establish owner acceptance or authorize
+> invitations, deployments, production writes, scheduling or embeddings.
+> The earlier, longer README is preserved verbatim at
 > [`docs/history/readme-through-phase-4d.md`](docs/history/readme-through-phase-4d.md).
 
 ## Live demo and screenshots
@@ -32,13 +32,14 @@ catalog stores only the titles people actually engage with.
 - **Live deployment:** <https://favalog.vercel.app>
 - **Screenshots:** fresh read-only production Home captures on **2026-09-30**,
   with decoded genuine RAWG artwork, at 1280×900 and 390×844. They show the
-  deployed baseline, not this unapplied follow-up or release acceptance.
+  deployed baseline at capture time, not authenticated release acceptance.
   Offline fixture captures are separate test evidence, never authentic covers.
 - **Genuine provider preview captures:** final application-source desktop/mobile
   Home, Explore, search and title images are retained in the
   [quality evidence index](docs/quality/baseline.md#follow-up-source-evidence-2026-09-30).
-  The hosted retrieval migration is not yet applied; authenticated Save evidence
-  comes separately from isolated CI fixtures.
+  The subsequent read-only audit confirms the hosted retrieval migration is
+  applied; authenticated Save evidence remains isolated CI fixtures, not a
+  fresh owner-controlled production session.
 - **Engineering case study:** [`docs/case-study.md`](docs/case-study.md).
 
 ![Production Home with genuine RAWG artwork, captured read-only](docs/screenshots/home-desktop-production.png)
@@ -162,26 +163,33 @@ production behavior.
 
 ## Known limitations
 
-- The demonstration-separation follow-up requires owner application of
-  `20260930180000_separate_demonstration_catalog.sql` before deployment acceptance.
-  Saved IDs/routes/references are preserved; ordinary discovery excludes only
-  the known demonstration identities, not every internal catalog title.
+- The read-only audit confirms hosted migration
+  `20260930180000_separate_demonstration_catalog.sql` and its installed guards.
+  It preserves saved IDs/routes/references and excludes the 28 exact legacy
+  demonstration identities, not every internal catalog title. Authenticated
+  saved-record access and broad cross-media production exclusion remain unverified.
 - The synthetic golden dataset is now local-fixture-only. Live semantic-quality
   evaluation is explicitly deferred until genuine-provider judgments are reviewed;
   the evaluator refuses paid calls against that fixture dataset.
-- Inspected post-merge CI `36749917450` passed 20 retry-free first-list journeys
-  and 34 fixtures, but failed likes startup on port 54324 before tests executed.
-  Its results do not verify this follow-up or authorize an invited beta.
+- Historical CI `36749917450` failed likes startup before execution. Later
+  inspected main runs, latest `36778248362`, execute feed/likes and the retry-free
+  first-list/fixture journeys successfully. That supersedes the engineering
+  blocker, not the unknown original socket owner or owner release gates.
 
 - RAWG content is not semantically searchable (see above).
 - Community reviews on some surfaces still come from the labelled mock layer.
 - Catalog-refresh scheduling exists, but the five latest observed scheduled
   runs skipped the refresh job (latest: `36702695138`, inspected 2026-09-30). This is not evidence
   of processing. Activation is a **GitHub Actions** variable, not a Vercel
-  environment variable; owner operational acceptance is still required.
-- MVP 1 is **not yet accepted**. See the
-  [release checklist](docs/mvp1-release-checklist.md) for outstanding evidence
-  and owner screen-reader/operational checks.
+  environment variable. Recorded activation-variable access returned 403, so
+  its current value is unknown, not confirmed disabled. Protected dry-run
+  rehearsal, schedule-state confirmation and any intentional scheduling deferral
+  remain owner checks; no workflow is dispatched here.
+- MVP 1 is **not accepted**: authenticated production/saved-record flows, manual
+  assistive technology/actual zoom/contrast and safe failure/operational rehearsals
+  have no completed results or reviewed release waivers. See the
+  [release checklist](docs/mvp1-release-checklist.md). Invitations still require
+  separate approval; this documentation PR authorizes no operational changes.
 - Possible duplicate RAWG candidates are tracked as a data-quality issue.
   Records are never merged on title similarity alone.
 - There are no notifications, comments, blocking, or private accounts yet.

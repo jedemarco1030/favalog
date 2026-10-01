@@ -1,10 +1,11 @@
 # Favalog product roadmap
 
 > Living document. Last reconciled: 2026-09-30 (Phase 4E closeout), against
-> post-merge `main` at `f1a392e` (merged PR #22). Final PR evidence is verified;
-> the new main run is reviewed separately in
-> [the release checklist](mvp1-release-checklist.md). Beta acceptance still needs
-> explicit owner migration/deployment, accessibility and operational checks.
+> post-merge `main` at `b017f83` (merged PR #23). Latest main CI and recorded
+> hosted migration/deployment identity are verified in
+> [the release checklist](mvp1-release-checklist.md#reconciled-acceptance-record-2026-09-30).
+> MVP 1 is **not accepted**: authenticated production/saved-record, manual
+> accessibility and operational owner checks remain open, not silently deferred.
 > Update this file whenever a phase
 > ships, a capability becomes production-verified, or the agreed sequence
 > changes. When a statement is only true at a point in time, keep it and date it
@@ -12,35 +13,57 @@
 
 ## Current closeout evidence (2026-09-30)
 
+After merged [PR #23](https://github.com/jedemarco1030/favalog/pull/23),
+[latest main CI 36778248362](https://github.com/jedemarco1030/favalog/actions/runs/36778248362)
+completed successfully on `b017f839e12a541278511a5bf69a7240d35fdd8a`.
+Inspected logs and downloaded reports confirm **1,615 unit/component tests
+across 166 files**, **617 pgTAP tests across 19 files**, byte-identical generated
+types, 34 first-attempt fixtures, 20 first-list repetitions plus auth setup,
+configured Explore 15 passes/one paid-semantic skip, eight provider-layout
+passes, production fixture-refusal one pass, feed/likes one pass each, default
+no-env 44 passes/six skips and explicit no-env five passes. Zero executed E2E
+failures, retries, flaky outcomes or runner errors; all six jobs, formatting,
+lint, typecheck, coverage and both builds passed. Skips remain skips.
+
+**MVP 1 engineering closeout complete; MVP 1 NOT ACCEPTED.** The preceding
+read-only migration/acceptance record supplies the hosted results below, not a
+new authenticated session or signed owner release decision. The
+[release checklist](mvp1-release-checklist.md#reconciled-acceptance-record-2026-09-30)
+records full evidence, limits, blockers and deferral treatment.
+
+| Current capability / gate                          | Evidence                                                                                                                                                                                           | Release status                                                                                                                                                                     |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Engineering closeout                               | Latest main CI `36778248362`; required execution reports and quality artifacts inspected.                                                                                                          | Verified for `b017f83`, not production owner acceptance.                                                                                                                           |
+| Hosted migration and project identity              | All 35 versions/names match; Vercel production config matches connected Supabase ref. `20260930180000` is recorded, exclusions/alias guards installed, zero aliases on 28 exact legacy identities. | Verified by preceding read-only audit; not pending application.                                                                                                                    |
+| Production deployment                              | `dpl_Gx3wtzXB1bwvb7DLhVVRWdptKxw8` Ready on exact reviewed `b017f83`.                                                                                                                              | Deployment identity verified; authenticated smoke still pending.                                                                                                                   |
+| Demonstration separation and saved records         | “paper watch” has zero local production search results; labelled `/title/paper-watch` still resolves; migration preserves identities/references.                                                   | Partial production observation; broad exclusion and authenticated existing-record access remain open.                                                                              |
+| Save and personal/social journeys                  | Signed-out Save retains selected title in sign-in `returnTo`; local fixture/feed/likes and RLS tests pass.                                                                                         | Fresh authenticated continuation, list saves/duplicates/refresh, cross-media, two-account isolation, visibility/revocation, feed/likes and diary/reviews/favorites still required. |
+| Accessibility and safe partial failure             | CI Save focus/axe and 320 px reflow checks pass; recorded production skip link and 320 px Home check.                                                                                              | No screen-reader announcements or actual 200% zoom; light/dark contrast, axe incomplete targets, other narrow surfaces and safe nonproduction failure rehearsal remain open.       |
+| Catalog refresh                                    | Recorded five skipped schedules; no manual-dispatch rehearsal; no reviewer/branch protections at inspection; activation-variable read 403.                                                         | No processing or verified-disabled flag claim. Protected `dry_run=true`, `limit=1` rehearsal, schedule-state confirmation and owner review remain required.                        |
+| RAWG semantic embeddings / live quality evaluation | RAWG permission unresolved; genuine-provider evaluation judgments pending.                                                                                                                         | Documented scope/tooling deferrals: keyword-only games and no live relevance/corpus-completeness claim.                                                                            |
+
+Intentional live-scheduling deferral still needs owner confirmation with user
+impact (unverified automatic freshness); it is not inferred from a skipped run
+or this task's no-activation constraint. No remaining account, accessibility or
+operational gate has a reviewed release waiver. Acceptance requires recorded
+results or explicit owner-reviewed deferrals (reviewer/date, scope, reason,
+impact, mitigation, follow-up), followed by an explicit release decision.
+Nothing here authorizes invitations, deployment, hosted writes, scheduling or
+embedding runs.
+
+### PR #22 evidence before the hosted audit
+
 The owner merged [PR #22](https://github.com/jedemarco1030/favalog/pull/22),
 final source `cf82d647d5ccbb685ec5aba25b9c5e48a7ecaa37`, into main
 `f1a392e2d43dad39e690383451b829b77824f361` with an identical tree.
 [Final PR CI 36771309279](https://github.com/jedemarco1030/favalog/actions/runs/36771309279)
-completed successfully. Downloaded reports confirm **1,615 unit/component tests
-across 166 files**, **617 pgTAP tests across 19 files**, unchanged generated
-types, 34 fixture passes, 20 first-list repetitions plus auth setup, configured
-Explore 15 passes/one intentional paid-semantic skip, eight provider-layout
-passes, production fixture-refusal one pass, feed and likes one pass each.
-Default no-env has 44 passes/six intentional skips; explicit no-env has five
-passes. Every executed E2E test passed first attempt, with zero retries/flaky
-outcomes or runner errors. Formatting, lint, typecheck and both builds passed.
-
-The final CI fix reserves local Supabase ports before image pulls, preserving
-Linux reservations, and prevents dependent Explore suites running after failed
-setup while still failing the job. No tests, report requirements, assertions,
-retries or timeouts were weakened. Original historical socket ownership remains
-unknown. [New main CI 36773633454](https://github.com/jedemarco1030/favalog/actions/runs/36773633454)
-completed successfully. Separately downloaded main reports confirm every
-count and zero-retry result above, along with quality/screenshot artifacts and
-byte-identical generated types; validation/database logs confirm both test
-counts. **MVP 1 engineering closeout complete; beta acceptance pending these
-owner checks.** Hosted migration/deployment, real-account saved-record flows,
-manual accessibility and operational rehearsal remain acceptance dependencies.
-
-Fresh refresh inspection found five skipped schedules, no configured reviewer
-or branch protections on `catalog-refresh`, and a 403 when reading the activation
-variable. Owner review and a separately approved read-only rehearsal remain
-required. Nothing was activated or written remotely.
+and [first main CI 36773633454](https://github.com/jedemarco1030/favalog/actions/runs/36773633454)
+passed; their separately inspected reports confirm the counts above. Main
+`b017f83` leaves application, workflow, script and migration trees unchanged;
+#23 added documentation and retained screenshots. The CI fix reserves local
+Supabase ports before image pulls and gates dependent suites on successful
+setup without relaxing tests, artifacts, assertions, retries or timeouts.
+Original historical socket ownership remains unknown.
 
 ### Historical candidates and baseline
 
@@ -616,9 +639,11 @@ future work here. Closeout PR #21 restores discovery-first Explore, corrects
 artwork-backed screenshot/quality readiness, retains first-failure traces,
 adds retry-free first-list repetitions, and completes per-invocation CI gates.
 
-MVP 1 is **not accepted yet**. Final-source CI counts/artifacts and owner
-screen-reader, actual zoom, contrast, operational rehearsal, and production
-smoke results are explicit gates in the
+MVP 1 is **not accepted yet**. Latest main CI counts/artifacts, the hosted
+migration and deployed SHA are verified. Authenticated production/saved-record
+smoke, screen-reader announcements, actual zoom, contrast/manual axe review,
+safe partial-failure rehearsal and protected refresh/schedule-state acceptance
+remain open, with no reviewed release waiver. See the
 [release checklist](mvp1-release-checklist.md). The existing
 [invited-beta script](beta/invited-beta-checklist.md) stays a future owner-led
 activity, not evidence of completed user research. No performance improvement
@@ -682,9 +707,11 @@ the owner-controlled hosted rollout.
 The following remain deferred and are not implied by the Phase 4B.1 delivery or
 the locally implemented Phase 4B.2 feed:
 
-- Operational acceptance of scheduled catalog refresh: the workflow is
-  installed, but observed scheduled jobs skipped. Hosted write activation and
-  bounded processing evidence remain owner-controlled (see the release checklist).
+- Live scheduled catalog refresh remains owner-controlled and unverified:
+  observed schedules skipped, and activation-variable access returned 403.
+  Intentional release deferral is not yet owner-confirmed; automatic freshness
+  may be unavailable. Protected dry-run rehearsal and schedule-state confirmation
+  remain acceptance gates, not passed checks (see the release checklist).
 - Live RAWG embedding, until permission is documented.
 - Notifications, email, and push.
 - Moderation.
